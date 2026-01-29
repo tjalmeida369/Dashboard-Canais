@@ -966,7 +966,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new2.xlsx"
+file_path = "base_final_trt_new2.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -3209,7 +3209,7 @@ with tab4:
     def load_ligacoes_data_lig():
         """Carrega dados de ligações com tratamento especial"""
         try:
-            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes.xlsx"
+            ligacoes_path = "televendas_ligacoes.xlsx"
             df_ligacoes_lig = pd.read_excel(ligacoes_path)
             
             # Filtrar apenas TIPO_DADOS = REAL
@@ -4168,5 +4168,6 @@ def create_logo_html():
         </div>
     </div>
     """
+
 
 st.markdown(create_logo_html(), unsafe_allow_html=True)
