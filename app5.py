@@ -966,6 +966,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
+#C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\
 file_path = "base_final_trt_new2.xlsx"
 df = load_data(file_path)
 
@@ -1543,287 +1544,287 @@ with tab1:
                 value=plataformas_ativas
             )
     
-    # =========================
-    # GRÁFICO DE LINHAS TEMPORAL
-    # =========================
+# =========================
+# GRÁFICO DE LINHAS TEMPORAL
+# =========================
+with st.container():
+    st.markdown("""
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <div style="font-size: 18px; color: #333333; font-weight: 600;">
+                📈 EVOLUÇÃO MENSAL - COMPARATIVO ANUAL
+            </div>
+            <div style="font-size: 12px; color: #FF2800; font-weight: 600; padding: 4px 10px; 
+                        background: rgba(255, 40, 0, 0.08); border-radius: 4px;">
+                ANÁLISE TEMPORAL
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
     with st.container():
-        st.markdown("""
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                <div style="font-size: 18px; color: #333333; font-weight: 600;">
-                    📈 EVOLUÇÃO MENSAL - COMPARATIVO ANUAL
-                </div>
-                <div style="font-size: 12px; color: #FF2800; font-weight: 600; padding: 4px 10px; 
-                            background: rgba(255, 40, 0, 0.08); border-radius: 4px;">
-                    ANÁLISE TEMPORAL
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns(4)
         
-        with st.container():
-            col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns(4)
-            
-            with col_filtro1:
-                st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">CANAL</div>', unsafe_allow_html=True)
-                canal_selecionado = st.selectbox(
-                    "Selecione o Canal",
-                    options=["Todos"] + sorted(df_filtered['CANAL_PLAN'].unique()),
-                    key="filtro_canal_linhas",
-                    label_visibility="collapsed"
-                )
-            
-            with col_filtro2:
-                st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">REGIONAL</div>', unsafe_allow_html=True)
-                regional_selecionada = st.selectbox(
-                    "Selecione a Regional",
-                    options=["Todos"] + sorted(df_filtered['REGIONAL'].unique()),
-                    key="filtro_regional_linhas",
-                    label_visibility="collapsed"
-                )
-            
-            with col_filtro3:
-                st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">INDICADOR</div>', unsafe_allow_html=True)
-                indicador_selecionado = st.selectbox(
-                    "Selecione o Indicador",
-                    options=["Todos"] + sorted(df_filtered['DSC_INDICADOR'].unique()),
-                    key="filtro_indicador_linhas",
-                    label_visibility="collapsed"
-                )
-            
-            with col_filtro4:
-                st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">PLATAFORMA</div>', unsafe_allow_html=True)
-                plataforma_selecionada = st.selectbox(
-                    "Selecione a Plataforma",
-                    options=["Todos"] + sorted(df_filtered['COD_PLATAFORMA'].unique()),
-                    key="filtro_plataforma_linhas",
-                    label_visibility="collapsed"
-                )
-        
-        # Aplicar filtros
-        df_grafico = df_filtered.copy()
-        
-        if canal_selecionado != "Todos":
-            df_grafico = df_grafico[df_grafico['CANAL_PLAN'] == canal_selecionado]
-        if regional_selecionada != "Todos":
-            df_grafico = df_grafico[df_grafico['REGIONAL'] == regional_selecionada]
-        if indicador_selecionado != "Todos":
-            df_grafico = df_grafico[df_grafico['DSC_INDICADOR'] == indicador_selecionado]
-        if plataforma_selecionada != "Todos":
-            df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
-        
-        # Criar dados para gráfico
-        df_linhas = create_line_chart_data(df_grafico)
-        
-        # Criar título dinâmico
-        filtros_ativos = []
-        if canal_selecionado != "Todos":
-            filtros_ativos.append(f"Canal: {canal_selecionado}")
-        if regional_selecionada != "Todos":
-            filtros_ativos.append(f"Regional: {regional_selecionada}")
-        if indicador_selecionado != "Todos":
-            filtros_ativos.append(f"Indicador: {indicador_selecionado}")
-        if plataforma_selecionada != "Todos":
-            filtros_ativos.append(f"Plataforma: {plataforma_selecionada}")
-        
-        titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
-        
-        # Criar gráfico
-        cores_personalizadas = {
-            '2024': '#FF2800',
-            '2025': '#790E09',
-            '2026': '#5A6268'
-        }
-        
-        fig_linhas = px.line(
-            df_linhas,
-            x='Mês',
-            y='Valor',
-            color='Ano',
-            title=f'<b>📈 EVOLUÇÃO MENSAL</b><br><span style="font-size: 13px; color: #666666;">Comparativo Anual | {titulo_filtros}</span>',
-            labels={'Valor': '', 'Mês': ''},
-            markers=True,
-            line_shape='spline',
-            color_discrete_map=cores_personalizadas,
-            text='Valor_Formatado'
-        )
-        
-        fig_linhas.update_layout(
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font=dict(family='Segoe UI', size=13, color='#333333'),
-            margin=dict(l=40, r=40, t=70, b=60),
-            xaxis=dict(
-                title='',
-                tickmode='array',
-                tickvals=['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-                tickfont=dict(size=12, color='#666666'),
-                showgrid=False,
-                linecolor='#E9ECEF',
-                linewidth=1,
-                mirror=True,
-                tickangle=0,
-                showline=True,
-                zeroline=False
-            ),
-            yaxis=dict(
-                title='',
-                tickfont=dict(size=12, color='#666666'),
-                showgrid=True,
-                gridcolor='rgba(233, 236, 239, 0.3)',
-                linecolor='#E9ECEF',
-                linewidth=1,
-                mirror=True,
-                showline=True,
-                zeroline=False
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.25,
-                xanchor="right",
-                x=1,
-                bgcolor='rgba(255, 255, 255, 0.9)',
-                bordercolor='#E9ECEF',
-                borderwidth=1,
-                font=dict(size=12, color='#333333'),
-                itemwidth=40,
-                itemclick=False,
-                itemdoubleclick=False,
-                title=None
-            ),
-            title=dict(
-                x=0.5,
-                xanchor='center',
-                yanchor='top',
-                font=dict(size=16, color='#333333', weight='bold'),
-                y=0.95
-            ),
-            hovermode='x unified',
-            hoverlabel=dict(
-                bgcolor='white',
-                font_size=12,
-                font_family='Segoe UI',
-                bordercolor='#E9ECEF',
-                font_color='#333333'
-            ),
-            height=420
-        )
-        
-        for i, trace in enumerate(fig_linhas.data):
-            ano = trace.name
-            trace.update(
-                mode='lines+markers+text',
-                marker=dict(size=9, line=dict(width=1.5, color='white'), symbol='circle', opacity=0.9),
-                line=dict(width=3, smoothing=1.3),
-                textposition='top center',
-                textfont=dict(size=10, color=cores_personalizadas[ano], weight='bold'),
-                hovertemplate=(
-                    f"<b>%{{x}}/{ano}</b><br>" +
-                    "Valor: <b>%{y:,.0f}</b><br>" +
-                    "<extra></extra>"
-                )
+        with col_filtro1:
+            st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">CANAL</div>', unsafe_allow_html=True)
+            canal_selecionado = st.selectbox(
+                "Selecione o Canal",
+                options=["Todos"] + sorted(df_filtered['CANAL_PLAN'].unique()),
+                key="filtro_canal_linhas",
+                label_visibility="collapsed"
             )
-            
-            if ano == '2026':
-                trace.update(
-                    line=dict(width=3, dash='dash', color=cores_personalizadas[ano]),
-                    marker=dict(size=9, line=dict(width=1.5, color='white'), symbol='diamond', opacity=0.9)
-                )
         
-        # Container de informações
-        st.markdown(f"""
-            <div style="background: #F8F9FA; 
-                        padding: 8px 12px; 
-                        border-radius: 8px; 
-                        border: 1px solid #E9ECEF;
-                        margin: 10px 0 5px 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 13px; color: #333333;">
-                        <span style="font-weight: 600;">📊 Dados Filtrados:</span>
-                        <span style="color: #FF2800; font-weight: 700; margin-left: 5px;">{len(df_grafico):,}</span>
-                    </div>
-                    <div style="font-size: 12px; color: #666666; display: flex; gap: 15px;">
-                        <span style="display: inline-flex; align-items: center;">
-                            <div style="width: 10px; height: 10px; background: #FF2800; border-radius: 50%; margin-right: 5px;"></div>
-                            2024 (Real)
-                        </span>
-                        <span style="display: inline-flex; align-items: center;">
-                            <div style="width: 10px; height: 10px; background: #790E09; border-radius: 50%; margin-right: 5px;"></div>
-                            2025 (Real)
-                        </span>
-                        <span style="display: inline-flex; align-items: center;">
-                            <div style="width: 10px; height: 10px; background: #5A6268; border-radius: 50%; margin-right: 5px; border: 1px solid #E9ECEF;"></div>
-                            2026 (Meta) <span style="color: #5A6268; margin-left: 3px;">— —</span>
-                        </span>
-                    </div>
+        with col_filtro2:
+            st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">REGIONAL</div>', unsafe_allow_html=True)
+            regional_selecionada = st.selectbox(
+                "Selecione a Regional",
+                options=["Todos"] + sorted(df_filtered['REGIONAL'].unique()),
+                key="filtro_regional_linhas",
+                label_visibility="collapsed"
+            )
+        
+        with col_filtro3:
+            st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">INDICADOR</div>', unsafe_allow_html=True)
+            indicador_selecionado = st.selectbox(
+                "Selecione o Indicador",
+                options=["Todos"] + sorted(df_filtered['DSC_INDICADOR'].unique()),
+                key="filtro_indicador_linhas",
+                label_visibility="collapsed"
+            )
+        
+        with col_filtro4:
+            st.markdown('<div style="font-size: 12px; color: #666666; margin-bottom: 8px; font-weight: 600;">PLATAFORMA</div>', unsafe_allow_html=True)
+            plataforma_selecionada = st.selectbox(
+                "Selecione a Plataforma",
+                options=["Todos"] + sorted(df_filtered['COD_PLATAFORMA'].unique()),
+                key="filtro_plataforma_linhas",
+                label_visibility="collapsed"
+            )
+    
+    # Aplicar filtros
+    df_grafico = df_filtered.copy()
+    
+    if canal_selecionado != "Todos":
+        df_grafico = df_grafico[df_grafico['CANAL_PLAN'] == canal_selecionado]
+    if regional_selecionada != "Todos":
+        df_grafico = df_grafico[df_grafico['REGIONAL'] == regional_selecionada]
+    if indicador_selecionado != "Todos":
+        df_grafico = df_grafico[df_grafico['DSC_INDICADOR'] == indicador_selecionado]
+    if plataforma_selecionada != "Todos":
+        df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
+    
+    # Criar dados para gráfico
+    df_linhas = create_line_chart_data(df_grafico)
+    
+    # Criar título dinâmico
+    filtros_ativos = []
+    if canal_selecionado != "Todos":
+        filtros_ativos.append(f"Canal: {canal_selecionado}")
+    if regional_selecionada != "Todos":
+        filtros_ativos.append(f"Regional: {regional_selecionada}")
+    if indicador_selecionado != "Todos":
+        filtros_ativos.append(f"Indicador: {indicador_selecionado}")
+    if plataforma_selecionada != "Todos":
+        filtros_ativos.append(f"Plataforma: {plataforma_selecionada}")
+    
+    titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
+    
+    # Criar gráfico
+    cores_personalizadas = {
+        '2024': '#FF2800',
+        '2025': '#790E09',
+        '2026': '#5A6268'
+    }
+    
+    fig_linhas = px.line(
+        df_linhas,
+        x='Mês',
+        y='Valor',
+        color='Ano',
+        title=f'<b>📈 EVOLUÇÃO MENSAL</b><br><span style="font-size: 13px; color: #666666;">Comparativo Anual | {titulo_filtros}</span>',
+        labels={'Valor': '', 'Mês': ''},
+        markers=True,
+        line_shape='spline',
+        color_discrete_map=cores_personalizadas,
+        text='Valor_Formatado'
+    )
+    
+    fig_linhas.update_layout(
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(family='Segoe UI', size=13, color='#333333'),
+        margin=dict(l=40, r=40, t=70, b=60),
+        xaxis=dict(
+            title='',
+            tickmode='array',
+            tickvals=['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
+            tickfont=dict(size=12, color='#666666'),
+            showgrid=False,
+            linecolor='#E9ECEF',
+            linewidth=1,
+            mirror=True,
+            tickangle=0,
+            showline=True,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title='',
+            tickfont=dict(size=12, color='#666666'),
+            showgrid=True,
+            gridcolor='rgba(233, 236, 239, 0.3)',
+            linecolor='#E9ECEF',
+            linewidth=1,
+            mirror=True,
+            showline=True,
+            zeroline=False
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.25,
+            xanchor="right",
+            x=1,
+            bgcolor='rgba(255, 255, 255, 0.9)',
+            bordercolor='#E9ECEF',
+            borderwidth=1,
+            font=dict(size=12, color='#333333'),
+            itemwidth=40,
+            itemclick=False,
+            itemdoubleclick=False,
+            title=None
+        ),
+        title=dict(
+            x=0.5,
+            xanchor='center',
+            yanchor='top',
+            font=dict(size=16, color='#333333'),
+            y=0.95
+        ),
+        hovermode='x unified',
+        hoverlabel=dict(
+            bgcolor='white',
+            font_size=12,
+            font_family='Segoe UI',
+            bordercolor='#E9ECEF',
+            font_color='#333333'
+        ),
+        height=420
+    )
+    
+    for i, trace in enumerate(fig_linhas.data):
+        ano = trace.name
+        trace.update(
+            mode='lines+markers+text',
+            marker=dict(size=9, line=dict(width=1.5, color='white'), symbol='circle', opacity=0.9),
+            line=dict(width=3, smoothing=1.3),
+            textposition='top center',
+            textfont=dict(size=10, color=cores_personalizadas[ano]),  # REMOVI weight='bold'
+            hovertemplate=(
+                f"<b>%{{x}}/{ano}</b><br>" +
+                "Valor: <b>%{y:,.0f}</b><br>" +
+                "<extra></extra>"
+            )
+        )
+        
+        if ano == '2026':
+            trace.update(
+                line=dict(width=3, dash='dash', color=cores_personalizadas[ano]),
+                marker=dict(size=9, line=dict(width=1.5, color='white'), symbol='diamond', opacity=0.9)
+            )
+    
+    # Container de informações
+    st.markdown(f"""
+        <div style="background: #F8F9FA; 
+                    padding: 8px 12px; 
+                    border-radius: 8px; 
+                    border: 1px solid #E9ECEF;
+                    margin: 10px 0 5px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 13px; color: #333333;">
+                    <span style="font-weight: 600;">📊 Dados Filtrados:</span>
+                    <span style="color: #FF2800; font-weight: 700; margin-left: 5px;">{len(df_grafico):,}</span>
+                </div>
+                <div style="font-size: 12px; color: #666666; display: flex; gap: 15px;">
+                    <span style="display: inline-flex; align-items: center;">
+                        <div style="width: 10px; height: 10px; background: #FF2800; border-radius: 50%; margin-right: 5px;"></div>
+                        2024 (Real)
+                    </span>
+                    <span style="display: inline-flex; align-items: center;">
+                        <div style="width: 10px; height: 10px; background: #790E09; border-radius: 50%; margin-right: 5px;"></div>
+                        2025 (Real)
+                    </span>
+                    <span style="display: inline-flex; align-items: center;">
+                        <div style="width: 10px; height: 10px; background: #5A6268; border-radius: 50%; margin-right: 5px; border: 1px solid #E9ECEF;"></div>
+                        2026 (Meta) <span style="color: #5A6268; margin-left: 3px;">— —</span>
+                    </span>
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Exibir gráfico
+    st.plotly_chart(fig_linhas, width='stretch')
+    
+    # Insights
+    if not df_linhas.empty:
+        df_2024 = df_linhas[df_linhas['Ano'] == '2024']
+        df_2025 = df_linhas[df_linhas['Ano'] == '2025']
+        df_2026 = df_linhas[df_linhas['Ano'] == '2026']
         
-        # Exibir gráfico
-        st.plotly_chart(fig_linhas, width='stretch')
-        
-        # Insights
-        if not df_linhas.empty:
-            df_2024 = df_linhas[df_linhas['Ano'] == '2024']
-            df_2025 = df_linhas[df_linhas['Ano'] == '2025']
-            df_2026 = df_linhas[df_linhas['Ano'] == '2026']
+        if not df_2024.empty and not df_2025.empty:
+            crescimento_2024_2025 = ((df_2025['Valor'].sum() - df_2024['Valor'].sum()) / df_2024['Valor'].sum() * 100) if df_2024['Valor'].sum() > 0 else 0
             
-            if not df_2024.empty and not df_2025.empty:
-                crescimento_2024_2025 = ((df_2025['Valor'].sum() - df_2024['Valor'].sum()) / df_2024['Valor'].sum() * 100) if df_2024['Valor'].sum() > 0 else 0
-                
-                st.markdown("""
-                    <div style="background: #F8F9FA; 
-                                padding: 15px; 
-                                border-radius: 8px; 
-                                border: 1px solid #E9ECEF;
-                                margin-top: 10px;">
-                        <div style="font-size: 13px; 
-                                    color: #333333; 
-                                    font-weight: 600; 
-                                    margin-bottom: 12px;
-                                    padding-bottom: 8px;
-                                    border-bottom: 1px solid #E9ECEF;">
-                            💡 INSIGHTS DA ANÁLISE
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-                """, unsafe_allow_html=True)
-                
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    total_2025 = df_2025['Valor'].sum()
+            st.markdown("""
+                <div style="background: #F8F9FA; 
+                            padding: 15px; 
+                            border-radius: 8px; 
+                            border: 1px solid #E9ECEF;
+                            margin-top: 10px;">
+                    <div style="font-size: 13px; 
+                                color: #333333; 
+                                font-weight: 600; 
+                                margin-bottom: 12px;
+                                padding-bottom: 8px;
+                                border-bottom: 1px solid #E9ECEF;">
+                        💡 INSIGHTS DA ANÁLISE
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            """, unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                total_2025 = df_2025['Valor'].sum()
+                st.metric(
+                    label="Total 2025",
+                    value=f"{total_2025:,.0f}".replace(",", "."),
+                    delta=f"{crescimento_2024_2025:+.1f}% vs 2024" if crescimento_2024_2025 != 0 else None,
+                    label_visibility="visible"
+                )
+            
+            with col2:
+                if not df_2026.empty:
+                    meta_2026 = df_2026['Valor'].sum()
+                    alcance_meta = (df_2025['Valor'].sum() / meta_2026 * 100) if meta_2026 > 0 else 0
                     st.metric(
-                        label="Total 2025",
-                        value=f"{total_2025:,.0f}".replace(",", "."),
-                        delta=f"{crescimento_2024_2025:+.1f}% vs 2024" if crescimento_2024_2025 != 0 else None,
+                        label="Meta 2026",
+                        value=f"{meta_2026:,.0f}".replace(",", "."),
+                        delta=f"{alcance_meta:.1f}% do alcançado",
                         label_visibility="visible"
                     )
-                
-                with col2:
-                    if not df_2026.empty:
-                        meta_2026 = df_2026['Valor'].sum()
-                        alcance_meta = (df_2025['Valor'].sum() / meta_2026 * 100) if meta_2026 > 0 else 0
-                        st.metric(
-                            label="Meta 2026",
-                            value=f"{meta_2026:,.0f}".replace(",", "."),
-                            delta=f"{alcance_meta:.1f}% do alcançado",
-                            label_visibility="visible"
-                        )
-                
-                with col3:
-                    melhor_mes_2025 = df_2025.loc[df_2025['Valor'].idxmax()] if not df_2025.empty else None
-                    if melhor_mes_2025 is not None:
-                        st.metric(
-                            label="Melhor Mês 2025",
-                            value=f"{melhor_mes_2025['Mês'].title()}",
-                            delta=f"{melhor_mes_2025['Valor']:,.0f}".replace(",", "."),
-                            label_visibility="visible"
-                        )
-                
-                st.markdown("""
-                        </div>
+            
+            with col3:
+                melhor_mes_2025 = df_2025.loc[df_2025['Valor'].idxmax()] if not df_2025.empty else None
+                if melhor_mes_2025 is not None:
+                    st.metric(
+                        label="Melhor Mês 2025",
+                        value=f"{melhor_mes_2025['Mês'].title()}",
+                        delta=f"{melhor_mes_2025['Valor']:,.0f}".replace(",", "."),
+                        label_visibility="visible"
+                    )
+            
+            st.markdown("""
                     </div>
-                """, unsafe_allow_html=True)
+                </div>
+            """, unsafe_allow_html=True)
     
     # =========================
     # GRÁFICO DE BARRAS HORIZONTAIS
@@ -4168,6 +4169,5 @@ def create_logo_html():
         </div>
     </div>
     """
-
 
 st.markdown(create_logo_html(), unsafe_allow_html=True)
