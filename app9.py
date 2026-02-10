@@ -1149,7 +1149,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
+file_path = "base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -2810,7 +2810,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
+            file_path = "base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -5470,9 +5470,9 @@ with tab4:
     # =========================
     @st.cache_data(ttl=3600)
     def load_ligacoes_base():
-        """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
+        """Carrega dados REAIS de ligações (arquivo televendas_ligacoes2.xlsx)"""
         try:
-            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+            ligacoes_path = "televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -5575,7 +5575,7 @@ with tab4:
     def load_metas_ligacoes():
         """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
         try:
-            metas_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
+            metas_path = "base_final_trt_new3.xlsx"
             
             # Carregar dados
             df_metas = pd.read_excel(metas_path)
@@ -7208,3 +7208,4 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Plataforma filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
+
