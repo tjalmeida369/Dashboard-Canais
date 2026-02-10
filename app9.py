@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -956,6 +956,30 @@ st.markdown("""
             color: var(--ds-text) !important;
         }
 
+        /* Sidebar filters: keep layout compact and prevent chip overflow */
+        [data-testid="stSidebar"] [data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+            min-height: 44px !important;
+            max-height: 52px !important;
+            overflow: hidden !important;
+            align-items: center !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stMultiSelect"] div[data-baseweb="select"] > div > div {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            gap: 6px !important;
+            overflow: hidden !important;
+            align-items: center !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+            max-width: 120px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            padding: 2px 8px !important;
+        }
+
         /* Filtros com fundo vermelho: garantir texto branco */
         [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
         [data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
@@ -1167,21 +1191,21 @@ with st.sidebar:
     region_filter = st.multiselect(
         "**Regional:**", 
         options=df['REGIONAL'].unique(), 
-        default=df['REGIONAL'].unique(),
+        default=[],
         help="Selecione uma ou mais regionais"
     )
     
     canal_filter = st.multiselect(
         "**Canal:**", 
         options=df['CANAL_PLAN'].unique(), 
-        default=df['CANAL_PLAN'].unique(),
+        default=[],
         help="Selecione um ou mais canais"
     )
     
     data_filter = st.multiselect(
         "**Período:**", 
         options=df['dat_tratada'].unique(), 
-        default=df['dat_tratada'].unique(),
+        default=[],
         help="Selecione um ou mais períodos"
     )
     
@@ -1196,9 +1220,15 @@ with st.sidebar:
     st.markdown("**ℹ️ Informações:**")
     st.info(f"Total de registros: {len(df):,}")
 
+# Filtro vazio no widget = "Todos" para manter comportamento anterior
+region_filter_eff = region_filter if len(region_filter) > 0 else df['REGIONAL'].dropna().unique().tolist()
+canal_filter_eff = canal_filter if len(canal_filter) > 0 else df['CANAL_PLAN'].dropna().unique().tolist()
+data_filter_eff = data_filter if len(data_filter) > 0 else df['dat_tratada'].dropna().unique().tolist()
+indicador_filter_eff = indicador_filter if len(indicador_filter) > 0 else df['DSC_INDICADOR'].dropna().unique().tolist()
+
 # Aplicar filtros
 df_filtered = df.query(
-    "REGIONAL in @region_filter and CANAL_PLAN in @canal_filter and dat_tratada in @data_filter and DSC_INDICADOR in @indicador_filter"
+    "REGIONAL in @region_filter_eff and CANAL_PLAN in @canal_filter_eff and dat_tratada in @data_filter_eff and DSC_INDICADOR in @indicador_filter_eff"
 )
 
 # =========================
@@ -5470,7 +5500,7 @@ with tab4:
     # =========================
     @st.cache_data(ttl=3600)
     def load_ligacoes_base():
-        """Carrega dados REAIS de ligações (arquivo televendas_ligacoes2.xlsx)"""
+        """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
             ligacoes_path = "televendas_ligacoes2.xlsx"
             
@@ -7208,4 +7238,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Plataforma filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
