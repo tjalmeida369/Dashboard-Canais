@@ -1656,21 +1656,15 @@ with tab1:
         meses_com_datas.sort(key=lambda x: x[1])
         meses_ordenados = [mes for mes, _ in meses_com_datas]
         
-        # Para Ativados, abrir sempre no mês fechado (mês anterior ao mês corrente)
+        # Para Ativados, abrir sempre no mês atual
         mes_atual_formatado = get_mes_atual_formatado()
-        mes_fechado_referencia = get_mes_anterior(mes_atual_formatado)
         
         if len(meses_ordenados) > 0:
-            if mes_fechado_referencia in meses_ordenados:
-                idx_padrao = meses_ordenados.index(mes_fechado_referencia)
+            if mes_atual_formatado in meses_ordenados:
+                idx_padrao = meses_ordenados.index(mes_atual_formatado)
             else:
-                # Fallback: usa o mês disponível mais recente até a referência fechada
-                data_ref = mes_ano_para_data(mes_fechado_referencia)
-                indices_validos = [
-                    i for i, mes in enumerate(meses_ordenados)
-                    if mes_ano_para_data(mes) <= data_ref
-                ]
-                idx_padrao = indices_validos[-1] if indices_validos else len(meses_ordenados) - 1
+                # Fallback: usa o mês disponível mais recente
+                idx_padrao = len(meses_ordenados) - 1
         else:
             idx_padrao = 0
         
@@ -4291,9 +4285,10 @@ with tab3:
             meses_com_datas_pedidos.sort(key=lambda x: x[1])
             meses_ordenados_pedidos = [mes for mes, _ in meses_com_datas_pedidos]
             
-            # Encontrar índice do mês atual (dez/25)
-            if 'dez/25' in meses_ordenados_pedidos:
-                idx_padrao_pedidos = meses_ordenados_pedidos.index('dez/25')
+            # Encontrar índice do mês atual
+            mes_atual_formatado_pedidos = get_mes_atual_formatado()
+            if mes_atual_formatado_pedidos in meses_ordenados_pedidos:
+                idx_padrao_pedidos = meses_ordenados_pedidos.index(mes_atual_formatado_pedidos)
             else:
                 idx_padrao_pedidos = len(meses_ordenados_pedidos) - 1
             
