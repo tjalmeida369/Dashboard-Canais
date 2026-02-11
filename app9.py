@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -1491,7 +1491,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -1593,8 +1593,8 @@ st.markdown(
     f"""
     <div class="data-freshness-banner">
         <div class="data-freshness-track">
-            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
-            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
+            <span class="data-freshness-text">DASHBOARD DE CANAIS ESTRATÉGICOS - PME | Realizado atualizado até {data_realizado_max} | Base oficial consolidada</span>
+            <span class="data-freshness-text">DASHBOARD DE CANAIS ESTRATÉGICOS - PME | Realizado atualizado até {data_realizado_max} | Base oficial consolidada</span>
         </div>
     </div>
     """,
@@ -1885,7 +1885,7 @@ with tab1:
         st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL - COMPARATIVO ANUAL</div>', unsafe_allow_html=True)
         
         with st.container():
-            col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns(4)
+            col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
             
             with col_filtro1:
                 render_filter_label("CANAL")
@@ -1906,15 +1906,6 @@ with tab1:
                 )
             
             with col_filtro3:
-                render_filter_label("INDICADOR")
-                indicador_selecionado = st.selectbox(
-                    "Selecione o Indicador",
-                    options=["Todos"] + sorted(df_filtered['DSC_INDICADOR'].unique()),
-                    key="filtro_indicador_linhas",
-                    label_visibility="collapsed"
-                )
-            
-            with col_filtro4:
                 render_filter_label("PRODUTO")
                 plataforma_selecionada = st.selectbox(
                     "Selecione o Produto",
@@ -1930,8 +1921,6 @@ with tab1:
             df_grafico = df_grafico[df_grafico['CANAL_PLAN'] == canal_selecionado]
         if regional_selecionada != "Todos":
             df_grafico = df_grafico[df_grafico['REGIONAL'] == regional_selecionada]
-        if indicador_selecionado != "Todos":
-            df_grafico = df_grafico[df_grafico['DSC_INDICADOR'] == indicador_selecionado]
         if plataforma_selecionada != "Todos":
             df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
         
@@ -1944,8 +1933,6 @@ with tab1:
             filtros_ativos.append(f"Canal: {canal_selecionado}")
         if regional_selecionada != "Todos":
             filtros_ativos.append(f"Regional: {regional_selecionada}")
-        if indicador_selecionado != "Todos":
-            filtros_ativos.append(f"Indicador: {indicador_selecionado}")
         if plataforma_selecionada != "Todos":
             filtros_ativos.append(f"Produto: {plataforma_selecionada}")
         
@@ -3087,7 +3074,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -3174,7 +3161,7 @@ with tab2:
             <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📉</span>
             DESATIVADOS
             <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE CHURN/DESATIVAÇOES - LINHAS SILENTES E INADIMPLENTES
+                ANÁLISE DE DESATIVAÇÕES E CHURN
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -5643,7 +5630,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -5746,7 +5733,7 @@ with tab4:
     def load_metas_ligacoes():
         """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
         try:
-            metas_path = "base_final_trt_new3.xlsx"
+            metas_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
             
             # Carregar dados
             df_metas = pd.read_excel(metas_path)
