@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -1426,10 +1426,38 @@ def apply_standard_line_traces(fig, color_map: dict, valor_label: str = 'Valor',
             )
         )
 
+def apply_standard_title_style(fig, size: int = 16):
+    """Padroniza visual do título dos gráficos sem alterar posicionamento já definido."""
+    if not hasattr(fig, "layout"):
+        return
+    current_text = fig.layout.title.text if fig.layout.title is not None else None
+    if current_text in (None, "", "undefined"):
+        return
+
+    x_val = fig.layout.title.x if fig.layout.title.x is not None else 0.02
+    y_val = fig.layout.title.y if fig.layout.title.y is not None else 0.96
+    x_anchor = fig.layout.title.xanchor if fig.layout.title.xanchor is not None else 'left'
+    y_anchor = fig.layout.title.yanchor if fig.layout.title.yanchor is not None else 'top'
+
+    fig.update_layout(
+        title=dict(
+            text=current_text,
+            x=x_val,
+            y=y_val,
+            xanchor=x_anchor,
+            yanchor=y_anchor,
+            font=dict(size=size, color='#2F3747', family='Segoe UI')
+        )
+    )
+
 @st.cache_data
 def create_bar_chart_data(df_mes_selecionado):
     """Cria dados para gráfico de barras horizontais"""
-    bar_data = df_mes_selecionado.groupby(['CANAL_PLAN', 'COD_PLATAFORMA'], observed=True)['QTDE'].sum().reset_index()
+    df_plot = df_mes_selecionado.copy()
+    df_plot['CANAL_PLAN'] = df_plot['CANAL_PLAN'].astype(str).str.strip()
+    df_plot['COD_PLATAFORMA'] = df_plot['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
+    df_plot['QTDE'] = pd.to_numeric(df_plot['QTDE'], errors='coerce').fillna(0)
+    bar_data = df_plot.groupby(['CANAL_PLAN', 'COD_PLATAFORMA'], observed=True)['QTDE'].sum().reset_index()
     canal_totals = bar_data.groupby('CANAL_PLAN', observed=True)['QTDE'].sum().sort_values(ascending=False)
     canal_order = canal_totals.index
     
@@ -1979,6 +2007,7 @@ with tab1:
         """, unsafe_allow_html=True)
         
         # Exibir gráfico
+        apply_standard_title_style(fig_linhas)
         st.plotly_chart(fig_linhas, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
     
     # =========================
@@ -2048,6 +2077,7 @@ with tab1:
         )
         
         fig_bar.update_layout(
+            barmode='stack',
             plot_bgcolor='white',
             paper_bgcolor='white',
             font=dict(family='Segoe UI', size=14, color='#333333'),
@@ -2172,6 +2202,7 @@ with tab1:
         )
         
         # Exibir gráfico
+        apply_standard_title_style(fig_bar)
         st.plotly_chart(fig_bar, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
         
         # Bloco de insights removido por solicitação
@@ -2197,7 +2228,10 @@ with tab1:
     # =========================
     # TABELA DINÂMICA POR REGIONAL COM MÉTRICAS AVANÇADAS (VERSÃO MELHORADA)
     # =========================
-    st.subheader("📊 CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL")
+    st.markdown(
+        '<div class="section-title"><span class="section-icon">📊</span> CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL</div>',
+        unsafe_allow_html=True
+    )
     
     # Adicionar filtros específicos para a tabela
     col_filtro_t1, col_filtro_t2 = st.columns(2)
@@ -3037,6 +3071,7 @@ with tab1:
                     )
                 )
                 
+                apply_standard_title_style(fig_comparativo)
                 st.plotly_chart(fig_comparativo, width='stretch')
     else:
         st.warning("Não há dados disponíveis para exibir a tabela dinâmica com os filtros atuais.")
@@ -3139,7 +3174,7 @@ with tab2:
             <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📉</span>
             DESATIVADOS
             <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE DESATIVAÇÕES E CHURN
+                ANÁLISE DE CHURN/DESATIVAÇOES - LINHAS SILENTES E INADIMPLENTES
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -3465,6 +3500,7 @@ with tab2:
                 showlegend=False
             )
 
+            apply_standard_title_style(fig_inad)
             st.plotly_chart(
                 fig_inad,
                 width='stretch',
@@ -3618,6 +3654,7 @@ with tab2:
             </div>
         """, unsafe_allow_html=True)
 
+        apply_standard_title_style(fig_combo)
         st.plotly_chart(fig_combo, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
     
     # =========================
@@ -3733,6 +3770,7 @@ with tab2:
         )
         
         # Exibir gráfico
+        apply_standard_title_style(fig_barras)
         st.plotly_chart(fig_barras, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
         
         # KPIs de resumo
@@ -4571,6 +4609,7 @@ with tab3:
                 align='center'
             )
 
+            apply_standard_title_style(fig_donut)
             st.plotly_chart(
                 fig_donut,
                 use_container_width=True,
@@ -5580,6 +5619,7 @@ with tab3:
             """, unsafe_allow_html=True)
             
             # Exibir gráfico
+            apply_standard_title_style(fig_linhas_pedidos)
             st.plotly_chart(fig_linhas_pedidos, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
 
 # =========================
@@ -5953,7 +5993,32 @@ with tab4:
         else:
             mes_anterior = mes_selecionado
         
-        st.info(f"**📊 Período de Análise:** Mês Atual: **{mes_selecionado}** | Mês Anterior: **{mes_anterior}**")
+        st.markdown(f"""
+            <div class="info-box" style="margin: 6px 0 0 0; padding: 12px 15px;">
+                <div class="info-box-title">Período de Análise</div>
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: nowrap; min-height: 42px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 13px; color: #333333; font-weight: 600;">Mês Atual:</span>
+                        <span style="font-size: 14px; color: #FF2800; font-weight: 800;
+                                background: rgba(255, 40, 0, 0.1); padding: 6px 15px; border-radius: 20px;">
+                            {mes_selecionado}
+                        </span>
+                    </div>
+                    <div style="width: 1px; height: 30px; background: #E9ECEF;"></div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 13px; color: #333333; font-weight: 600;">Mês Anterior:</span>
+                        <span style="font-size: 14px; color: #790E09; font-weight: 700;
+                                background: rgba(121, 14, 9, 0.1); padding: 6px 15px; border-radius: 20px;">
+                            {mes_anterior}
+                        </span>
+                    </div>
+                    <div style="width: 1px; height: 30px; background: #E9ECEF;"></div>
+                    <div style="font-size: 13px; color: #666666; font-weight: 600;">
+                        Gráfico sincronizado com a seleção dos cards KPI
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
     else:
         st.warning("⚠️ Nenhum mês disponível nos dados")
         mes_selecionado = None
@@ -5965,7 +6030,10 @@ with tab4:
     # =========================
     if mes_selecionado:
         st.markdown("---")
-        st.markdown("### 📊 **INDICADORES DE LIGAÇÕES**")
+        st.markdown(
+            '<div class="section-title"><span class="section-icon">📊</span> INDICADORES DE LIGAÇÕES</div>',
+            unsafe_allow_html=True
+        )
         
         # Calcular valores do mês atual
         total_atual = calcular_total_ligacoes(df_lig, mes_selecionado, regional_selecionada)
@@ -6119,7 +6187,10 @@ with tab4:
         # GRÁFICO DE LINHAS TEMPORAL - LIGAÇÕES (VERSÃO CORRIGIDA E OTIMIZADA)
         # =========================
         st.markdown("---")
-        st.markdown("### 📈 **EVOLUÇÃO MENSAL DE LIGAÇÕES - VISÃO COMPARATIVA**")
+        st.markdown(
+            '<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL DE LIGAÇÕES - VISÃO COMPARATIVA</div>',
+            unsafe_allow_html=True
+        )
 
         # Container para filtros
         with st.container():
@@ -6326,6 +6397,7 @@ with tab4:
             """, unsafe_allow_html=True)
             
             # EXIBIR GRÁFICO COM LARGURA COMPLETA
+            apply_standard_title_style(fig_linhas_lig)
             st.plotly_chart(fig_linhas_lig, use_container_width=True, config={
                 'displayModeBar': True, 
                 'displaylogo': False,
@@ -6485,7 +6557,10 @@ with tab4:
         # TABELA DINÂMICA POR REGIONAL - LIGAÇÕES (VERSÃO CORRIGIDA E COMPLETA)
         # =========================
         st.markdown("---")
-        st.markdown("### 📋 **TABELA DINÂMICA POR REGIONAL - LIGAÇÕES**")
+        st.markdown(
+            '<div class="section-title"><span class="section-icon">📋</span> TABELA DINÂMICA POR REGIONAL - LIGAÇÕES</div>',
+            unsafe_allow_html=True
+        )
 
         # Container principal
         with st.container():
@@ -7071,7 +7146,10 @@ with tab4:
                 # RESUMO ESTATÍSTICO
                 # =========================
                 st.markdown("---")
-                st.markdown("### 📈 **RESUMO ESTATÍSTICO**")
+                st.markdown(
+                    '<div class="section-title"><span class="section-icon">📈</span> RESUMO ESTATÍSTICO</div>',
+                    unsafe_allow_html=True
+                )
                 
                 col_res1, col_res2, col_res3, col_res4 = st.columns(4)
                 
@@ -7242,4 +7320,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
