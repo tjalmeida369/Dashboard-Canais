@@ -3161,7 +3161,7 @@ with tab2:
             <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📉</span>
             DESATIVADOS
             <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE DESATIVAÇÕES E CHURN
+                ANÁLISE DE CHURN/DESATIVAÇÃO - LINHAS SILENTES e INADIMPLENTES
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -7307,5 +7307,6 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
+
 
 
