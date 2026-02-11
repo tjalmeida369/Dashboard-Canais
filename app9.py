@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from datetime import datetime, date
 from io import BytesIO
+from pathlib import Path
 import locale
 import re
 from textwrap import dedent
@@ -86,10 +87,39 @@ def formatar_numero_brasileiro(valor, casas_decimais=0):
         print(f"Erro ao formatar {valor}: {e}")
         return str(valor)
 
+def normalizar_numerico_serie(serie):
+    """
+    Normaliza series numéricas incluindo textos em formato BR
+    (ex.: 2.659,40 -> 2659.40).
+    """
+    if not isinstance(serie, pd.Series):
+        serie = pd.Series(serie)
+    if pd.api.types.is_numeric_dtype(serie):
+        return pd.to_numeric(serie, errors='coerce')
+    s = serie.astype(str).str.strip()
+    s = s.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+    s = s.str.replace(r'[^0-9\.-]', '', regex=True)
+    return pd.to_numeric(s, errors='coerce')
+
 # =========================
 # CONFIGURAÇÕES DE ESTILO GLOBAL
 # =========================
 st.set_page_config(page_title="Dashboard - Canais Estratégicos", layout="wide")
+
+def render_header_logo():
+    """Render top-right logo if the local PNG file exists."""
+    logo_path = Path(r"C:\Users\F270665\Downloads\logo_claro_empresas.png")
+    if not logo_path.exists():
+        return
+
+    col_space, col_logo = st.columns([6, 2])
+    with col_logo:
+        st.markdown(
+            '<div style="display:flex;justify-content:flex-end;padding:4px 0 2px 0;">',
+            unsafe_allow_html=True
+        )
+        st.image(str(logo_path), width=230)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # Adicionar CSS personalizado (mantido igual)
 st.markdown("""
@@ -738,32 +768,52 @@ st.markdown("""
         .kpi-card-dinamico,
         .kpi-block-dinamico,
         [data-testid="stMetric"] {
-            background: var(--ds-surface) !important;
-            border: 1px solid var(--ds-border) !important;
-            box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06) !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%) !important;
+            border: 1px solid #E6EAF0 !important;
+            box-shadow:
+                0 1px 1px rgba(16, 24, 40, 0.04),
+                0 6px 16px rgba(16, 24, 40, 0.08) !important;
+        }
+
+        .kpi-card-dinamico {
+            overflow: hidden;
         }
 
         .kpi-card-dinamico::before,
         .kpi-block-dinamico::before {
             height: 3px;
-            background: var(--ds-primary);
+            background: linear-gradient(90deg, var(--ds-primary), var(--ds-primary-soft));
             opacity: 1;
+        }
+
+        .kpi-card-dinamico::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 42%;
+            height: 100%;
+            background: radial-gradient(circle at top right, rgba(162, 59, 54, 0.10), rgba(162, 59, 54, 0.00) 62%);
+            pointer-events: none;
         }
 
         .kpi-card-dinamico:hover,
         .kpi-block-dinamico:hover {
-            transform: none;
-            border-color: var(--ds-border-strong) !important;
-            box-shadow: 0 4px 12px rgba(16, 24, 40, 0.10) !important;
+            transform: translateY(-2px);
+            border-color: #D7DEE8 !important;
+            box-shadow:
+                0 2px 4px rgba(16, 24, 40, 0.05),
+                0 12px 24px rgba(16, 24, 40, 0.12) !important;
         }
 
         .kpi-title-dinamico {
             background: none !important;
             color: var(--ds-primary) !important;
             -webkit-text-fill-color: var(--ds-primary) !important;
-            font-size: 16px !important;
-            letter-spacing: 0.2px;
-            margin-bottom: 10px !important;
+            font-size: 15px !important;
+            letter-spacing: 0.35px;
+            margin-bottom: 9px !important;
+            text-transform: uppercase;
         }
 
         .kpi-title-dinamico::after {
@@ -773,16 +823,20 @@ st.markdown("""
         }
 
         .kpi-value-dinamico {
-            font-size: 24px !important;
+            font-size: 25px !important;
             color: var(--ds-text) !important;
             background: none !important;
             -webkit-text-fill-color: var(--ds-text) !important;
             text-shadow: none;
+            letter-spacing: -0.3px;
         }
 
         .kpi-variacao-item {
             box-shadow: none;
-            border-radius: 10px;
+            border-radius: 999px;
+            border-width: 1px !important;
+            min-height: 24px;
+            padding: 4px 10px !important;
         }
 
         .variacao-positiva {
@@ -798,29 +852,106 @@ st.markdown("""
         }
 
         .stTabs [data-baseweb="tab-list"] {
-            background: var(--ds-surface);
-            border: 1px solid var(--ds-border);
-            box-shadow: none;
-            padding: 5px;
-            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F4F6F9 100%);
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            box-shadow:
+                0 1px 1px rgba(16, 24, 40, 0.04),
+                0 10px 24px rgba(16, 24, 40, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.95);
+            padding: 7px;
+            gap: 8px;
+            margin-bottom: 22px;
+            backdrop-filter: blur(4px);
+        }
+
+        .stTabs [data-baseweb="tab-list"]::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.00) 35%);
+            pointer-events: none;
         }
 
         .stTabs [data-baseweb="tab"] {
-            background: var(--ds-surface-soft) !important;
-            color: var(--ds-text-muted) !important;
+            position: relative;
+            overflow: hidden;
+            background: transparent !important;
+            color: #4B5563 !important;
             border: 1px solid transparent !important;
             box-shadow: none !important;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 10px 18px;
+            min-height: 43px;
             font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            transition: all 0.22s ease;
+            z-index: 1;
+        }
+
+        .stTabs [data-baseweb="tab"]::before {
+            content: "";
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            top: 7px;
+            height: 36%;
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0));
+            opacity: 0;
+            transition: opacity 0.22s ease;
+            pointer-events: none;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            background: #FFFFFF !important;
+            color: #1F2937 !important;
+            border-color: #E4EAF2 !important;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+            transform: translateY(-1px);
+        }
+
+        .stTabs [data-baseweb="tab"]:hover::before {
+            opacity: 1;
+        }
+
+        .stTabs [data-baseweb="tab"]:focus-visible {
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(121, 14, 9, 0.16) !important;
+        }
+
+        .stTabs [data-baseweb="tab"]::after {
+            content: "";
+            position: absolute;
+            left: 14px;
+            right: 14px;
+            bottom: 5px;
+            height: 2px;
+            background: transparent;
+            border-radius: 2px;
+            transition: all 0.22s ease;
         }
 
         .stTabs [aria-selected="true"] {
-            background: var(--ds-primary) !important;
+            background: linear-gradient(135deg, #B2463F 0%, #8D1A12 55%, #790E09 100%) !important;
             color: #FFFFFF !important;
-            border-color: var(--ds-primary) !important;
-            box-shadow: none !important;
-            transform: none;
+            border-color: #790E09 !important;
+            box-shadow:
+                0 8px 18px rgba(121, 14, 9, 0.28),
+                inset 0 1px 0 rgba(255, 255, 255, 0.20) !important;
+            transform: translateY(-1px);
+        }
+
+        .stTabs [aria-selected="true"]::before {
+            opacity: 1;
+            background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0));
+        }
+
+        .stTabs [aria-selected="true"]::after {
+            background: rgba(255, 255, 255, 0.95);
         }
 
         [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
@@ -879,6 +1010,42 @@ st.markdown("""
             border-bottom: 1px solid var(--ds-border);
             margin-bottom: 10px;
             padding-bottom: 8px;
+        }
+
+        .data-freshness-banner {
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid #E6ECF4;
+            border-left: 4px solid #FF2800;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #FFF4F2 0%, #FFFFFF 45%, #FFF4F2 100%);
+            box-shadow: 0 4px 14px rgba(121, 14, 9, 0.08);
+            margin: 6px 0 16px 0;
+            height: 42px;
+            display: flex;
+            align-items: center;
+        }
+
+        .data-freshness-track {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            animation: dataFreshnessSlide 22s linear infinite;
+            will-change: transform;
+            padding-left: 100%;
+        }
+
+        .data-freshness-text {
+            color: #7A120C;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            margin-right: 42px;
+        }
+
+        @keyframes dataFreshnessSlide {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
         }
 
         .info-box {
@@ -1098,6 +1265,28 @@ def render_filter_label(texto: str):
     """Renderiza rótulo padrão para filtros com label colapsado."""
     st.markdown(f'<div class="filter-label-standard">{texto}</div>', unsafe_allow_html=True)
 
+def get_data_realizado_max_formatada(df_base: pd.DataFrame) -> str:
+    """Retorna a data máxima de realizado no formato dd/mm/aaaa."""
+    if df_base is None or df_base.empty:
+        return "N/D"
+
+    # Considera "realizado" apenas onde QTDE > 0
+    base_ref = df_base
+    if 'QTDE' in df_base.columns:
+        qtde_num = pd.to_numeric(df_base['QTDE'], errors='coerce').fillna(0)
+        base_ref = df_base.loc[qtde_num > 0]
+        if base_ref.empty:
+            return "N/D"
+
+    colunas_data = ['DAT_MOVIMENTO', 'DAT_MOVIMENTO2', 'PERIODO', 'DAT_MOVIMENTO_2']
+    for col in colunas_data:
+        if col in base_ref.columns:
+            serie_data = pd.to_datetime(base_ref[col], errors='coerce')
+            data_max = serie_data.max()
+            if pd.notna(data_max):
+                return data_max.strftime('%d/%m/%Y')
+    return "N/D"
+
 @st.cache_data
 def create_line_chart_data(df_grafico):
     """Cria dados para gráfico de linhas temporal"""
@@ -1136,6 +1325,107 @@ def create_line_chart_data(df_grafico):
     
     return df_linhas
 
+MESES_TICKVALS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+def apply_standard_line_layout(fig, y_axis_title: str, height: int = 520):
+    """Aplica padrão visual moderno e consistente para gráficos de linha."""
+    fig.update_layout(
+        plot_bgcolor='#FFFFFF',
+        paper_bgcolor='#FCFCFD',
+        font=dict(family='Segoe UI', size=14, color='#2F3747'),
+        margin=dict(l=64, r=64, t=96, b=88),
+        xaxis=dict(
+            title='',
+            tickmode='array',
+            tickvals=MESES_TICKVALS,
+            tickfont=dict(size=12, color='#5B6578'),
+            showgrid=True,
+            gridcolor='rgba(230, 236, 244, 0.85)',
+            gridwidth=1,
+            linecolor='#E6ECF4',
+            linewidth=1.5,
+            mirror=True,
+            tickangle=0,
+            showline=True,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title=f'<b>{y_axis_title}</b>',
+            title_font=dict(size=13, color='#2F3747'),
+            tickfont=dict(size=12, color='#5B6578'),
+            showgrid=True,
+            gridcolor='rgba(230, 236, 244, 0.85)',
+            gridwidth=1,
+            linecolor='#E6ECF4',
+            linewidth=1.5,
+            mirror=True,
+            showline=True,
+            zeroline=False,
+            rangemode='tozero'
+        ),
+        legend=dict(
+            title=dict(text='<b>ANO</b>', font=dict(size=13, color='#2F3747')),
+            orientation='h',
+            yanchor='bottom',
+            y=-0.26,
+            xanchor='center',
+            x=0.5,
+            bgcolor='rgba(255, 255, 255, 0.92)',
+            bordercolor='#E6ECF4',
+            borderwidth=1.5,
+            font=dict(size=12, color='#2F3747'),
+            itemwidth=52,
+            traceorder='normal'
+        ),
+        title=dict(
+            x=0.5,
+            xanchor='center',
+            yanchor='top',
+            font=dict(size=16, color='#2F3747'),
+            y=0.95
+        ),
+        hovermode='x unified',
+        hoverlabel=dict(
+            bgcolor='white',
+            font_size=13,
+            font_family='Segoe UI',
+            bordercolor='#E6ECF4',
+            font_color='#2F3747'
+        ),
+        height=height,
+        showlegend=True
+    )
+
+def apply_standard_line_traces(fig, color_map: dict, valor_label: str = 'Valor', meta_year: str = '2026'):
+    """Aplica padrão de linha/marcador/rótulo para séries anuais."""
+    for trace in fig.data:
+        ano = str(trace.name)
+        cor = color_map.get(ano, '#6B7280')
+        is_meta = ano == str(meta_year)
+        hover_nome = 'Meta' if is_meta else valor_label
+        trace.update(
+            mode='lines+markers+text',
+            marker=dict(
+                size=11,
+                line=dict(width=1.8, color='white'),
+                symbol='diamond' if is_meta else 'circle',
+                opacity=0.92
+            ),
+            line=dict(
+                width=3.4 if is_meta else 3.2,
+                dash='dash' if is_meta else 'solid',
+                smoothing=1.2,
+                color=cor
+            ),
+            textposition='top center',
+            textfont=dict(size=11, color=cor),
+            hovertemplate=(
+                f"<b>%{{x}}/{ano}</b><br>"
+                + f"<b>{hover_nome}:</b> %{{y:,.0f}}<br>"
+                + "<extra></extra>"
+            )
+        )
+
 @st.cache_data
 def create_bar_chart_data(df_mes_selecionado):
     """Cria dados para gráfico de barras horizontais"""
@@ -1173,11 +1463,17 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
 validate_data(df)
+
+# Normalizar coluna de tendência (fallback para QTDE quando não existir)
+if 'TEND_QTD' in df.columns:
+    df['TEND_QTD'] = normalizar_numerico_serie(df['TEND_QTD']).fillna(0)
+else:
+    df['TEND_QTD'] = normalizar_numerico_serie(df.get('QTDE', 0)).fillna(0)
 
 # =========================
 # FILTROS GERAIS (SIDEBAR)
@@ -1231,6 +1527,14 @@ df_filtered = df.query(
     "REGIONAL in @region_filter_eff and CANAL_PLAN in @canal_filter_eff and dat_tratada in @data_filter_eff and DSC_INDICADOR in @indicador_filter_eff"
 )
 
+# Versão sem filtro de período (para tabelas dinâmicas de ciclo)
+df_filtered_sem_periodo = df.query(
+    "REGIONAL in @region_filter_eff and CANAL_PLAN in @canal_filter_eff and DSC_INDICADOR in @indicador_filter_eff"
+)
+
+# Logo institucional no topo (quando disponível no caminho local)
+render_header_logo()
+
 # =========================
 # TÍTULO PRINCIPAL
 # =========================
@@ -1254,6 +1558,20 @@ st.markdown("""
         </div>
     </div>
 """, unsafe_allow_html=True)
+
+# Tarja de atualização dos dados (antes das abas)
+data_realizado_max = get_data_realizado_max_formatada(df)
+st.markdown(
+    f"""
+    <div class="data-freshness-banner">
+        <div class="data-freshness-track">
+            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
+            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # =========================
 # ABAS PRINCIPAIS
@@ -1338,14 +1656,23 @@ with tab1:
         meses_com_datas.sort(key=lambda x: x[1])
         meses_ordenados = [mes for mes, _ in meses_com_datas]
         
-        # Obter mês atual formatado
+        # Para Ativados, abrir sempre no mês fechado (mês anterior ao mês corrente)
         mes_atual_formatado = get_mes_atual_formatado()
+        mes_fechado_referencia = get_mes_anterior(mes_atual_formatado)
         
-        # Encontrar índice do mês atual ou usar o último disponível
-        if mes_atual_formatado in meses_ordenados:
-            idx_padrao = meses_ordenados.index(mes_atual_formatado)
+        if len(meses_ordenados) > 0:
+            if mes_fechado_referencia in meses_ordenados:
+                idx_padrao = meses_ordenados.index(mes_fechado_referencia)
+            else:
+                # Fallback: usa o mês disponível mais recente até a referência fechada
+                data_ref = mes_ano_para_data(mes_fechado_referencia)
+                indices_validos = [
+                    i for i, mes in enumerate(meses_ordenados)
+                    if mes_ano_para_data(mes) <= data_ref
+                ]
+                idx_padrao = indices_validos[-1] if indices_validos else len(meses_ordenados) - 1
         else:
-            idx_padrao = len(meses_ordenados) - 1 if len(meses_ordenados) > 0 else 0
+            idx_padrao = 0
         
         # Selectbox para seleção do mês
         col_filtro1, col_filtro2 = st.columns([1, 3])
@@ -1393,11 +1720,21 @@ with tab1:
                 </div>
             """, unsafe_allow_html=True)
     
+    mes_corrente_ref = get_mes_atual_formatado().strip().lower()
+
     # Função para calcular métricas
     def calcular_metricas_canal(canal, plataforma, mes_atual, mes_anterior):
-        atual = df_filtered.query(
+        realizado_atual = df_filtered.query(
             "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
         )['QTDE'].sum()
+
+        tendencia_atual = df_filtered.query(
+            "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
+        )['TEND_QTD'].sum()
+
+        usar_tendencia_mes = str(mes_atual).strip().lower() == mes_corrente_ref
+        usar_tendencia = usar_tendencia_mes and (tendencia_atual > 0)
+        atual = tendencia_atual if usar_tendencia else realizado_atual
         
         anterior = df_filtered.query(
             "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_anterior"
@@ -1416,6 +1753,9 @@ with tab1:
         
         return {
             'atual': atual,
+            'real_atual': realizado_atual,
+            'tend_atual': tendencia_atual,
+            'usa_tendencia': usar_tendencia,
             'anterior': anterior,
             'meta': meta,
             'variacao_mom': variacao_mom,
@@ -1459,14 +1799,21 @@ with tab1:
                 metricas = calcular_metricas_canal(canal, plataforma, mes_selecionado_cards, mes_anterior_cards)
                 
                 atual = metricas['atual']
+                real_atual = metricas['real_atual']
+                usa_tendencia = metricas['usa_tendencia']
                 anterior = metricas['anterior']
                 meta = metricas['meta']
                 variacao_mom = metricas['variacao_mom']
                 desvio_meta = metricas['desvio_meta']
                 
                 atual_formatado = f"{atual:,.0f}".replace(",", ".")
+                real_atual_formatado = f"{real_atual:,.0f}".replace(",", ".")
                 anterior_formatado = f"{anterior:,.0f}".replace(",", ".")
                 meta_formatado = f"{meta:,.0f}".replace(",", ".")
+                real_hint_html = (
+                    f'<div style="font-size: 11px; color: #666666; font-weight: 700; margin-top: 4px;">Parcial: {real_atual_formatado}</div>'
+                    if usa_tendencia else ''
+                )
                 
                 if variacao_mom >= 0:
                     classe_mom = "variacao-positiva"
@@ -1487,6 +1834,7 @@ with tab1:
                     f'<div class="kpi-block-dinamico">'
                     f'<div style="font-size: 13px; color: #333333; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">{plataforma}</div>'
                     f'<div class="kpi-value-dinamico">{atual_formatado}</div>'
+                    f'{real_hint_html}'
                     f'<div style="font-size: 12.5px; color: #666666; margin: 5px 0; line-height: 1.4; font-weight: 500;">'
                     f'<span style="font-weight: 600;">Anterior:</span> {anterior_formatado} | '
                     f'<span style="font-weight: 600;">Meta:</span> {meta_formatado}'
@@ -1507,33 +1855,6 @@ with tab1:
                         f'</div>',
                         unsafe_allow_html=True
                     )
-    
-    # Rodapé da seção
-    st.markdown(f"""
-        <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #F8F9FA, #FFFFFF); 
-                    border-radius: 16px; border: 2px solid #E9ECEF; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);">
-            <div style="font-size: 13px; color: #666666; margin-bottom: 10px; text-align: center;">
-                <span style="color: #FF2800; font-weight: 700;">📌</span> 
-                <strong>Métricas calculadas:</strong> 
-                <span style="color: #333333; font-weight: 600;">MoM</span> (Mês sobre mês vs {mes_anterior_cards}) e 
-                <span style="color: #333333; font-weight: 600;">% Meta</span> (Desvio percentual em relação à meta)
-            </div>
-            <div style="display: flex; justify-content: center; gap: 25px; margin-top: 15px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 14px; height: 14px; background: linear-gradient(135deg, #4CAF50, #2E7D32); border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"></div>
-                    <span style="font-size: 13px; color: #333333; font-weight: 700;">Positivo ▲</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 14px; height: 14px; background: linear-gradient(135deg, #F44336, #C62828); border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"></div>
-                    <span style="font-size: 13px; color: #333333; font-weight: 700;">Negativo ▼</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 14px; height: 14px; background: linear-gradient(135deg, #9E9E9E, #757575); border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"></div>
-                    <span style="font-size: 13px; color: #333333; font-weight: 700;">Meta não disponível</span>
-                </div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
     
     # =========================
     # GRÁFICO DE LINHAS TEMPORAL
@@ -1572,9 +1893,9 @@ with tab1:
                 )
             
             with col_filtro4:
-                render_filter_label("PLATAFORMA")
+                render_filter_label("PRODUTO")
                 plataforma_selecionada = st.selectbox(
-                    "Selecione a Plataforma",
+                    "Selecione o Produto",
                     options=["Todos"] + sorted(df_filtered['COD_PLATAFORMA'].unique()),
                     key="filtro_plataforma_linhas",
                     label_visibility="collapsed"
@@ -1604,7 +1925,7 @@ with tab1:
         if indicador_selecionado != "Todos":
             filtros_ativos.append(f"Indicador: {indicador_selecionado}")
         if plataforma_selecionada != "Todos":
-            filtros_ativos.append(f"Plataforma: {plataforma_selecionada}")
+            filtros_ativos.append(f"Produto: {plataforma_selecionada}")
         
         titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
         
@@ -1628,93 +1949,8 @@ with tab1:
             text='Valor_Formatado'
         )
         
-        fig_linhas.update_layout(
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font=dict(family='Segoe UI', size=14, color='#333333'),
-            margin=dict(l=60, r=60, t=100, b=80),
-            xaxis=dict(
-                title='',
-                tickmode='array',
-                tickvals=['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-                tickfont=dict(size=13, color='#666666', weight=600),
-                showgrid=True,
-                gridcolor='rgba(233, 236, 239, 0.5)',
-                gridwidth=1,
-                linecolor='#E9ECEF',
-                linewidth=2,
-                mirror=True,
-                tickangle=0,
-                showline=True,
-                zeroline=False
-            ),
-            yaxis=dict(
-                title='<b>VOLUME</b>',
-                title_font=dict(size=15, weight=700, color='#333333'),
-                tickfont=dict(size=13, color='#666666', weight=600),
-                showgrid=True,
-                gridcolor='rgba(233, 236, 239, 0.5)',
-                gridwidth=1,
-                linecolor='#E9ECEF',
-                linewidth=2,
-                mirror=True,
-                showline=True,
-                zeroline=False
-            ),
-            legend=dict(
-                title=dict(text='<b>ANO</b>', font=dict(size=14, weight=700, color='#333333')),
-                orientation="h",
-                yanchor="bottom",
-                y=-0.25,
-                xanchor="center",
-                x=0.5,
-                bgcolor='rgba(255, 255, 255, 0.95)',
-                bordercolor='#E9ECEF',
-                borderwidth=2,
-                font=dict(size=13, color='#333333', weight=600),
-                itemwidth=50,
-                traceorder='normal'
-            ),
-            title=dict(
-                x=0.5,
-                xanchor='center',
-                yanchor='top',
-                font=dict(size=16, color='#333333', weight=800),
-                y=0.95
-            ),
-            hovermode='x unified',
-            hoverlabel=dict(
-                bgcolor='white',
-                font_size=14,
-                font_family='Segoe UI',
-                bordercolor='#E9ECEF',
-                font_color='#333333',
-                font_weight=600
-            ),
-            height=500,
-            showlegend=True
-        )
-        
-        for i, trace in enumerate(fig_linhas.data):
-            ano = trace.name
-            trace.update(
-                mode='lines+markers+text',
-                marker=dict(size=12, line=dict(width=2, color='white'), symbol='circle', opacity=0.9),
-                line=dict(width=4, smoothing=1.3),
-                textposition='top center',
-                textfont=dict(size=12, color=cores_personalizadas[ano], weight=700),
-                hovertemplate=(
-                    f"<b>%{{x}}/{ano}</b><br>" +
-                    "<b>Valor:</b> %{y:,.0f}<br>" +
-                    "<extra></extra>"
-                )
-            )
-            
-            if ano == '2026':
-                trace.update(
-                    line=dict(width=4, dash='dash', color=cores_personalizadas[ano]),
-                    marker=dict(size=12, line=dict(width=2, color='white'), symbol='diamond', opacity=0.9)
-                )
+        apply_standard_line_layout(fig_linhas, 'VOLUME', height=500)
+        apply_standard_line_traces(fig_linhas, cores_personalizadas, valor_label='Valor', meta_year='2026')
         
         # Container de informações
         st.markdown(f"""
@@ -1754,7 +1990,7 @@ with tab1:
     # =========================
     # GRÁFICO DE BARRAS HORIZONTAIS
     # =========================
-    st.markdown('<div class="section-title"><span class="section-icon">📊</span> DISTRIBUIÇÃO POR CANAL E PLATAFORMA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><span class="section-icon">📊</span> DISTRIBUIÇÃO POR CANAL E PRODUTO</div>', unsafe_allow_html=True)
     
     # Usar o mesmo mês selecionado nos cards KPI
     mes_selecionado = mes_selecionado_cards
@@ -1845,7 +2081,7 @@ with tab1:
                 linewidth=2
             ),
             legend=dict(
-                title=dict(text='<b>PLATAFORMA</b>', font=dict(size=14, weight=800, color='#333333')),
+                title=dict(text='<b>PRODUTO</b>', font=dict(size=14, weight=800, color='#333333')),
                 orientation="v",
                 yanchor="middle",
                 y=0.5,
@@ -1888,7 +2124,7 @@ with tab1:
             marker=dict(line=dict(width=1.5, color='white'), opacity=0.95),
             hovertemplate=(
                 "<b>Canal: %{y}</b><br>" +
-                "<b>Plataforma: %{fullData.name}</b><br>" +
+                "<b>Produto: %{fullData.name}</b><br>" +
                 "<b>Volume: %{x:,.0f}</b><br>" +
                 "<extra></extra>"
             )
@@ -1944,66 +2180,7 @@ with tab1:
         # Exibir gráfico
         st.plotly_chart(fig_bar, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
         
-        # Insights e KPIs
-        with st.container():
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #FFFFFF, #F8F9FA); 
-                            padding: 25px; border-radius: 16px; border: 2px solid #E9ECEF; 
-                            margin-top: 30px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);">
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                        <span style="color: #790E09; font-size: 24px;">💡</span>
-                        <span style="font-size: 16px; color: #333333; font-weight: 800;">
-                            INSIGHTS E ANÁLISES
-                        </span>
-                    </div>
-            """, unsafe_allow_html=True)
-            
-            total_por_plataforma = bar_data.groupby('COD_PLATAFORMA', observed=True)['QTDE'].sum()
-            top_canal = canal_totals.index[0] if len(canal_totals) > 0 else "N/A"
-            top_valor = canal_totals.iloc[0] if len(canal_totals) > 0 else 0
-            
-            if len(total_por_plataforma) > 0:
-                top_plataforma = total_por_plataforma.idxmax()
-                top_plataforma_valor = total_por_plataforma.max()
-                top_plataforma_percent = (top_plataforma_valor / total_geral * 100) if total_geral > 0 else 0
-            
-            col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
-            
-            with col_kpi1:
-                st.metric(
-                    label="Total Geral",
-                    value=f"{total_geral:,.0f}".replace(',', '.'),
-                    help="Soma total de todos os canais",
-                    delta=None
-                )
-            
-            with col_kpi2:
-                if len(canal_totals) > 0:
-                    st.metric(
-                        label="Canal Líder",
-                        value=top_canal,
-                        delta=f"{top_valor:,.0f}".replace(',', '.'),
-                        delta_color="off"
-                    )
-            
-            with col_kpi3:
-                if len(total_por_plataforma) > 0:
-                    st.metric(
-                        label="Plataforma Principal",
-                        value=top_plataforma,
-                        delta=f"{top_plataforma_percent:.1f}%",
-                        delta_color="normal"
-                    )
-            
-            with col_kpi4:
-                st.metric(
-                    label="Canais Analisados",
-                    value=len(canal_totals),
-                    delta="Segmentos",
-                    delta_color="off"
-                )
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Bloco de insights removido por solicitação
     else:
         st.markdown(f"""
             <div style="background: linear-gradient(135deg, #FFEBEE, #FFCDD2); 
@@ -2034,21 +2211,21 @@ with tab1:
     with col_filtro_t1:
         canal_tabela = st.multiselect(
             "Filtrar por Canal:",
-            options=["Todos"] + sorted(df_filtered['CANAL_PLAN'].unique()),
+            options=["Todos"] + sorted(df_filtered_sem_periodo['CANAL_PLAN'].dropna().unique()),
             default=["Todos"],
             key="filtro_canal_tabela"
         )
     
     with col_filtro_t2:
-        plataforma_tabela = st.multiselect(
-            "Filtrar por Plataforma:",
-            options=["Todos"] + sorted(df_filtered['COD_PLATAFORMA'].unique()),
-            default=["Todos"],
-            key="filtro_plataforma_tabela"
-        )
+            plataforma_tabela = st.multiselect(
+                "Filtrar por Produto:",
+                options=["Todos"] + sorted(df_filtered_sem_periodo['COD_PLATAFORMA'].dropna().unique()),
+                default=["Todos"],
+                key="filtro_plataforma_tabela"
+            )
     
     # Aplicar filtros à tabela
-    df_tabela = df_filtered.copy()
+    df_tabela = df_filtered_sem_periodo.copy()
     
     if "Todos" not in canal_tabela:
         df_tabela = df_tabela[df_tabela['CANAL_PLAN'].isin(canal_tabela)]
@@ -2071,6 +2248,7 @@ with tab1:
         """
         pivot_data = []
         regionais = sorted(df_tabela['REGIONAL'].unique())
+        mes_corrente_local = get_mes_atual_formatado().strip().lower()
 
         # Determinar meses de 2026 até o mês anterior ao foco (evitar duplicar Real/Meta do mês foco)
         mes_atual_num = meses_ordem.index(mes_atual.split('/')[0]) + 1
@@ -2098,11 +2276,14 @@ with tab1:
 
             mes_anterior = get_mes_anterior(mes_atual)
             mes_atual_valor = df_regional[df_regional['mes_ano'] == mes_atual]['QTDE'].sum()
+            tend_mes_atual_valor = df_regional[df_regional['mes_ano'] == mes_atual]['TEND_QTD'].sum()
             mes_anterior_valor = df_regional[df_regional['mes_ano'] == mes_anterior]['QTDE'].sum()
-            variacao_mom = ((mes_atual_valor - mes_anterior_valor) / mes_anterior_valor * 100) if mes_anterior_valor > 0 else 0
+            usar_tendencia = (str(mes_atual).strip().lower() == mes_corrente_local) and (tend_mes_atual_valor > 0)
+            valor_base_meta = tend_mes_atual_valor if usar_tendencia else mes_atual_valor
+            variacao_mom = ((valor_base_meta - mes_anterior_valor) / mes_anterior_valor * 100) if mes_anterior_valor > 0 else 0
 
             meta_mes_atual = df_regional[df_regional['mes_ano'] == mes_atual]['DESAFIO_QTD'].sum()
-            alcance_meta = (((mes_atual_valor / meta_mes_atual) - 1) * 100) if meta_mes_atual > 0 else 0
+            alcance_meta = (((valor_base_meta / meta_mes_atual) - 1) * 100) if meta_mes_atual > 0 else 0
 
             var_2025_2024 = ((total_2025 - total_2024) / total_2024 * 100) if total_2024 > 0 else 0
 
@@ -2112,19 +2293,26 @@ with tab1:
                 **{f'{meses_ordem[i]}/25': valores_mensais_2025[i] for i in range(12)},
                 'Total 2025': total_2025,
                 **{meses_2026[i]: valores_mensais_2026[i] for i in range(len(meses_2026))},
+                f'Tend {mes_atual}': tend_mes_atual_valor,
                 f'Real {mes_atual}': mes_atual_valor,
                 f'Meta {mes_atual}': meta_mes_atual,
-                'Alcance Meta': alcance_meta,
-                'Var MoM': variacao_mom,
-                'Var 2025/2024': var_2025_2024
+                'TEND vs META': alcance_meta,
+                'MOM': variacao_mom,
+                '25VS24': var_2025_2024
             }
 
             pivot_data.append(row_data)
 
         return pivot_data, meses_2026
     
-    # Obter mês atual para a tabela
-    mes_atual_tabela = mes_selecionado_cards
+    # Obter mês foco da tabela (sempre mês corrente quando disponível)
+    meses_tabela_disponiveis = sorted(
+        df_tabela['dat_tratada'].dropna().unique().tolist(),
+        key=mes_ano_para_data
+    )
+    mes_atual_tabela = get_mes_atual_formatado()
+    if mes_atual_tabela not in meses_tabela_disponiveis:
+        mes_atual_tabela = meses_tabela_disponiveis[-1] if meses_tabela_disponiveis else mes_selecionado_cards
     
     # AGORA CHAMAR A FUNÇÃO PARA CRIAR A TABELA PIVOT ATUALIZADA
     pivot_data, meses_2026_tabela = create_pivot_table_updated(df_tabela, mes_atual_tabela)
@@ -2158,6 +2346,7 @@ with tab1:
     
     # Calcular REAL geral do mês atual
     real_mes_atual_geral = df_total[df_total['mes_ano'] == mes_atual_tabela]['QTDE'].sum()
+    tend_mes_atual_geral = df_total[df_total['mes_ano'] == mes_atual_tabela]['TEND_QTD'].sum()
     
     # Calcular meta geral do mês atual
     meta_mes_atual_geral = df_total[df_total['mes_ano'] == mes_atual_tabela]['DESAFIO_QTD'].sum()
@@ -2169,10 +2358,12 @@ with tab1:
     mes_anterior_geral = get_mes_anterior(mes_atual_tabela)
     mes_atual_valor_geral = df_total[df_total['mes_ano'] == mes_atual_tabela]['QTDE'].sum()
     mes_anterior_valor_geral = df_total[df_total['mes_ano'] == mes_anterior_geral]['QTDE'].sum()
-    variacao_mom_geral = ((mes_atual_valor_geral - mes_anterior_valor_geral) / mes_anterior_valor_geral * 100) if mes_anterior_valor_geral > 0 else 0
+    usar_tendencia_geral = (str(mes_atual_tabela).strip().lower() == mes_corrente_ref) and (tend_mes_atual_geral > 0)
+    valor_base_meta_geral = tend_mes_atual_geral if usar_tendencia_geral else mes_atual_valor_geral
+    variacao_mom_geral = ((valor_base_meta_geral - mes_anterior_valor_geral) / mes_anterior_valor_geral * 100) if mes_anterior_valor_geral > 0 else 0
     
     # Calcular alcance da meta geral
-    alcance_meta_geral = (((real_mes_atual_geral / meta_mes_atual_geral)-1) * 100) if meta_mes_atual_geral > 0 else 0
+    alcance_meta_geral = (((valor_base_meta_geral / meta_mes_atual_geral)-1) * 100) if meta_mes_atual_geral > 0 else 0
     
     # Adicionar linha de TOTAL no início
     linha_total = {
@@ -2181,11 +2372,12 @@ with tab1:
         'Total 2025': total_2025_geral,
         **{f'{meses_ordem[i]}/25': valores_mensais_2025_geral[i] for i in range(12)},
         **{meses_2026_tabela[i]: valores_mensais_2026_geral[i] for i in range(len(meses_2026_tabela))},
+        f'Tend {mes_atual_tabela}': tend_mes_atual_geral,
         f'Real {mes_atual_tabela}': real_mes_atual_geral,
         f'Meta {mes_atual_tabela}': meta_mes_atual_geral,
-        'Alcance Meta': alcance_meta_geral,
-        'Var 2025/2024': variacao_2024_2025_geral,
-        'Var MoM': variacao_mom_geral
+        'TEND vs META': alcance_meta_geral,
+        '25VS24': variacao_2024_2025_geral,
+        'MOM': variacao_mom_geral
     }
     
     # Criar DataFrame final com as regionais ordenadas por Total 2025 (decrescente)
@@ -2198,9 +2390,9 @@ with tab1:
     colunas_base = ['Regional', 'Total 2024']
     colunas_meses_2025 = [f'{meses_ordem[i]}/25' for i in range(12)]
     colunas_meses_2026 = meses_2026_tabela
-    colunas_finais = [f'Real {mes_atual_tabela}', f'Meta {mes_atual_tabela}', 'Alcance Meta', 'Var 2025/2024', 'Var MoM']
+    colunas_finais = [f'Tend {mes_atual_tabela}', f'Real {mes_atual_tabela}', f'Meta {mes_atual_tabela}', 'MOM', 'TEND vs META']
 
-    colunas_ordenadas = colunas_base + colunas_meses_2025 + ['Total 2025'] + colunas_meses_2026 + colunas_finais
+    colunas_ordenadas = colunas_base + colunas_meses_2025 + ['Total 2025', '25VS24'] + colunas_meses_2026 + colunas_finais
     
     # Manter apenas colunas presentes no DataFrame
     colunas_ordenadas = [col for col in colunas_ordenadas if col in df_final.columns]
@@ -2222,7 +2414,7 @@ with tab1:
     
     df_exibicao = df_final.copy()
     for col in df_exibicao.columns:
-        if col not in ['Regional', 'Var 2025/2024', 'Var MoM', 'Alcance Meta']:
+        if col not in ['Regional', '25VS24', 'MOM', 'TEND vs META']:
             df_exibicao[col] = df_exibicao[col].apply(formatar_numero)
         else:
             df_exibicao[col] = df_exibicao[col].apply(formatar_percentual)
@@ -2578,13 +2770,13 @@ with tab1:
                 classe = "col-total-anual"
             elif '/25' in col or '/26' in col:
                 classe = "col-mes"
-            elif 'Real' in col:
+            elif 'Real' in col or 'Tend' in col:
                 classe = "col-real-mes"
-            elif 'Meta' in col and 'Alcance' not in col:
+            elif 'Meta' in col and col != 'TEND vs META':
                 classe = "col-meta"
-            elif 'Alcance' in col:
+            elif 'Alcance' in col or col == 'TEND vs META':
                 classe = "col-alcance"
-            elif 'Var' in col:
+            elif 'Var' in col or col in ['25VS24', 'MOM']:
                 classe = "col-variacao"
             
             html += f'<th class="{classe}">{col}</th>'
@@ -2607,13 +2799,13 @@ with tab1:
                         classe_celula = "col-total-anual"
                     elif '/25' in col or '/26' in col:
                         classe_celula = "col-mes"
-                    elif 'Real' in col:
+                    elif 'Real' in col or 'Tend' in col:
                         classe_celula = "col-real-mes"
-                    elif 'Meta' in col and 'Alcance' not in col:
+                    elif 'Meta' in col and col != 'TEND vs META':
                         classe_celula = "col-meta"
-                    elif 'Alcance' in col:
+                    elif 'Alcance' in col or col == 'TEND vs META':
                         classe_celula = "col-alcance"
-                    elif 'Var' in col:
+                    elif 'Var' in col or col in ['25VS24', 'MOM']:
                         classe_celula = "col-variacao"
                 else:
                     if col == 'Regional':
@@ -2622,17 +2814,17 @@ with tab1:
                         classe_celula = "col-total-anual"
                     elif '/25' in col or '/26' in col:
                         classe_celula = "col-mes"
-                    elif 'Real' in col:
+                    elif 'Real' in col or 'Tend' in col:
                         classe_celula = "col-real-mes"
-                    elif 'Meta' in col and 'Alcance' not in col:
+                    elif 'Meta' in col and col != 'TEND vs META':
                         classe_celula = "col-meta"
-                    elif 'Alcance' in col or 'Var' in col:
+                    elif 'Alcance' in col or 'Var' in col or col in ['25VS24', 'MOM', 'TEND vs META']:
                         try:
                             valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                             num_valor = float(valor_limpo)
                             
                             if num_valor > 0:
-                                if 'Alcance' in col:
+                                if 'Alcance' in col or col == 'TEND vs META':
                                     classe_celula = "col-alcance percentual-positivo"
                                 else:
                                     classe_celula = "col-variacao percentual-positivo"
@@ -2640,7 +2832,7 @@ with tab1:
                                 if num_valor > 50:
                                     classe_celula += " performance-excelente"
                             elif num_valor < 0:
-                                if 'Alcance' in col:
+                                if 'Alcance' in col or col == 'TEND vs META':
                                     classe_celula = "col-alcance percentual-negativo"
                                 else:
                                     classe_celula = "col-variacao percentual-negativo"
@@ -2648,12 +2840,12 @@ with tab1:
                                 if num_valor < -30:
                                     classe_celula += " performance-critica"
                             else:
-                                if 'Alcance' in col:
+                                if 'Alcance' in col or col == 'TEND vs META':
                                     classe_celula = "col-alcance percentual-neutro"
                                 else:
                                     classe_celula = "col-variacao percentual-neutro"
                         except:
-                            if 'Alcance' in col:
+                            if 'Alcance' in col or col == 'TEND vs META':
                                 classe_celula = "col-alcance"
                             else:
                                 classe_celula = "col-variacao"
@@ -2703,7 +2895,7 @@ with tab1:
                     for col_num, col_name in enumerate(df_numerico.columns):
                         worksheet.write(0, col_num, col_name, header_format)
                         
-                        if col_name in ['Var 2025/2024', 'Var MoM', 'Alcance Meta']:
+                        if col_name in ['25VS24', 'MOM', 'TEND vs META']:
                             cell_format = percent_format
                         else:
                             cell_format = number_format
@@ -2751,7 +2943,7 @@ with tab1:
             **Resumo:** {len(pivot_data)} Regionais | 
             **Total 2025:** {formatar_numero(total_2025_geral)} | 
             **Crescimento vs 2024:** {formatar_percentual(variacao_2024_2025_geral)} | 
-            **Alcance Meta ({mes_atual_tabela}):** {formatar_percentual(alcance_meta_geral)}
+            **TEND vs META ({mes_atual_tabela}):** {formatar_percentual(alcance_meta_geral)}
             """)
         
         # Análise detalhada
@@ -2766,11 +2958,11 @@ with tab1:
             with col_insight1:
                 df_crescimento = pd.DataFrame(pivot_data_ordenada)
                 if not df_crescimento.empty and len(df_crescimento) > 0:
-                    maior_cresc_idx = df_crescimento['Var 2025/2024'].idxmax()
+                    maior_cresc_idx = df_crescimento['25VS24'].idxmax()
                     maior_cresc = df_crescimento.loc[maior_cresc_idx]
                     st.metric("Maior Crescimento", 
                              maior_cresc['Regional'], 
-                             f"{maior_cresc['Var 2025/2024']:+.1f}%")
+                             f"{maior_cresc['25VS24']:+.1f}%")
             
             with col_insight2:
                 if not df_crescimento.empty and len(df_crescimento) > 0:
@@ -2782,14 +2974,14 @@ with tab1:
             
             with col_insight3:
                 if not df_crescimento.empty and len(df_crescimento) > 0:
-                    media_alcance = df_crescimento['Alcance Meta'].mean()
-                    st.metric("Média Alcance Meta", 
+                    media_alcance = df_crescimento['TEND vs META'].mean()
+                    st.metric("Média TEND vs META", 
                              f"{media_alcance:.1f}%", 
                              None)
             
             with col_insight4:
                 if not df_crescimento.empty and len(df_crescimento) > 0:
-                    media_cresc = df_crescimento['Var 2025/2024'].mean()
+                    media_cresc = df_crescimento['25VS24'].mean()
                     st.metric("Crescimento Médio", 
                              f"{media_cresc:+.1f}%", 
                              None)
@@ -2807,22 +2999,48 @@ with tab1:
                     orientation='h',
                     title='Top 10 Regionais por Volume 2025',
                     color='Total 2025',
-                    color_continuous_scale='Reds',
+                    color_continuous_scale=['#F9D6D3', '#D26D64', '#8D1A12'],
                     text='Total 2025'
                 )
                 
                 fig_comparativo.update_traces(
                     texttemplate='%{x:,.0f}',
-                    textposition='outside'
+                    textposition='outside',
+                    marker_line_color='white',
+                    marker_line_width=1.1,
+                    hovertemplate='<b>Regional:</b> %{y}<br><b>Total 2025:</b> %{x:,.0f}<extra></extra>'
                 )
                 
                 fig_comparativo.update_layout(
-                    height=400,
+                    height=430,
                     showlegend=False,
-                    xaxis_title="Volume 2025",
+                    xaxis_title='Volume 2025',
                     yaxis_title="",
-                    yaxis={'categoryorder': 'total ascending'},
-                    margin=dict(l=20, r=20, t=40, b=20)
+                    coloraxis_showscale=False,
+                    plot_bgcolor='white',
+                    paper_bgcolor='#FCFCFD',
+                    font=dict(family='Segoe UI', size=13, color='#2F3747'),
+                    margin=dict(l=20, r=20, t=56, b=24),
+                    xaxis=dict(
+                        gridcolor='rgba(230, 236, 244, 0.85)',
+                        showgrid=True,
+                        zeroline=False,
+                        linecolor='#E6ECF4',
+                        linewidth=1.4,
+                        tickfont=dict(size=12, color='#5B6578')
+                    ),
+                    yaxis=dict(
+                        categoryorder='total ascending',
+                        showgrid=False,
+                        linecolor='#E6ECF4',
+                        linewidth=1.4,
+                        tickfont=dict(size=12, color='#5B6578')
+                    ),
+                    title=dict(
+                        x=0.01,
+                        xanchor='left',
+                        font=dict(size=15, color='#2F3747')
+                    )
                 )
                 
                 st.plotly_chart(fig_comparativo, width='stretch')
@@ -2840,7 +3058,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -3109,164 +3327,165 @@ with tab2:
         }
     
     # =========================
-    # CARDS KPI POR CANAL
+    # CARDS KPI POR CANAL + INADIMPLÊNCIA POR CANAL (LADO A LADO)
     # =========================
     st.markdown('<div class="section-title"><span class="section-icon">📊</span> PERFORMANCE POR CANAL - DESATIVADOS</div>', unsafe_allow_html=True)
-    
-    # Ordenar canais
-    canais_ordenados = sorted(df_filtrado['CANAL_PLAN'].unique())
-    num_canais = len(canais_ordenados)
-    
-    # Renderizar cards KPI
-    for i in range(0, num_canais, 3):
-        cols = st.columns(3, gap="medium")
-        canais_linha = canais_ordenados[i:i+3]
-        
-        for j, canal in enumerate(canais_linha):
-            metricas = calcular_metricas_canal_desativados(canal, mes_selecionado, mes_anterior)
-            
-            total_atual = metricas['total_atual']
-            total_anterior = metricas['total_anterior']
-            silentes_atual = metricas['silentes_atual']
-            variacao_mom = metricas['variacao_mom']
-            percent_silentes = metricas['percent_silentes']
-            
-            # Formatar valores
-            total_atual_fmt = f"{total_atual:,.0f}".replace(",", ".")
-            total_anterior_fmt = f"{total_anterior:,.0f}".replace(",", ".")
-            silentes_fmt = f"{silentes_atual:,.0f}".replace(",", ".")
-            
-            # Determinar classes de variação
-            classe_mom = "variacao-positiva" if variacao_mom < 0 else "variacao-negativa"
-            classe_silentes = "variacao-negativa" if percent_silentes > 20 else "variacao-positiva"
-            
-            with cols[j]:
-                st.markdown(
-                    f"""
-                    <div class="kpi-card-dinamico animate-fade-in-up">
-                        <div class="kpi-title-dinamico">{canal}</div>
-                        <div style="text-align: center; padding: 15px 0;">
-                            <div class="kpi-value-dinamico">{total_atual_fmt}</div>
-                            <div style="font-size: 12.5px; color: #666666; margin: 10px 0; line-height: 1.4; font-weight: 500;">
-                                <span style="font-weight: 600;">Anterior ({mes_anterior}):</span> {total_anterior_fmt}<br>
-                                <span style="font-weight: 600;">Silentes:</span> {silentes_fmt}
-                            </div>
-                            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-                                <div class="kpi-variacao-item {classe_mom}" style="font-size: 10px !important;">
-                                    {variacao_mom:+.0f}% MoM
+
+    # Layout lado a lado: cards (esquerda) + gráfico de inadimplência (direita)
+    col_cards_des, col_inad_des = st.columns([1.25, 1], gap="large")
+
+    with col_cards_des:
+        # Ordenar canais
+        canais_ordenados = sorted(df_filtrado['CANAL_PLAN'].unique())
+        num_canais = len(canais_ordenados)
+
+        # Renderizar cards KPI em grade 2xN para manter simetria visual
+        for i in range(0, num_canais, 2):
+            cols = st.columns(2, gap="medium")
+            canais_linha = canais_ordenados[i:i+2]
+
+            for j, canal in enumerate(canais_linha):
+                metricas = calcular_metricas_canal_desativados(canal, mes_selecionado, mes_anterior)
+
+                total_atual = metricas['total_atual']
+                total_anterior = metricas['total_anterior']
+                silentes_atual = metricas['silentes_atual']
+                variacao_mom = metricas['variacao_mom']
+                percent_silentes = metricas['percent_silentes']
+
+                # Formatar valores
+                total_atual_fmt = f"{total_atual:,.0f}".replace(",", ".")
+                total_anterior_fmt = f"{total_anterior:,.0f}".replace(",", ".")
+                silentes_fmt = f"{silentes_atual:,.0f}".replace(",", ".")
+
+                # Determinar classes de variação
+                classe_mom = "variacao-positiva" if variacao_mom < 0 else "variacao-negativa"
+                classe_silentes = "variacao-negativa" if percent_silentes > 20 else "variacao-positiva"
+
+                with cols[j]:
+                    st.markdown(
+                        f"""
+                        <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">
+                            <div class="kpi-title-dinamico">{canal}</div>
+                            <div style="text-align: center; padding: 6px 0;">
+                                <div class="kpi-value-dinamico">{total_atual_fmt}</div>
+                                <div style="font-size: 12px; color: #666666; margin: 7px 0; line-height: 1.3; font-weight: 500;">
+                                    <span style="font-weight: 600;">Anterior ({mes_anterior}):</span> {total_anterior_fmt}<br>
+                                    <span style="font-weight: 600;">Silentes:</span> {silentes_fmt}
                                 </div>
-                                <div class="kpi-variacao-item {classe_silentes}" style="font-size: 10px !important;">
-                                    {percent_silentes:.0f}% Silentes
+                                <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
+                                    <div class="kpi-variacao-item {classe_mom}" style="font-size: 10px !important;">
+                                        {variacao_mom:+.0f}% MoM
+                                    </div>
+                                    <div class="kpi-variacao-item {classe_silentes}" style="font-size: 10px !important;">
+                                        {percent_silentes:.0f}% Silentes
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+    with col_inad_des:
+        st.markdown(f"""
+            <div class="card-title" style="margin-top: 0; margin-bottom: 12px; font-size: 15px;">
+                DISTRIBUIÇÃO DE INADIMPLENTES POR CANAL
+                <div style="font-size: 12px; color: #64748B; font-weight: 600; margin-top: 6px;">
+                    Mês selecionado: {mes_selecionado}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        df_inad_base = df_filtrado[df_filtrado['mes_ano'] == mes_selecionado].copy()
+
+        if not df_inad_base.empty:
+            total_por_canal = (
+                df_inad_base.groupby('CANAL_PLAN', as_index=False)['QTDE']
+                .sum()
+                .rename(columns={'QTDE': 'Total_Canal'})
+            )
+            inad_por_canal = (
+                df_inad_base[df_inad_base['INADIMPLENTE'] == 'Sim']
+                .groupby('CANAL_PLAN', as_index=False)['QTDE']
+                .sum()
+                .rename(columns={'QTDE': 'Inadimplentes'})
+            )
+            df_inad = total_por_canal.merge(inad_por_canal, on='CANAL_PLAN', how='left')
+            df_inad['Inadimplentes'] = df_inad['Inadimplentes'].fillna(0)
+            df_inad['Pct_Inad'] = np.where(
+                df_inad['Total_Canal'] > 0,
+                (df_inad['Inadimplentes'] / df_inad['Total_Canal']) * 100,
+                0
+            )
+            df_inad = df_inad.sort_values('Inadimplentes', ascending=False).reset_index(drop=True)
+            df_inad['Label'] = df_inad.apply(
+                lambda r: f"{formatar_numero_brasileiro(r['Inadimplentes'], 0)} | {r['Pct_Inad']:.1f}%".replace('.', ','),
+                axis=1
+            )
+
+            fig_inad = go.Figure()
+            fig_inad.add_trace(go.Bar(
+                y=df_inad['CANAL_PLAN'],
+                x=df_inad['Inadimplentes'],
+                orientation='h',
+                name='Inadimplentes',
+                marker=dict(color='#8D1A12', line=dict(color='white', width=1.1)),
+                text=df_inad['Label'],
+                textposition='outside',
+                cliponaxis=False,
+                customdata=np.stack([df_inad['Total_Canal'], df_inad['Pct_Inad']], axis=-1),
+                hovertemplate=(
+                    "<b>Canal:</b> %{y}<br>"
+                    "<b>Inadimplentes:</b> %{x:,.0f}<br>"
+                    "<b>Total Canal:</b> %{customdata[0]:,.0f}<br>"
+                    "<b>% Inadimplentes:</b> %{customdata[1]:.1f}%<br>"
+                    "<extra></extra>"
                 )
-    
-    # =========================
-    # GRÁFICO DE DONUT - INADIMPLENTES vs NÃO INADIMPLENTES
-    # =========================
-    st.markdown('<div class="section-title"><span class="section-icon">📈</span> DISTRIBUIÇÃO POR INADIMPLÊNCIA</div>', unsafe_allow_html=True)
-    
-    # Filtros para o gráfico de donut
-    with st.container():
-        col_filtro_donut1, col_filtro_donut2 = st.columns(2)
-        
-        with col_filtro_donut1:
-            render_filter_label("CANAL")
-            canal_donut = st.selectbox(
-                "Selecione o Canal",
-                options=["Todos"] + sorted(df_filtrado['CANAL_PLAN'].unique()),
-                key="filtro_canal_donut",
-                label_visibility="collapsed"
+            ))
+
+            fig_inad.update_layout(
+                plot_bgcolor='white',
+                paper_bgcolor='#FCFCFD',
+                font=dict(family='Segoe UI', size=12, color='#2F3747'),
+                margin=dict(l=8, r=24, t=8, b=12),
+                height=max(320, 48 * len(df_inad) + 90),
+                xaxis=dict(
+                    title='',
+                    tickfont=dict(size=11, color='#5B6578'),
+                    gridcolor='rgba(230, 236, 244, 0.85)',
+                    showgrid=True,
+                    showline=True,
+                    linecolor='#E6ECF4',
+                    linewidth=1.3,
+                    zeroline=False
+                ),
+                yaxis=dict(
+                    title='',
+                    tickfont=dict(size=11, color='#5B6578'),
+                    categoryorder='array',
+                    categoryarray=df_inad['CANAL_PLAN'][::-1].tolist(),
+                    showgrid=False,
+                    showline=False
+                ),
+                showlegend=False
             )
-        
-        with col_filtro_donut2:
-            render_filter_label("REGIONAL")
-            regional_donut = st.selectbox(
-                "Selecione a Regional",
-                options=["Todos"] + sorted(df_filtrado['REGIONAL'].unique()),
-                key="filtro_regional_donut",
-                label_visibility="collapsed"
+
+            st.plotly_chart(
+                fig_inad,
+                width='stretch',
+                config={'displayModeBar': False, 'displaylogo': False}
             )
-    
-    # Aplicar filtros para o donut
-    df_donut = df_filtrado.copy()
-    
-    if canal_donut != "Todos":
-        df_donut = df_donut[df_donut['CANAL_PLAN'] == canal_donut]
-    
-    if regional_donut != "Todos":
-        df_donut = df_donut[df_donut['REGIONAL'] == regional_donut]
-    
-    # Calcular totais por inadimplência
-    if not df_donut.empty:
-        total_por_inadimplencia = df_donut.groupby('INADIMPLENTE')['QTDE'].sum().reset_index()
-        total_geral_donut = total_por_inadimplencia['QTDE'].sum()
-        
-        # Calcular percentuais
-        total_por_inadimplencia['Percentual'] = (total_por_inadimplencia['QTDE'] / total_geral_donut * 100).round(1)
-        
-        # Criar gráfico de donut
-        fig_donut = px.pie(
-            total_por_inadimplencia,
-            values='QTDE',
-            names='INADIMPLENTE',
-            title=f'<b>DISTRIBUIÇÃO POR INADIMPLÊNCIA</b>',
-            hole=0.6,
-            color='INADIMPLENTE',
-            color_discrete_map={
-                'Sim': '#FF2800',
-                'Não': '#790E09'
-            }
-        )
-        
-        # Atualizar layout
-        fig_donut.update_traces(
-            textposition='inside',
-            textinfo='percent+label',
-            hovertemplate="<b>%{label}</b><br>Quantidade: %{value:,.0f}<br>Percentual: %{percent}",
-            marker=dict(line=dict(color='white', width=2))
-        )
-        
-        fig_donut.update_layout(
-            height=400,
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font=dict(family='Segoe UI', size=14, color='#333333'),
-            margin=dict(l=20, r=20, t=80, b=20),
-            title=dict(
-                x=0.5,
-                xanchor='center',
-                yanchor='top',
-                font=dict(size=16, color='#333333', weight=800),
-                y=0.95
-            ),
-            showlegend=True,
-            legend=dict(
-                title=dict(text='<b>INADIMPLÊNCIA</b>', font=dict(size=14, weight=700, color='#333333')),
-                orientation="h",
-                yanchor="bottom",
-                y=-0.1,
-                xanchor="center",
-                x=0.5
+
+            total_inad = df_inad['Inadimplentes'].sum()
+            total_base = df_inad['Total_Canal'].sum()
+            pct_geral_inad = (total_inad / total_base * 100) if total_base > 0 else 0
+            st.caption(
+                f"Total Inadimplentes: {formatar_numero_brasileiro(total_inad, 0)} | "
+                f"% Inadimplência Geral: {pct_geral_inad:.1f}%".replace('.', ',')
             )
-        )
-        
-        # Adicionar texto no centro
-        fig_donut.add_annotation(
-            text=f"<b>TOTAL</b><br>{total_geral_donut:,.0f}",
-            x=0.5, y=0.5,
-            font=dict(size=20, color='#333333', weight=800),
-            showarrow=False
-        )
-        
-        # Exibir gráfico
-        st.plotly_chart(fig_donut, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
-    else:
-        st.warning("Nenhum dado disponível para os filtros selecionados.")
+        else:
+            st.warning("Sem dados para inadimplência no mês selecionado.")
     
     # =========================
     # GRÁFICO DE LINHAS TEMPORAL
@@ -3304,157 +3523,81 @@ with tab2:
     if regional_linha != "Todos":
         df_linhas = df_linhas[df_linhas['REGIONAL'] == regional_linha]
     
-    # Preparar dados para o gráfico de linhas
+    # Preparar dados para gráfico combinado (colunas + linha) em janela móvel de 13 meses
     if not df_linhas.empty:
-        # Extrair ano e mês
-        df_linhas['ANO'] = df_linhas['DAT_MOVIMENTO2'].dt.year
-        df_linhas['MES_NUM'] = df_linhas['DAT_MOVIMENTO2'].dt.month
-        
-        # Mapear meses
+        df_linhas = df_linhas.copy()
+        df_linhas['MES_REF'] = df_linhas['DAT_MOVIMENTO2'].dt.to_period('M')
+
         meses_abreviados = {
             1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
             7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
         }
-        
-        # Criar DataFrame para o gráfico
-        dados_grafico = []
-        anos_disponiveis = sorted(df_linhas['ANO'].unique())
-        
-        for ano in anos_disponiveis:
-            df_ano = df_linhas[df_linhas['ANO'] == ano]
-            for mes_num in range(1, 13):
-                df_mes = df_ano[df_ano['MES_NUM'] == mes_num]
-                total = df_mes['QTDE'].sum()
-                
-                dados_grafico.append({
-                    'Ano': str(ano),
-                    'Mês': meses_abreviados.get(mes_num, str(mes_num)),
-                    'Mês_Num': mes_num,
-                    'Valor': total,
-                    'Tipo': 'Real'
-                })
-        
-        df_linhas_grafico = pd.DataFrame(dados_grafico)
-        df_linhas_grafico['Mês_Ord'] = df_linhas_grafico['Mês_Num']
-        df_linhas_grafico = df_linhas_grafico.sort_values(['Ano', 'Mês_Ord'])
-        df_linhas_grafico['Valor_Formatado'] = df_linhas_grafico['Valor'].apply(lambda x: f'{x:,.0f}'.replace(',', '.'))
-        
-        # Criar título dinâmico
+
+        mes_fim = pd.Timestamp(mes_ano_para_data(mes_selecionado)).to_period('M')
+        meses_janela = pd.period_range(end=mes_fim, periods=13, freq='M')
+        df_12m = df_linhas[df_linhas['MES_REF'].isin(meses_janela)].copy()
+
+        agg_12m = df_12m.groupby('MES_REF', as_index=False).agg({
+            'QTDE': 'sum',
+            'QTDE_SILENTE': 'sum'
+        })
+
+        df_combo = pd.DataFrame({'MES_REF': meses_janela})
+        df_combo = df_combo.merge(agg_12m, on='MES_REF', how='left').fillna(0)
+        df_combo = df_combo.rename(columns={'QTDE': 'Desativados', 'QTDE_SILENTE': 'Silentes'})
+        df_combo['Periodo'] = df_combo['MES_REF'].apply(
+            lambda p: f"{meses_abreviados.get(p.month, 'jan')}/{str(p.year)[-2:]}"
+        )
+        df_combo['Desativados_fmt'] = df_combo['Desativados'].apply(lambda x: formatar_numero_brasileiro(x, 0))
+        df_combo['Silentes_fmt'] = df_combo['Silentes'].apply(lambda x: formatar_numero_brasileiro(x, 0))
+
         filtros_ativos = []
         if canal_linha != "Todos":
             filtros_ativos.append(f"Canal: {canal_linha}")
         if regional_linha != "Todos":
             filtros_ativos.append(f"Regional: {regional_linha}")
-        
-        titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
-        
-        # Criar gráfico
-        cores_personalizadas = {
-            '2024': '#FF2800',
-            '2025': '#790E09',
-            '2026': '#5A6268'
-        }
-        
-        # Filtrar apenas anos com dados
-        anos_com_dados = sorted(df_linhas_grafico['Ano'].unique())
-        color_map = {ano: cores_personalizadas.get(int(ano), '#666666') for ano in anos_com_dados}
-        
-        fig_linhas = px.line(
-            df_linhas_grafico,
-            x='Mês',
-            y='Valor',
-            color='Ano',
+        filtros_ativos.append(f"Período: {df_combo['Periodo'].iloc[0]} a {df_combo['Periodo'].iloc[-1]}")
+        titulo_filtros = " | ".join(filtros_ativos)
+
+        fig_combo = go.Figure()
+
+        fig_combo.add_trace(go.Bar(
+            x=df_combo['Periodo'],
+            y=df_combo['Silentes'],
+            name='Silentes',
+            marker=dict(color='rgba(210, 109, 100, 0.72)', line=dict(color='#B2463F', width=1)),
+            text=df_combo['Silentes_fmt'],
+            textposition='outside',
+            cliponaxis=False,
+            hovertemplate='<b>%{x}</b><br><b>Silentes:</b> %{y:,.0f}<extra></extra>'
+        ))
+
+        fig_combo.add_trace(go.Scatter(
+            x=df_combo['Periodo'],
+            y=df_combo['Desativados'],
+            name='Desativados',
+            mode='lines+markers+text',
+            line=dict(color='#790E09', width=3.4, shape='spline', smoothing=1.2),
+            marker=dict(size=10, color='#790E09', line=dict(color='white', width=1.8)),
+            text=df_combo['Desativados_fmt'],
+            textposition='top center',
+            textfont=dict(size=11, color='#790E09'),
+            hovertemplate='<b>%{x}</b><br><b>Desativados:</b> %{y:,.0f}<extra></extra>'
+        ))
+
+        fig_combo.update_layout(
             title=f'<b>EVOLUÇÃO MENSAL DE DESATIVADOS</b><br><span style="font-size: 14px; color: #666666;">{titulo_filtros}</span>',
-            labels={'Valor': 'Volume', 'Mês': ''},
-            markers=True,
-            line_shape='spline',
-            color_discrete_map=color_map,
-            text='Valor_Formatado'
+            barmode='group'
         )
-        
-        fig_linhas.update_layout(
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font=dict(family='Segoe UI', size=14, color='#333333'),
-            margin=dict(l=60, r=60, t=100, b=80),
-            xaxis=dict(
-                title='',
-                tickmode='array',
-                tickvals=['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-                tickfont=dict(size=13, color='#666666', weight=600),
-                showgrid=True,
-                gridcolor='rgba(233, 236, 239, 0.5)',
-                gridwidth=1,
-                linecolor='#E9ECEF',
-                linewidth=2,
-                mirror=True,
-                tickangle=0,
-                showline=True,
-                zeroline=False
-            ),
-            yaxis=dict(
-                title='<b>VOLUME DE DESATIVADOS</b>',
-                title_font=dict(size=15, weight=700, color='#333333'),
-                tickfont=dict(size=13, color='#666666', weight=600),
-                showgrid=True,
-                gridcolor='rgba(233, 236, 239, 0.5)',
-                gridwidth=1,
-                linecolor='#E9ECEF',
-                linewidth=2,
-                mirror=True,
-                showline=True,
-                zeroline=False
-            ),
-            legend=dict(
-                title=dict(text='<b>ANO</b>', font=dict(size=14, weight=700, color='#333333')),
-                orientation="h",
-                yanchor="bottom",
-                y=-0.25,
-                xanchor="center",
-                x=0.5,
-                bgcolor='rgba(255, 255, 255, 0.95)',
-                bordercolor='#E9ECEF',
-                borderwidth=2,
-                font=dict(size=13, color='#333333', weight=600),
-                itemwidth=50,
-                traceorder='normal'
-            ),
-            title=dict(
-                x=0.5,
-                xanchor='center',
-                yanchor='top',
-                font=dict(size=16, color='#333333', weight=800),
-                y=0.95
-            ),
-            hovermode='x unified',
-            hoverlabel=dict(
-                bgcolor='white',
-                font_size=14,
-                font_family='Segoe UI',
-                bordercolor='#E9ECEF',
-                font_color='#333333',
-                font_weight=600
-            ),
-            height=500,
-            showlegend=True
+        apply_standard_line_layout(fig_combo, 'VOLUME DE DESATIVADOS E SILENTES', height=520)
+        fig_combo.update_layout(bargap=0.22, bargroupgap=0.08)
+        fig_combo.update_xaxes(
+            tickmode='array',
+            tickvals=df_combo['Periodo'].tolist(),
+            categoryorder='array',
+            categoryarray=df_combo['Periodo'].tolist()
         )
-        
-        for i, trace in enumerate(fig_linhas.data):
-            ano = trace.name
-            trace.update(
-                mode='lines+markers+text',
-                marker=dict(size=12, line=dict(width=2, color='white'), symbol='circle', opacity=0.9),
-                line=dict(width=4, smoothing=1.3),
-                textposition='top center',
-                textfont=dict(size=12, color=color_map.get(ano, '#666666'), weight=700),
-                hovertemplate=(
-                    f"<b>%{{x}}/{ano}</b><br>" +
-                    "<b>Valor:</b> %{y:,.0f}<br>" +
-                    "<extra></extra>"
-                )
-            )
-        
-        # Container de informações
+
         st.markdown(f"""
             <div style="background: linear-gradient(135deg, #FFFFFF, #F8F9FA); 
                         padding: 15px 20px; 
@@ -3465,28 +3608,23 @@ with tab2:
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                     <div style="font-size: 14px; color: #333333; font-weight: 700;">
                         <span>📊 Dados Filtrados:</span>
-                        <span style="color: #FF2800; margin-left: 8px;">{len(df_linhas):,}</span>
+                        <span style="color: #FF2800; margin-left: 8px;">{len(df_12m):,}</span>
                     </div>
                     <div style="font-size: 13px; color: #666666; display: flex; gap: 20px; flex-wrap: wrap;">
-        """, unsafe_allow_html=True)
-        
-        # Adicionar legendas de cores
-        for ano, cor in color_map.items():
-            st.markdown(f"""
-                <span style="display: inline-flex; align-items: center; gap: 8px;">
-                    <div style="width: 12px; height: 12px; background: {cor}; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                    <span style="font-weight: 600;">{ano} (Real)</span>
-                </span>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("""
+                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            <div style="width: 12px; height: 12px; background: rgba(210, 109, 100, 0.72); border-radius: 2px; border: 1px solid #B2463F;"></div>
+                            <span style="font-weight: 600;">Silentes (Coluna)</span>
+                        </span>
+                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            <div style="width: 12px; height: 12px; background: #790E09; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                            <span style="font-weight: 600;">Desativados (Linha)</span>
+                        </span>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        
-        # Exibir gráfico
-        st.plotly_chart(fig_linhas, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
+
+        st.plotly_chart(fig_combo, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
     
     # =========================
     # GRÁFICO DE BARRAS HORIZONTAIS
@@ -3511,104 +3649,93 @@ with tab2:
         
         # Rótulos de dados
         labels_total = dados_barras['QTDE'].apply(lambda x: formatar_numero_brasileiro(x, 0))
-        labels_silente = dados_barras.apply(
-            lambda row: f"{formatar_numero_brasileiro(row['QTDE_SILENTE'], 0)} ({row['Percentual_Silentes']:.1f}%)",
-            axis=1
-        )
-        
-        # Criar gráfico de barras verticais agrupadas (não empilhadas)
+        labels_silente = dados_barras['QTDE_SILENTE'].apply(lambda x: formatar_numero_brasileiro(x, 0))
+        # Gráfico executivo: barras agrupadas
         fig_barras = go.Figure()
-        
+
         fig_barras.add_trace(go.Bar(
             x=dados_barras['CANAL_PLAN'],
             y=dados_barras['QTDE'],
-            name='Total Desativados',
-            marker=dict(color='#790E09'),
+            name='Desativados',
+            marker=dict(color='#8D1A12', line=dict(color='white', width=1.4)),
             text=labels_total,
             textposition='outside',
             cliponaxis=False,
-            hovertemplate='<b>Canal:</b> %{x}<br><b>Total Desativados:</b> %{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Canal:</b> %{x}<br><b>Desativados:</b> %{y:,.0f}<extra></extra>'
         ))
-        
+
         fig_barras.add_trace(go.Bar(
             x=dados_barras['CANAL_PLAN'],
             y=dados_barras['QTDE_SILENTE'],
             name='Silentes',
-            marker=dict(color='#FF2800'),
+            marker=dict(color='rgba(210, 109, 100, 0.78)', line=dict(color='white', width=1.4)),
             text=labels_silente,
             textposition='outside',
             cliponaxis=False,
-            customdata=dados_barras['Percentual_Silentes'],
-            hovertemplate='<b>Canal:</b> %{x}<br><b>Silentes:</b> %{y:,.0f}<br><b>% Silentes:</b> %{customdata:.1f}%<extra></extra>'
+            hovertemplate='<b>Canal:</b> %{x}<br><b>Silentes:</b> %{y:,.0f}<extra></extra>'
         ))
-        
+
         y_max = max(
             float(dados_barras['QTDE'].max()) if not dados_barras.empty else 0.0,
             float(dados_barras['QTDE_SILENTE'].max()) if not dados_barras.empty else 0.0
         )
-        y_top = y_max * 1.30 if y_max > 0 else 1
-        
-        # Atualizar layout
+        y_top = y_max * 1.34 if y_max > 0 else 1
+
         fig_barras.update_layout(
             barmode='group',
             plot_bgcolor='white',
-            paper_bgcolor='white',
-            font=dict(family='Segoe UI', size=14, color='#333333'),
-            margin=dict(l=20, r=20, t=80, b=90),
-            height=520,
+            paper_bgcolor='#FCFCFD',
+            font=dict(family='Segoe UI', size=14, color='#2F3747'),
+            margin=dict(l=24, r=24, t=92, b=98),
+            height=560,
             xaxis=dict(
                 title='<b>CANAL</b>',
-                title_font=dict(size=16, weight=800, color='#333333'),
-                tickfont=dict(size=12, color='#666666', weight=600),
+                title_font=dict(size=14, color='#2F3747'),
+                tickfont=dict(size=12, color='#5B6578'),
                 showgrid=False,
-                linecolor='#E9ECEF',
-                linewidth=2,
-                tickangle=-15,
+                linecolor='#E6ECF4',
+                linewidth=1.6,
+                tickangle=-18,
                 categoryorder='array',
                 categoryarray=dados_barras['CANAL_PLAN'].tolist()
             ),
             yaxis=dict(
                 title='<b>QUANTIDADE</b>',
-                title_font=dict(size=16, weight=800, color='#333333'),
-                tickfont=dict(size=13, color='#666666', weight=600),
-                gridcolor='rgba(233, 236, 239, 0.7)',
+                title_font=dict(size=13, color='#2F3747'),
+                tickfont=dict(size=12, color='#5B6578'),
+                gridcolor='rgba(230, 236, 244, 0.85)',
                 showgrid=True,
                 gridwidth=1,
                 zeroline=False,
                 showline=True,
-                linecolor='#E9ECEF',
-                linewidth=2,
+                linecolor='#E6ECF4',
+                linewidth=1.6,
                 range=[0, y_top]
             ),
             legend=dict(
-                title=dict(text='<b>TIPO</b>', font=dict(size=14, weight=800, color='#333333')),
-                orientation="h",
-                yanchor="bottom",
+                title=dict(text='<b>SÉRIE</b>', font=dict(size=12, color='#2F3747')),
+                orientation='h',
+                yanchor='bottom',
                 y=1.02,
-                xanchor="left",
+                xanchor='left',
                 x=0.0,
-                bgcolor='rgba(255, 255, 255, 0.95)',
-                bordercolor='#E9ECEF',
-                borderwidth=1,
-                font=dict(size=12, color='#333333', weight=600),
+                bgcolor='rgba(255,255,255,0.92)',
+                bordercolor='#E6ECF4',
+                borderwidth=1.2,
+                font=dict(size=11, color='#2F3747'),
                 traceorder='normal'
             ),
             title=dict(
-                text=f'<b>DESATIVADOS vs SILENTES - {mes_selecionado}</b>',
-                x=0.02,
+                text=f'<b>DESATIVADOS vs SILENTES POR CANAL</b><br><span style="font-size: 13px; color: #64748B;">{mes_selecionado} | Comparativo Executivo</span>',
+                x=0.01,
                 xanchor='left',
                 yanchor='top',
-                font=dict(size=16, color='#333333', weight=800),
-                y=0.95
+                font=dict(size=16, color='#2F3747'),
+                y=0.98
             ),
             hovermode='x unified',
-            bargap=0.32,
-            bargroupgap=0.12
-        )
-        
-        fig_barras.update_traces(
-            marker_line_color='white',
-            marker_line_width=1.2
+            bargap=0.24,
+            bargroupgap=0.10
         )
         
         # Exibir gráfico
@@ -3713,12 +3840,10 @@ with tab2:
         for regional in regionais:
             df_regional = df[df['REGIONAL'] == regional]
             
-            # Calcular totais por ano
-            total_2024 = df_regional[df_regional['ano'] == '24']['QTDE'].sum()
+            # Calcular total anual disponível
             total_2025 = df_regional[df_regional['ano'] == '25']['QTDE'].sum()
             
             # Calcular silentes por ano
-            silentes_2024 = df_regional[df_regional['ano'] == '24']['QTDE_SILENTE'].sum()
             silentes_2025 = df_regional[df_regional['ano'] == '25']['QTDE_SILENTE'].sum()
             
             # Calcular valores mensais para 2025
@@ -3734,9 +3859,6 @@ with tab2:
             real_jan_26 = df_regional[df_regional['mes_ano_formatado'] == 'jan/26']['QTDE'].sum()
             silentes_jan_26 = df_regional[df_regional['mes_ano_formatado'] == 'jan/26']['QTDE_SILENTE'].sum()
             
-            # Calcular variações
-            variacao_2024_2025 = ((total_2025 - total_2024) / total_2024 * 100) if total_2024 > 0 else 0
-            
             # Calcular variação MoM (dez/25 vs nov/25)
             dez_25 = df_regional[df_regional['mes_ano_formatado'] == 'dez/25']['QTDE'].sum()
             nov_25 = df_regional[df_regional['mes_ano_formatado'] == 'nov/25']['QTDE'].sum()
@@ -3747,15 +3869,12 @@ with tab2:
             
             pivot_data.append({
                 'Regional': regional,
-                'Total 2024': total_2024,
-                'Silentes 2024': silentes_2024,
                 **{meses_2025[i]: valores_mensais_2025[i] for i in range(12)},
                 'Total 2025': total_2025,
                 'Silentes 2025': silentes_2025,
                 '% Silentes': percent_silentes_2025,
                 'Real Jan/26': real_jan_26,
                 'Silentes Jan/26': silentes_jan_26,
-                'Var 2025/2024': variacao_2024_2025,
                 'Var MoM': variacao_mom
             })
         
@@ -3777,9 +3896,7 @@ with tab2:
         pivot_data_ordenada = df_temp.to_dict('records')
         
         # Calcular totais gerais
-        total_2024_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['ano'] == '24']['QTDE'].sum()
         total_2025_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['ano'] == '25']['QTDE'].sum()
-        silentes_2024_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['ano'] == '24']['QTDE_SILENTE'].sum()
         silentes_2025_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['ano'] == '25']['QTDE_SILENTE'].sum()
         
         # Calcular valores mensais gerais
@@ -3795,9 +3912,6 @@ with tab2:
         real_jan_26_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['mes_ano_formatado'] == 'jan/26']['QTDE'].sum()
         silentes_jan_26_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['mes_ano_formatado'] == 'jan/26']['QTDE_SILENTE'].sum()
         
-        # Calcular variações gerais
-        variacao_2024_2025_geral = ((total_2025_geral - total_2024_geral) / total_2024_geral * 100) if total_2024_geral > 0 else 0
-        
         # Calcular variação MoM geral
         dez_25_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['mes_ano_formatado'] == 'dez/25']['QTDE'].sum()
         nov_25_geral = df_filtrado_tabela_des[df_filtrado_tabela_des['mes_ano_formatado'] == 'nov/25']['QTDE'].sum()
@@ -3809,15 +3923,12 @@ with tab2:
         # Adicionar linha de TOTAL
         linha_total = {
             'Regional': 'TOTAL',
-            'Total 2024': total_2024_geral,
-            'Silentes 2024': silentes_2024_geral,
             **{meses_2025[i]: valores_mensais_2025_geral[i] for i in range(12)},
             'Total 2025': total_2025_geral,
             'Silentes 2025': silentes_2025_geral,
             '% Silentes': percent_silentes_geral,
             'Real Jan/26': real_jan_26_geral,
             'Silentes Jan/26': silentes_jan_26_geral,
-            'Var 2025/2024': variacao_2024_2025_geral,
             'Var MoM': variacao_mom_geral
         }
         
@@ -3840,7 +3951,7 @@ with tab2:
         
         df_exibicao = df_final.copy()
         for col in df_exibicao.columns:
-            if col not in ['Regional', 'Var 2025/2024', 'Var MoM', '% Silentes']:
+            if col not in ['Regional', 'Var MoM', '% Silentes']:
                 df_exibicao[col] = df_exibicao[col].apply(formatar_numero)
             else:
                 df_exibicao[col] = df_exibicao[col].apply(formatar_percentual)
@@ -4094,7 +4205,7 @@ with tab3:
     coluna_canal = 'CANAL_PLAN' if 'CANAL_PLAN' in df_pedidos.columns else ('DSC_CANAL' if 'DSC_CANAL' in df_pedidos.columns else None)
 
     if 'DSC_INDICADOR' not in df_pedidos.columns or coluna_canal is None:
-        st.error("❌ Base de pedidos sem colunas obrigatórias (DSC_INDICADOR/CANAL_PLAN).")
+        st.error("❌ Base de pedidos sem colunas obrigatórias (DSC_INDICADOR/CANAL).")
         df_pedidos = pd.DataFrame()
     else:
         indicador_norm = df_pedidos['DSC_INDICADOR'].astype(str).str.strip().str.upper()
@@ -4135,8 +4246,10 @@ with tab3:
             df_pedidos['QTDE'] = pd.to_numeric(df_pedidos.get('QTDE', 0), errors='coerce')
 
         df_pedidos['DESAFIO_QTD'] = pd.to_numeric(df_pedidos.get('DESAFIO_QTD', 0), errors='coerce')
+        df_pedidos['TEND_QTD'] = normalizar_numerico_serie(df_pedidos.get('TEND_QTD', df_pedidos['QTDE']))
         df_pedidos['QTDE'] = df_pedidos['QTDE'].fillna(0)
         df_pedidos['DESAFIO_QTD'] = df_pedidos['DESAFIO_QTD'].fillna(0)
+        df_pedidos['TEND_QTD'] = df_pedidos['TEND_QTD'].fillna(0)
     
     if df_pedidos.empty:
         st.warning("⚠️ Não há dados de pedidos disponíveis para E-Commerce com os filtros atuais.")
@@ -4240,12 +4353,21 @@ with tab3:
         # =========================
         # FUNÇÃO PARA CALCULAR MÉTRICAS DE PEDIDOS
         # =========================
+        mes_corrente_ref_pedidos = get_mes_atual_formatado().strip().lower()
         def calcular_metricas_pedidos(plataforma, mes_atual, mes_anterior):
             """Calcula métricas de pedidos para uma plataforma específica"""
             # Realizado no mês atual (QTDE)
             realizado_atual = df_pedidos.query(
                 "COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
             )['QTDE'].sum()
+
+            tendencia_atual = df_pedidos.query(
+                "COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
+            )['TEND_QTD'].sum()
+
+            usar_tendencia_mes = str(mes_atual).strip().lower() == mes_corrente_ref_pedidos
+            usar_tendencia = usar_tendencia_mes and (tendencia_atual > 0)
+            valor_atual = tendencia_atual if usar_tendencia else realizado_atual
             
             # Realizado no mês anterior (QTDE)
             realizado_anterior = df_pedidos.query(
@@ -4258,15 +4380,18 @@ with tab3:
             )['DESAFIO_QTD'].sum()
             
             # Calcular variações
-            variacao_mom = ((realizado_atual - realizado_anterior) / realizado_anterior * 100) if realizado_anterior > 0 else 0
+            variacao_mom = ((valor_atual - realizado_anterior) / realizado_anterior * 100) if realizado_anterior > 0 else 0
             
             if meta_atual > 0:
-                desvio_meta = ((realizado_atual / meta_atual) - 1) * 100
+                desvio_meta = ((valor_atual / meta_atual) - 1) * 100
             else:
                 desvio_meta = None
             
             return {
+                'atual': valor_atual,
                 'realizado': realizado_atual,
+                'tendencia': tendencia_atual,
+                'usa_tendencia': usar_tendencia,
                 'anterior': realizado_anterior,
                 'meta': meta_atual,
                 'variacao_mom': variacao_mom,
@@ -4283,10 +4408,12 @@ with tab3:
         metricas_fixa = calcular_metricas_pedidos('FIXA', mes_selecionado_pedidos, mes_anterior_pedidos)
         
         # Formatar valores
+        atual_conta_fmt = f"{metricas_conta['atual']:,.0f}".replace(",", ".")
         realizado_conta_fmt = f"{metricas_conta['realizado']:,.0f}".replace(",", ".")
         anterior_conta_fmt = f"{metricas_conta['anterior']:,.0f}".replace(",", ".")
         meta_conta_fmt = f"{metricas_conta['meta']:,.0f}".replace(",", ".")
         
+        atual_fixa_fmt = f"{metricas_fixa['atual']:,.0f}".replace(",", ".")
         realizado_fixa_fmt = f"{metricas_fixa['realizado']:,.0f}".replace(",", ".")
         anterior_fixa_fmt = f"{metricas_fixa['anterior']:,.0f}".replace(",", ".")
         meta_fixa_fmt = f"{metricas_fixa['meta']:,.0f}".replace(",", ".")
@@ -4294,132 +4421,166 @@ with tab3:
         # Determinar classes de variação
         classe_mom_conta = "variacao-positiva" if metricas_conta['variacao_mom'] >= 0 else "variacao-negativa"
         classe_mom_fixa = "variacao-positiva" if metricas_fixa['variacao_mom'] >= 0 else "variacao-negativa"
+        real_hint_conta = (
+            f'<div style="font-size: 11px; color: #666666; font-weight: 700; margin-top: 4px;">Parcial: {realizado_conta_fmt}</div>'
+            if metricas_conta['usa_tendencia'] else ''
+        )
+        real_hint_fixa = (
+            f'<div style="font-size: 11px; color: #666666; font-weight: 700; margin-top: 4px;">Parcial: {realizado_fixa_fmt}</div>'
+            if metricas_fixa['usa_tendencia'] else ''
+        )
         
         # HTML para meta
-        if metricas_conta['desvio_meta'] is not None:
+        if metricas_conta['desvio_meta'] is not None and np.isfinite(metricas_conta['desvio_meta']):
             classe_meta_conta = "variacao-positiva" if metricas_conta['desvio_meta'] >= 0 else "variacao-negativa"
             meta_html_conta = f'<div class="kpi-variacao-item {classe_meta_conta}" style="font-size: 10px !important;">{metricas_conta["desvio_meta"]:+.0f}% Meta</div>'
         else:
             meta_html_conta = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
         
-        if metricas_fixa['desvio_meta'] is not None:
+        if metricas_fixa['desvio_meta'] is not None and np.isfinite(metricas_fixa['desvio_meta']):
             classe_meta_fixa = "variacao-positiva" if metricas_fixa['desvio_meta'] >= 0 else "variacao-negativa"
             meta_html_fixa = f'<div class="kpi-variacao-item {classe_meta_fixa}" style="font-size: 10px !important;">{metricas_fixa["desvio_meta"]:+.0f}% Meta</div>'
         else:
             meta_html_fixa = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
         
         # Layout: coluna esquerda com cards empilhados, coluna direita com donut
-        col_cards, col_donut = st.columns([1, 1])
+        col_cards, col_donut = st.columns([0.5, 1.5])
         
         with col_cards:
-            st.markdown(
-                f"""
-                <div class="kpi-card-dinamico animate-fade-in-up" style="margin-bottom:14px;">
-                    <div class="kpi-title-dinamico">PEDIDOS CONTA</div>
-                    <div style="text-align: center; padding: 12px 0;">
-                        <div class="kpi-value-dinamico">{realizado_conta_fmt}</div>
-                        <div style="font-size: 12.5px; color: #666666; margin: 10px 0; line-height: 1.4; font-weight: 500;">
-                            <span style="font-weight: 600;">Anterior ({mes_anterior_pedidos}):</span> {anterior_conta_fmt}<br>
-                            <span style="font-weight: 600;">Meta ({mes_selecionado_pedidos}):</span> {meta_conta_fmt}
-                        </div>
-                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 12px;">
-                            <div class="kpi-variacao-item {classe_mom_conta}" style="font-size: 10px !important;">
-                                {metricas_conta['variacao_mom']:+.0f}% MoM
-                            </div>
-                            {meta_html_conta}
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
+            card_conta_html = (
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">'
+                f'<div class="kpi-title-dinamico">PEDIDOS CONTA</div>'
+                f'<div style="text-align: center; padding: 6px 0;">'
+                f'<div class="kpi-value-dinamico">{atual_conta_fmt}</div>'
+                f'{real_hint_conta}'
+                f'<div style="font-size: 12px; color: #666666; margin: 7px 0; line-height: 1.3; font-weight: 500;">'
+                f'<span style="font-weight: 600;">Anterior ({mes_anterior_pedidos}):</span> {anterior_conta_fmt}<br>'
+                f'<span style="font-weight: 600;">Meta ({mes_selecionado_pedidos}):</span> {meta_conta_fmt}'
+                f'</div>'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
+                f'<div class="kpi-variacao-item {classe_mom_conta}" style="font-size: 10px !important;">'
+                f'{metricas_conta["variacao_mom"]:+.0f}% MoM'
+                f'</div>'
+                f'{meta_html_conta}'
+                f'</div>'
+                f'</div>'
+                f'</div>'
             )
-            
-            st.markdown(
-                f"""
-                <div class="kpi-card-dinamico animate-fade-in-up">
-                    <div class="kpi-title-dinamico">PEDIDOS FIXA</div>
-                    <div style="text-align: center; padding: 12px 0;">
-                        <div class="kpi-value-dinamico">{realizado_fixa_fmt}</div>
-                        <div style="font-size: 12.5px; color: #666666; margin: 10px 0; line-height: 1.4; font-weight: 500;">
-                            <span style="font-weight: 600;">Anterior ({mes_anterior_pedidos}):</span> {anterior_fixa_fmt}<br>
-                            <span style="font-weight: 600;">Meta ({mes_selecionado_pedidos}):</span> {meta_fixa_fmt}
-                        </div>
-                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 12px;">
-                            <div class="kpi-variacao-item {classe_mom_fixa}" style="font-size: 10px !important;">
-                                {metricas_fixa['variacao_mom']:+.0f}% MoM
-                            </div>
-                            {meta_html_fixa}
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
+            st.markdown(card_conta_html, unsafe_allow_html=True)
+
+            card_fixa_html = (
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">'
+                f'<div class="kpi-title-dinamico">PEDIDOS FIXA</div>'
+                f'<div style="text-align: center; padding: 6px 0;">'
+                f'<div class="kpi-value-dinamico">{atual_fixa_fmt}</div>'
+                f'{real_hint_fixa}'
+                f'<div style="font-size: 12px; color: #666666; margin: 7px 0; line-height: 1.3; font-weight: 500;">'
+                f'<span style="font-weight: 600;">Anterior ({mes_anterior_pedidos}):</span> {anterior_fixa_fmt}<br>'
+                f'<span style="font-weight: 600;">Meta ({mes_selecionado_pedidos}):</span> {meta_fixa_fmt}'
+                f'</div>'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
+                f'<div class="kpi-variacao-item {classe_mom_fixa}" style="font-size: 10px !important;">'
+                f'{metricas_fixa["variacao_mom"]:+.0f}% MoM'
+                f'</div>'
+                f'{meta_html_fixa}'
+                f'</div>'
+                f'</div>'
+                f'</div>'
             )
+            st.markdown(card_fixa_html, unsafe_allow_html=True)
         
         with col_donut:
-            total_conta = metricas_conta['realizado']
-            total_fixa = metricas_fixa['realizado']
+            # Mes atual: usa tendencia (atual). Demais meses: usa realizado.
+            total_conta = float(metricas_conta['atual']) if pd.notna(metricas_conta['atual']) and np.isfinite(metricas_conta['atual']) else 0.0
+            total_fixa = float(metricas_fixa['atual']) if pd.notna(metricas_fixa['atual']) and np.isfinite(metricas_fixa['atual']) else 0.0
             total_geral_pedidos = total_conta + total_fixa
 
             df_donut = pd.DataFrame({
-                'Plataforma': ['CONTA', 'FIXA'],
+                'Produto': ['CONTA', 'FIXA'],
                 'Quantidade': [total_conta, total_fixa]
             })
+            if total_geral_pedidos > 0:
+                df_donut['Percentual'] = (df_donut['Quantidade'] / total_geral_pedidos * 100).round(1)
+            else:
+                df_donut['Percentual'] = 0.0
 
-            df_donut['Percentual'] = (df_donut['Quantidade'] / df_donut['Quantidade'].sum() * 100).round(1)
+            # Ordena para destacar o maior segmento e garantir leitura consistente
+            df_donut = df_donut.sort_values('Quantidade', ascending=False).reset_index(drop=True)
+            produto_lider = df_donut.loc[0, 'Produto'] if not df_donut.empty else 'N/A'
+            pct_lider = df_donut.loc[0, 'Percentual'] if not df_donut.empty else 0.0
 
-            fig_donut = px.pie(
-                df_donut,
-                values='Quantidade',
-                names='Plataforma',
-                title='',
-                hole=0.6,
-                color='Plataforma',
-                color_discrete_map={
-                    'CONTA': '#FF2800',
-                    'FIXA': '#790E09'
-                }
-            )
+            cores_donut = {
+                'CONTA': '#D64B3F',
+                'FIXA': '#8D1A12'
+            }
+            pulls = [0.03 if p == produto_lider else 0.0 for p in df_donut['Produto']]
 
-            fig_donut.update_traces(
-                textposition='inside',
-                textinfo='percent+label',
-                hovertemplate="<b>%{label}</b><br>Quantidade: %{value:,.0f}<br>Percentual: %{percent}",
-                marker=dict(line=dict(color='white', width=2))
+            fig_donut = go.Figure(
+                data=[
+                    go.Pie(
+                        labels=df_donut['Produto'],
+                        values=df_donut['Quantidade'],
+                        hole=0.64,
+                        sort=False,
+                        direction='clockwise',
+                        pull=pulls,
+                        marker=dict(
+                            colors=[cores_donut.get(p, '#8D1A12') for p in df_donut['Produto']],
+                            line=dict(color='white', width=2.2)
+                        ),
+                        text=df_donut['Percentual'].apply(lambda v: f"{v:.1f}%".replace('.', ',')),
+                        textinfo='text',
+                        textposition='outside',
+                        hovertemplate=(
+                            "<b>%{label}</b><br>"
+                            "<b>Pedidos:</b> %{value:,.0f}<br>"
+                            "<b>Participação:</b> %{percent}<br>"
+                            "<extra></extra>"
+                        )
+                    )
+                ]
             )
 
             fig_donut.update_layout(
-                height=420,
+                height=430,
                 plot_bgcolor='white',
-                paper_bgcolor='white',
-                font=dict(family='Segoe UI', size=14, color='#333333'),
-                margin=dict(l=10, r=10, t=60, b=10),
-                title=dict(
-                    x=0.5,
-                    xanchor='center',
-                    yanchor='top',
-                    font=dict(size=16, color='#333333', weight=800),
-                    y=0.98
-                ),
+                paper_bgcolor='#FCFCFD',
+                font=dict(family='Segoe UI', size=13, color='#2F3747'),
+                margin=dict(l=8, r=170, t=18, b=10),
                 showlegend=True,
                 legend=dict(
-                    title=dict(text='<b>PLATAFORMA</b>', font=dict(size=13, weight=700, color='#333333')),
-                    orientation="h",
-                    yanchor="bottom",
-                    y=-0.1,
-                    xanchor="center",
-                    x=0.5
-                )
+                    title=dict(text='<b>PRODUTO</b>', font=dict(size=12, color='#2F3747')),
+                    orientation='v',
+                    yanchor='middle',
+                    y=0.5,
+                    xanchor='left',
+                    x=1.03,
+                    bgcolor='rgba(255,255,255,0.92)',
+                    bordercolor='#E6ECF4',
+                    borderwidth=1.2,
+                    font=dict(size=11, color='#2F3747')
+                ),
+                uniformtext_minsize=10,
+                uniformtext_mode='hide'
             )
 
             fig_donut.add_annotation(
-                text=f"<b>TOTAL</b><br>{total_geral_pedidos:,.0f}",
+                text=(
+                    f"<b>TOTAL</b><br>"
+                    f"<span style='font-size:22px; color:#2F3747; font-weight:900;'>"
+                    f"{formatar_numero_brasileiro(total_geral_pedidos, 0)}</span><br>"
+                    f"<span style='font-size:11px; color:#64748B;'>Líder: {produto_lider} ({str(round(pct_lider,1)).replace('.', ',')}%)</span>"
+                ),
                 x=0.5, y=0.5,
-                font=dict(size=18, color='#333333', weight=800),
-                showarrow=False
+                showarrow=False,
+                align='center'
             )
 
-            st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': True, 'displaylogo': False})
+            st.plotly_chart(
+                fig_donut,
+                use_container_width=True,
+                config={'displayModeBar': False, 'displaylogo': False}
+            )
         
         # =========================
         # TABELA DINÂMICA POR REGIONAL
@@ -4431,7 +4592,7 @@ with tab3:
         
         with col_filtro_t1_pedidos:
             plataforma_tabela_pedidos = st.multiselect(
-                "Filtrar por Plataforma:",
+                "Filtrar por Produto:",
                 options=["Todos"] + sorted(df_pedidos['COD_PLATAFORMA'].dropna().unique().tolist()),
                 default=["Todos"],
                 key="filtro_plataforma_tabela_pedidos"
@@ -4470,6 +4631,7 @@ with tab3:
             meses_ordem = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
             meses_2025 = [f'{m}/25' for m in meses_ordem]
             meses_2026 = []
+            mes_corrente_local = get_mes_atual_formatado().strip().lower()
             try:
                 mes_str, ano_curto = mes_foco.split('/')
                 if ano_curto == '26':
@@ -4486,11 +4648,14 @@ with tab3:
                 vals_2025 = [dfr[dfr['mes_ano'] == mes]['QTDE'].sum() for mes in meses_2025]
                 vals_2026 = [dfr[dfr['mes_ano'] == mes]['QTDE'].sum() for mes in meses_2026]
                 real_foco = dfr[dfr['mes_ano'] == mes_foco]['QTDE'].sum()
+                tend_foco = dfr[dfr['mes_ano'] == mes_foco]['TEND_QTD'].sum() if 'TEND_QTD' in dfr.columns else 0
                 meta_foco = dfr[dfr['mes_ano'] == mes_foco]['DESAFIO_QTD'].sum()
-                alcance = (((real_foco / meta_foco) - 1) * 100) if meta_foco > 0 else 0
                 mes_ant = get_mes_anterior(mes_foco)
                 real_ant = dfr[dfr['mes_ano'] == mes_ant]['QTDE'].sum()
-                var_mom = ((real_foco - real_ant) / real_ant * 100) if real_ant > 0 else 0
+                usar_tendencia = (str(mes_foco).strip().lower() == mes_corrente_local) and (tend_foco > 0)
+                valor_base_meta = tend_foco if usar_tendencia else real_foco
+                alcance = (((valor_base_meta / meta_foco) - 1) * 100) if meta_foco > 0 else 0
+                var_mom = ((valor_base_meta - real_ant) / real_ant * 100) if real_ant > 0 else 0
                 var_2425 = ((total_2025 - total_2024) / total_2024 * 100) if total_2024 > 0 else 0
 
                 linha = {
@@ -4502,11 +4667,11 @@ with tab3:
                 for i, mes in enumerate(meses_2026):
                     linha[mes] = vals_2026[i]
                 linha.update({
-                    f'Real {mes_foco}': real_foco,
+                    f'Tend {mes_foco}': tend_foco,
                     f'Meta {mes_foco}': meta_foco,
-                    'Alcance Meta': alcance,
-                    'Var 2025/2024': var_2425,
-                    'Var MoM': var_mom
+                    'TEND vs META': alcance,
+                    '25VS24': var_2425,
+                    'MOM': var_mom
                 })
                 pivot.append(linha)
             return pivot
@@ -4557,15 +4722,21 @@ with tab3:
                     'Total 2025': total_2025_pedidos,
                     'Real Jan/26': real_jan_26_pedidos,
                     'Meta Jan/26': meta_jan_26_pedidos,
-                    'Alcance Meta': alcance_meta_pedidos,
-                    'Var 2025/2024': variacao_2024_2025_pedidos,
-                    'Var MoM': variacao_mom_pedidos
+                    'TEND vs META': alcance_meta_pedidos,
+                    '25VS24': variacao_2024_2025_pedidos,
+                    'MOM': variacao_mom_pedidos
                 })
             
             return pivot_data_pedidos
         
+        # Mês foco da tabela dinâmica (independente do seletor de mês dos cards)
+        meses_tabela_pedidos = sorted(df_tabela_pedidos['dat_tratada'].dropna().unique().tolist(), key=mes_ano_para_data)
+        mes_foco_tabela_pedidos = get_mes_atual_formatado()
+        if mes_foco_tabela_pedidos not in meses_tabela_pedidos:
+            mes_foco_tabela_pedidos = meses_tabela_pedidos[-1] if meses_tabela_pedidos else mes_selecionado_pedidos
+
         # Criar tabela pivot
-        pivot_data_pedidos = create_pivot_table_pedidos_new(df_tabela_pedidos, mes_selecionado_pedidos)
+        pivot_data_pedidos = create_pivot_table_pedidos_new(df_tabela_pedidos, mes_foco_tabela_pedidos)
         
         if not pivot_data_pedidos:
             st.warning("Nenhum dado encontrado com os filtros selecionados para a tabela.")
@@ -4587,21 +4758,40 @@ with tab3:
             for mes in meses_2025_pedidos:
                 valor = df_total_pedidos[df_total_pedidos['mes_ano'] == mes]['QTDE'].sum()
                 valores_mensais_2025_geral_pedidos.append(valor)
+
+            # Calcular valores mensais gerais para 2026 até o mês foco
+            meses_2026_geral_pedidos = []
+            try:
+                ordem_meses_local = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+                mes_foco_txt, ano_foco_txt = str(mes_foco_tabela_pedidos).split('/')
+                if ano_foco_txt == '26':
+                    idx_foco = ordem_meses_local.index(mes_foco_txt)
+                    meses_2026_geral_pedidos = [f'{ordem_meses_local[i]}/26' for i in range(idx_foco + 1)]
+            except Exception:
+                meses_2026_geral_pedidos = []
+
+            valores_mensais_2026_geral_pedidos = []
+            for mes in meses_2026_geral_pedidos:
+                valor = df_total_pedidos[df_total_pedidos['mes_ano'] == mes]['QTDE'].sum()
+                valores_mensais_2026_geral_pedidos.append(valor)
             
             # Calcular REAL/META geral do mês foco selecionado
-            real_foco_geral_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_selecionado_pedidos]['QTDE'].sum()
-            meta_foco_geral_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_selecionado_pedidos]['DESAFIO_QTD'].sum()
+            real_foco_geral_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_foco_tabela_pedidos]['QTDE'].sum()
+            tend_foco_geral_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_foco_tabela_pedidos]['TEND_QTD'].sum() if 'TEND_QTD' in df_total_pedidos.columns else 0
+            meta_foco_geral_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_foco_tabela_pedidos]['DESAFIO_QTD'].sum()
             
             # Calcular variações gerais
             variacao_2024_2025_geral_pedidos = ((total_2025_geral_pedidos - total_2024_geral_pedidos) / total_2024_geral_pedidos * 100) if total_2024_geral_pedidos > 0 else 0
             
             # Calcular variação MoM geral com base no mês foco
-            mes_anterior_foco_pedidos = get_mes_anterior(mes_selecionado_pedidos)
+            mes_anterior_foco_pedidos = get_mes_anterior(mes_foco_tabela_pedidos)
             valor_mes_anterior_foco_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_anterior_foco_pedidos]['QTDE'].sum()
-            variacao_mom_geral_pedidos = ((real_foco_geral_pedidos - valor_mes_anterior_foco_pedidos) / valor_mes_anterior_foco_pedidos * 100) if valor_mes_anterior_foco_pedidos > 0 else 0
+            usar_tendencia_geral = (str(mes_foco_tabela_pedidos).strip().lower() == mes_corrente_ref) and (tend_foco_geral_pedidos > 0)
+            valor_base_meta_geral_pedidos = tend_foco_geral_pedidos if usar_tendencia_geral else real_foco_geral_pedidos
+            variacao_mom_geral_pedidos = ((valor_base_meta_geral_pedidos - valor_mes_anterior_foco_pedidos) / valor_mes_anterior_foco_pedidos * 100) if valor_mes_anterior_foco_pedidos > 0 else 0
             
             # Calcular alcance da meta geral
-            alcance_meta_geral_pedidos = (((real_foco_geral_pedidos / meta_foco_geral_pedidos)-1) * 100) if meta_foco_geral_pedidos > 0 else 0
+            alcance_meta_geral_pedidos = (((valor_base_meta_geral_pedidos / meta_foco_geral_pedidos)-1) * 100) if meta_foco_geral_pedidos > 0 else 0
             
             # Adicionar linha de TOTAL no início
             linha_total_pedidos = {
@@ -4609,11 +4799,12 @@ with tab3:
                 'Total 2024': total_2024_geral_pedidos,
                 **{meses_2025_pedidos[i]: valores_mensais_2025_geral_pedidos[i] for i in range(12)},
                 'Total 2025': total_2025_geral_pedidos,
-                f'Real {mes_selecionado_pedidos}': real_foco_geral_pedidos,
-                f'Meta {mes_selecionado_pedidos}': meta_foco_geral_pedidos,
-                'Alcance Meta': alcance_meta_geral_pedidos,
-                'Var 2025/2024': variacao_2024_2025_geral_pedidos,
-                'Var MoM': variacao_mom_geral_pedidos
+                **{meses_2026_geral_pedidos[i]: valores_mensais_2026_geral_pedidos[i] for i in range(len(meses_2026_geral_pedidos))},
+                f'Tend {mes_foco_tabela_pedidos}': tend_foco_geral_pedidos,
+                f'Meta {mes_foco_tabela_pedidos}': meta_foco_geral_pedidos,
+                'TEND vs META': alcance_meta_geral_pedidos,
+                '25VS24': variacao_2024_2025_geral_pedidos,
+                'MOM': variacao_mom_geral_pedidos
             }
             
             # Criar DataFrame final com as regionais ordenadas por Total 2025 (decrescente)
@@ -4640,11 +4831,11 @@ with tab3:
 
             # Mantém apenas meses de 2026 até o mês foco selecionado
             try:
-                mes_foco_num = ordem_mes[mes_selecionado_pedidos.split('/')[0]]
+                mes_foco_num = ordem_mes[mes_foco_tabela_pedidos.split('/')[0]]
                 colunas_mes_2026 = [c for c in colunas_mes_2026 if ordem_mes.get(str(c).split('/')[0], 99) <= mes_foco_num]
             except Exception:
                 pass
-            colunas_ordenadas_pedidos = ['Regional', 'Total 2024'] + colunas_mes_2025 + ['Total 2025'] + colunas_mes_2026 + [f'Real {mes_selecionado_pedidos}', f'Meta {mes_selecionado_pedidos}', 'Alcance Meta', 'Var 2025/2024', 'Var MoM']
+            colunas_ordenadas_pedidos = ['Regional', 'Total 2024'] + colunas_mes_2025 + ['Total 2025', '25VS24'] + colunas_mes_2026 + [f'Tend {mes_foco_tabela_pedidos}', f'Meta {mes_foco_tabela_pedidos}', 'MOM', 'TEND vs META']
             # Remover duplicidade mantendo ordem
             colunas_ordenadas_pedidos = list(dict.fromkeys(colunas_ordenadas_pedidos))
             colunas_ordenadas_pedidos = [c for c in colunas_ordenadas_pedidos if c in df_final_pedidos.columns]
@@ -4671,7 +4862,7 @@ with tab3:
             
             df_exibicao_pedidos = df_final_pedidos.copy().fillna(0)
             for col in df_exibicao_pedidos.columns:
-                if col in ['Regional', 'Var 2025/2024', 'Var MoM', 'Alcance Meta']:
+                if col in ['Regional', '25VS24', 'MOM', 'TEND vs META']:
                     df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(formatar_percentual_pedidos)
                 else:
                     df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(lambda v: formatar_numero_pedidos(v if not isinstance(v, pd.Series) else v.iloc[0]))
@@ -5031,13 +5222,13 @@ with tab3:
                         classe = "col-total-anual-pedidos"
                     elif col in meses_2025_pedidos:
                         classe = "col-mes-pedidos"
-                    elif col == 'Real Jan/26':
+                    elif str(col).startswith('Tend ') or col == 'Real Jan/26':
                         classe = "col-real-jan26-pedidos"
-                    elif 'Meta' in col and 'Alcance' not in col:
+                    elif 'Meta' in col and col != 'TEND vs META':
                         classe = "col-meta-pedidos"
-                    elif 'Alcance' in col:
+                    elif 'Alcance' in col or col == 'TEND vs META':
                         classe = "col-alcance-pedidos"
-                    elif 'Var' in col:
+                    elif 'Var' in col or col in ['25VS24', 'MOM']:
                         classe = "col-variacao-pedidos"
                     
                     html += f'<th class="{classe}">{col}</th>'
@@ -5060,13 +5251,13 @@ with tab3:
                                 classe_celula = "col-total-anual-pedidos"
                             elif col in meses_2025_pedidos:
                                 classe_celula = "col-mes-pedidos"
-                            elif col == 'Real Jan/26':
+                            elif str(col).startswith('Tend ') or col == 'Real Jan/26':
                                 classe_celula = "col-real-jan26-pedidos"
-                            elif 'Meta' in col and 'Alcance' not in col:
+                            elif 'Meta' in col and col != 'TEND vs META':
                                 classe_celula = "col-meta-pedidos"
-                            elif 'Alcance' in col:
+                            elif 'Alcance' in col or col == 'TEND vs META':
                                 classe_celula = "col-alcance-pedidos"
-                            elif 'Var' in col:
+                            elif 'Var' in col or col in ['25VS24', 'MOM']:
                                 classe_celula = "col-variacao-pedidos"
                         else:
                             if col == 'Regional':
@@ -5075,17 +5266,17 @@ with tab3:
                                 classe_celula = "col-total-anual-pedidos"
                             elif col in meses_2025_pedidos:
                                 classe_celula = "col-mes-pedidos"
-                            elif col == 'Real Jan/26':
+                            elif str(col).startswith('Tend ') or col == 'Real Jan/26':
                                 classe_celula = "col-real-jan26-pedidos"
-                            elif 'Meta' in col and 'Alcance' not in col:
+                            elif 'Meta' in col and col != 'TEND vs META':
                                 classe_celula = "col-meta-pedidos"
-                            elif 'Alcance' in col or 'Var' in col:
+                            elif 'Alcance' in col or 'Var' in col or col in ['25VS24', 'MOM', 'TEND vs META']:
                                 try:
                                     valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                                     num_valor = float(valor_limpo)
                                     
                                     if num_valor > 0:
-                                        if 'Alcance' in col:
+                                        if 'Alcance' in col or col == 'TEND vs META':
                                             classe_celula = "col-alcance-pedidos percentual-positivo-pedidos"
                                         else:
                                             classe_celula = "col-variacao-pedidos percentual-positivo-pedidos"
@@ -5093,7 +5284,7 @@ with tab3:
                                         if num_valor > 50:
                                             classe_celula += " performance-excelente-pedidos"
                                     elif num_valor < 0:
-                                        if 'Alcance' in col:
+                                        if 'Alcance' in col or col == 'TEND vs META':
                                             classe_celula = "col-alcance-pedidos percentual-negativo-pedidos"
                                         else:
                                             classe_celula = "col-variacao-pedidos percentual-negativo-pedidos"
@@ -5101,12 +5292,12 @@ with tab3:
                                         if num_valor < -30:
                                             classe_celula += " performance-critica-pedidos"
                                     else:
-                                        if 'Alcance' in col:
+                                        if 'Alcance' in col or col == 'TEND vs META':
                                             classe_celula = "col-alcance-pedidos percentual-neutro-pedidos"
                                         else:
                                             classe_celula = "col-variacao-pedidos percentual-neutro-pedidos"
                                 except:
-                                    if 'Alcance' in col:
+                                    if 'Alcance' in col or col == 'TEND vs META':
                                         classe_celula = "col-alcance-pedidos"
                                     else:
                                         classe_celula = "col-variacao-pedidos"
@@ -5158,7 +5349,7 @@ with tab3:
                         for col_num, col_name in enumerate(df_numerico_pedidos.columns):
                             worksheet.write(0, col_num, col_name, header_format)
                             
-                            if col_name in ['Var 2025/2024', 'Var MoM', 'Alcance Meta']:
+                            if col_name in ['25VS24', 'MOM', 'TEND vs META']:
                                 cell_format = percent_format
                             else:
                                 cell_format = number_format
@@ -5214,7 +5405,7 @@ with tab3:
                 **Total 2024:** {formatar_numero_pedidos(total_2024_geral_pedidos)} | 
                 **Total 2025:** {formatar_numero_pedidos(total_2025_geral_pedidos)} | 
                 **Crescimento:** {formatar_percentual_pedidos(variacao_2024_2025_geral_pedidos)} | 
-                **Alcance Meta:** {formatar_percentual_pedidos(alcance_meta_geral_pedidos)}
+                **TEND vs META:** {formatar_percentual_pedidos(alcance_meta_geral_pedidos)}
                 """)
             
             # =========================
@@ -5227,9 +5418,9 @@ with tab3:
                 col_filtro_evo1, col_filtro_evo2, col_filtro_evo3 = st.columns(3)
                 
                 with col_filtro_evo1:
-                    render_filter_label("PLATAFORMA")
+                    render_filter_label("PRODUTO")
                     plataforma_evo = st.selectbox(
-                        "Selecione a Plataforma",
+                        "Selecione o Produto",
                         options=["Todas"] + sorted(df_pedidos['COD_PLATAFORMA'].unique()),
                         key="filtro_plataforma_evo_pedidos",
                         label_visibility="collapsed"
@@ -5330,7 +5521,7 @@ with tab3:
             # Criar título dinâmico
             filtros_ativos = []
             if plataforma_evo != "Todas":
-                filtros_ativos.append(f"Plataforma: {plataforma_evo}")
+                filtros_ativos.append(f"Produto: {plataforma_evo}")
             if regional_evo != "Todas":
                 filtros_ativos.append(f"Regional: {regional_evo}")
             if indicador_evo != "Todos":
@@ -5358,93 +5549,8 @@ with tab3:
                 text='Valor_Formatado'
             )
             
-            fig_linhas_pedidos.update_layout(
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                font=dict(family='Segoe UI', size=14, color='#333333'),
-                margin=dict(l=60, r=60, t=100, b=80),
-                xaxis=dict(
-                    title='',
-                    tickmode='array',
-                    tickvals=['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-                    tickfont=dict(size=13, color='#666666', weight=600),
-                    showgrid=True,
-                    gridcolor='rgba(233, 236, 239, 0.5)',
-                    gridwidth=1,
-                    linecolor='#E9ECEF',
-                    linewidth=2,
-                    mirror=True,
-                    tickangle=0,
-                    showline=True,
-                    zeroline=False
-                ),
-                yaxis=dict(
-                    title='<b>VOLUME DE PEDIDOS</b>',
-                    title_font=dict(size=15, weight=700, color='#333333'),
-                    tickfont=dict(size=13, color='#666666', weight=600),
-                    showgrid=True,
-                    gridcolor='rgba(233, 236, 239, 0.5)',
-                    gridwidth=1,
-                    linecolor='#E9ECEF',
-                    linewidth=2,
-                    mirror=True,
-                    showline=True,
-                    zeroline=False
-                ),
-                legend=dict(
-                    title=dict(text='<b>ANO</b>', font=dict(size=14, weight=700, color='#333333')),
-                    orientation="h",
-                    yanchor="bottom",
-                    y=-0.25,
-                    xanchor="center",
-                    x=0.5,
-                    bgcolor='rgba(255, 255, 255, 0.95)',
-                    bordercolor='#E9ECEF',
-                    borderwidth=2,
-                    font=dict(size=13, color='#333333', weight=600),
-                    itemwidth=50,
-                    traceorder='normal'
-                ),
-                title=dict(
-                    x=0.5,
-                    xanchor='center',
-                    yanchor='top',
-                    font=dict(size=16, color='#333333', weight=800),
-                    y=0.95
-                ),
-                hovermode='x unified',
-                hoverlabel=dict(
-                    bgcolor='white',
-                    font_size=14,
-                    font_family='Segoe UI',
-                    bordercolor='#E9ECEF',
-                    font_color='#333333',
-                    font_weight=600
-                ),
-                height=500,
-                showlegend=True
-            )
-            
-            for i, trace in enumerate(fig_linhas_pedidos.data):
-                ano = trace.name
-                trace.update(
-                    mode='lines+markers+text',
-                    marker=dict(size=12, line=dict(width=2, color='white'), symbol='circle', opacity=0.9),
-                    line=dict(width=4, smoothing=1.3),
-                    textposition='top center',
-                    textfont=dict(size=12, color=cores_personalizadas[ano], weight=700),
-                    hovertemplate=(
-                        f"<b>%{{x}}/{ano}</b><br>" +
-                        "<b>Valor:</b> %{y:,.0f}<br>" +
-                        "<extra></extra>"
-                    )
-                )
-                
-                if ano == '2026':
-                    trace.update(
-                        line=dict(width=4, dash='dash', color=cores_personalizadas[ano]),
-                        marker=dict(size=12, line=dict(width=2, color='white'), symbol='diamond', opacity=0.9)
-                    )
+            apply_standard_line_layout(fig_linhas_pedidos, 'VOLUME DE PEDIDOS', height=500)
+            apply_standard_line_traces(fig_linhas_pedidos, cores_personalizadas, valor_label='Valor', meta_year='2026')
             
             # Container de informações
             st.markdown(f"""
@@ -5502,7 +5608,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -5605,7 +5711,7 @@ with tab4:
     def load_metas_ligacoes():
         """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
         try:
-            metas_path = "base_final_trt_new3.xlsx"
+            metas_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
             
             # Carregar dados
             df_metas = pd.read_excel(metas_path)
@@ -6025,9 +6131,9 @@ with tab4:
             col_filtro_lig1, col_filtro_lig2, col_filtro_lig3 = st.columns(3)
             
             with col_filtro_lig1:
-                render_filter_label("COD_PLATAFORMA")
+                render_filter_label("PRODUTO")
                 plataforma_linha = st.selectbox(
-                    "Selecione a Plataforma",
+                    "Selecione o Produto",
                     options=["Todas"] + sorted(df_lig['COD_PLATAFORMA'].dropna().unique().tolist()),
                     key="filtro_plataforma_linha_lig",
                     label_visibility="collapsed"
@@ -6160,7 +6266,7 @@ with tab4:
             # Criar título dinâmico
             filtros_ativos = []
             if plataforma_linha != "Todas":
-                filtros_ativos.append(f"Plataforma: {plataforma_linha}")
+                filtros_ativos.append(f"Produto: {plataforma_linha}")
             if tipo_chamada_linha != "Todos":
                 filtros_ativos.append(f"Tipo: {tipo_chamada_linha}")
             if regional_linha != "Todas":
@@ -6189,105 +6295,8 @@ with tab4:
                 text='Valor_Formatado'
             )
             
-            # ATUALIZAR LAYOUT COM TAMANHO OTIMIZADO
-            fig_linhas_lig.update_layout(
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                font=dict(family='Segoe UI', size=14, color='#333333'),
-                margin=dict(l=60, r=60, t=100, b=80),
-                xaxis=dict(
-                    title='',
-                    tickmode='array',
-                    tickvals=['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-                    tickfont=dict(size=13, color='#666666', weight=600),
-                    showgrid=True,
-                    gridcolor='rgba(233, 236, 239, 0.5)',
-                    gridwidth=1,
-                    linecolor='#E9ECEF',
-                    linewidth=2,
-                    mirror=True,
-                    tickangle=0,
-                    showline=True,
-                    zeroline=False
-                ),
-                yaxis=dict(
-                    title='<b>VOLUME DE LIGAÇÕES</b>',
-                    title_font=dict(size=15, weight=700, color='#333333'),
-                    tickfont=dict(size=13, color='#666666', weight=600),
-                    showgrid=True,
-                    gridcolor='rgba(233, 236, 239, 0.5)',
-                    gridwidth=1,
-                    linecolor='#E9ECEF',
-                    linewidth=2,
-                    mirror=True,
-                    showline=True,
-                    zeroline=False,
-                    rangemode='tozero'
-                ),
-                legend=dict(
-                    title=dict(text='<b>ANO</b>', font=dict(size=14, weight=700, color='#333333')),
-                    orientation="h",
-                    yanchor="bottom",
-                    y=-0.25,
-                    xanchor="center",
-                    x=0.5,
-                    bgcolor='rgba(255, 255, 255, 0.95)',
-                    bordercolor='#E9ECEF',
-                    borderwidth=2,
-                    font=dict(size=13, color='#333333', weight=600),
-                    itemwidth=50,
-                    traceorder='normal'
-                ),
-                title=dict(
-                    x=0.5,
-                    xanchor='center',
-                    yanchor='top',
-                    font=dict(size=16, color='#333333', weight=800),
-                    y=0.95
-                ),
-                hovermode='x unified',
-                hoverlabel=dict(
-                    bgcolor='white',
-                    font_size=14,
-                    font_family='Segoe UI',
-                    bordercolor='#E9ECEF',
-                    font_color='#333333',
-                    font_weight=600
-                ),
-                height=600,  # AUMENTADO PARA MAIOR VISIBILIDADE
-                showlegend=True
-            )
-            
-            # Personalizar cada linha
-            for i, trace in enumerate(fig_linhas_lig.data):
-                ano = trace.name
-                
-                if ano == '2026':
-                    trace.update(
-                        mode='lines+markers+text',
-                        marker=dict(size=10, line=dict(width=2, color='white'), symbol='diamond', opacity=0.9),
-                        line=dict(width=3, dash='dash', smoothing=1.3),
-                        textposition='top center',
-                        textfont=dict(size=11, color=cores_personalizadas[ano], weight=700),
-                        hovertemplate=(
-                            f"<b>%{{x}}/{ano}</b><br>" +
-                            "<b>Meta:</b> %{y:,.0f}<br>" +
-                            "<extra></extra>"
-                        )
-                    )
-                else:
-                    trace.update(
-                        mode='lines+markers+text',
-                        marker=dict(size=10, line=dict(width=2, color='white'), symbol='circle', opacity=0.9),
-                        line=dict(width=3, smoothing=1.3),
-                        textposition='top center',
-                        textfont=dict(size=11, color=cores_personalizadas[ano], weight=700),
-                        hovertemplate=(
-                            f"<b>%{{x}}/{ano}</b><br>" +
-                            "<b>Realizado:</b> %{y:,.0f}<br>" +
-                            "<extra></extra>"
-                        )
-                    )
+            apply_standard_line_layout(fig_linhas_lig, 'VOLUME DE LIGAÇÕES', height=600)
+            apply_standard_line_traces(fig_linhas_lig, cores_personalizadas, valor_label='Realizado', meta_year='2026')
             
             # Container de informações
             st.markdown(f"""
@@ -6490,7 +6499,7 @@ with tab4:
             
             with col_filtro1:
                 plataforma_filtro_tabela = st.multiselect(
-                    "**Filtrar por Plataforma:**",
+                    "**Filtrar por Produto:**",
                     options=["Todas"] + sorted(df_lig['COD_PLATAFORMA'].dropna().unique().tolist()),
                     default=["Todas"],
                     key="filtro_plataforma_tabela_lig"
@@ -6623,8 +6632,8 @@ with tab4:
                             'Total 2025': total_2025,
                             f'Real {mes_foco}': real_mes_foco,
                             f'Meta {mes_foco}': meta_mes_foco,
-                            'Alcance Meta %': alcance_meta,
-                            'Var MoM %': variacao_mom
+                            'TEND vs META': alcance_meta,
+                            'MOM': variacao_mom
                         }
                         
                         pivot_data.append(linha)
@@ -6639,11 +6648,11 @@ with tab4:
                                 continue
                             if col in ['Total 2025', f'Real {mes_foco}', f'Meta {mes_foco}']:
                                 linha_total[col] = df_totais[col].sum()
-                            elif 'Alcance Meta %' in col:
+                            elif col == 'TEND vs META':
                                 total_real = linha_total.get(f'Real {mes_foco}', 0)
                                 total_meta = linha_total.get(f'Meta {mes_foco}', 0)
                                 linha_total[col] = (total_real / total_meta * 100) if total_meta > 0 else 0
-                            elif 'Var MoM %' in col:
+                            elif col == 'MOM':
                                 linha_total[col] = 0
                             else:
                                 linha_total[col] = df_totais[col].sum()
@@ -6699,8 +6708,8 @@ with tab4:
                 colunas_ordenadas = ['Regional'] + meses_2025_exib + ['Total 2025'] + meses_pos_2025_exib + [
                                                                          f'Real {mes_selecionado}',
                                                                          f'Meta {mes_selecionado}',
-                                                                         'Alcance Meta %',
-                                                                         'Var MoM %'
+                                                                         'TEND vs META',
+                                                                         'MOM'
                                                                      ]
                 
                 # Manter apenas colunas que existem
@@ -6713,7 +6722,7 @@ with tab4:
                         return "0"
                     
                     try:
-                        if '%' in coluna:
+                        if coluna in ['MOM', 'TEND vs META']:
                             # Para porcentagens
                             return f"{float(valor):+.1f}%"
                         elif coluna in ['Regional']:
@@ -6979,11 +6988,11 @@ with tab4:
                                 classe = "col-mes-2026"
                         elif 'Real' in col:
                             classe = "col-real-mes"
-                        elif 'Meta' in col and 'Alcance' not in col:
+                        elif 'Meta' in col and col != 'TEND vs META':
                             classe = "col-meta-mes"
-                        elif 'Alcance' in col:
+                        elif 'Alcance' in col or col == 'TEND vs META':
                             classe = "col-alcance"
-                        elif 'Var' in col:
+                        elif 'Var' in col or col == 'MOM':
                             classe = "col-variacao"
                         elif col == 'Total 2025':
                             classe = "col-total-anual"
@@ -7016,7 +7025,7 @@ with tab4:
                                     classes_celula.append("col-regional")
                                 
                                 # Aplicar cores baseadas em valores
-                                if '%' in col:
+                                if col in ['MOM', 'TEND vs META']:
                                     try:
                                         valor_num = float(str(valor_numerico).replace('%', '').replace('+', ''))
                                         if valor_num > 0:
@@ -7025,7 +7034,7 @@ with tab4:
                                             classes_celula.append("valor-negativo")
                                         
                                         # Indicador de performance para alcance da meta
-                                        if 'Alcance' in col and valor_num > 0:
+                                        if (col == 'TEND vs META' or 'Alcance' in col) and valor_num > 0:
                                             if valor_num >= 120:
                                                 classes_celula.append("performance-excelente")
                                             elif valor_num >= 100:
@@ -7083,20 +7092,20 @@ with tab4:
                     if len(pivot_data_completa) > 1:
                         # Calcular alcance médio (excluindo TOTAL)
                         df_alcance = pd.DataFrame(pivot_data_completa[1:])  # Excluir linha TOTAL
-                        alcance_medio = df_alcance['Alcance Meta %'].mean() if 'Alcance Meta %' in df_alcance.columns else 0
+                        alcance_medio = df_alcance['TEND vs META'].mean() if 'TEND vs META' in df_alcance.columns else 0
                         st.metric(
-                            label="Alcance Médio da Meta",
+                            label="Média TEND vs META",
                             value=f"{alcance_medio:.1f}%",
                             delta=None
                         )
                 
                 with col_res3:
                     if len(pivot_data_completa) > 1:
-                        # Calcular crescimento médio 2025/2024
+                        # Calcular MOM médio
                         df_var = pd.DataFrame(pivot_data_completa[1:])
-                        crescimento_medio = df_var['Var 2025/2024 %'].mean() if 'Var 2025/2024 %' in df_var.columns else 0
+                        crescimento_medio = df_var['MOM'].mean() if 'MOM' in df_var.columns else 0
                         st.metric(
-                            label="Crescimento Médio 2025/2024",
+                            label="MOM Médio",
                             value=f"{crescimento_medio:+.1f}%",
                             delta=None
                         )
@@ -7203,7 +7212,7 @@ with tab4:
                     if regional_selecionada != "Todas":
                         filtros_ativos.append(f"Regional: {regional_selecionada}")
                     if "Todas" not in plataforma_filtro_tabela:
-                        filtros_ativos.append(f"Plataforma: {', '.join(plataforma_filtro_tabela)}")
+                        filtros_ativos.append(f"Produto: {', '.join(plataforma_filtro_tabela)}")
                     if "Todos" not in tipo_chamada_filtro_tabela:
                         filtros_ativos.append(f"Tipo: {', '.join(tipo_chamada_filtro_tabela)}")
                     
@@ -7236,5 +7245,5 @@ with tab4:
                         st.write("**⚠️ Metas não carregadas**")
                     
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
-                    st.write(f"**Plataforma filtro:** {plataforma_filtro_tabela}")
+                    st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
