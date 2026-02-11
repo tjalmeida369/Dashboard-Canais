@@ -108,7 +108,7 @@ st.set_page_config(page_title="Dashboard - Canais Estratégicos", layout="wide")
 
 def render_header_logo():
     """Render top-right logo if the local PNG file exists."""
-    logo_path = Path("logo_claro_empresas.png")
+    logo_path = Path("logo_claro_empresas222.png")
     if not logo_path.exists():
         return
 
@@ -7307,6 +7307,7 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
+
 
 
 
