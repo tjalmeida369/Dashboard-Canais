@@ -1588,19 +1588,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Tarja de atualização dos dados (antes das abas)
-data_realizado_max = get_data_realizado_max_formatada(df)
-st.markdown(
-    f"""
-    <div class="data-freshness-banner">
-        <div class="data-freshness-track">
-            <span class="data-freshness-text">DASHBOARD ANÁLITICO - CANAIS ESTRATÉGICOS PME - Este relatório não contém dados sensíveis, utilizado para trazer insights para a Diretoria de Canais Nacionais. Contém dados atualizado até {data_realizado_max}</span>
-            <span class="data-freshness-text">DASHBOARD ANÁLITICO - CANAIS ESTRATÉGICOS PME - Este relatório não contém dados sensíveis, utilizado para trazer insights para a Diretoria de Canais Nacionais. Contém dados atualizado até {data_realizado_max}</span>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+
 
 # =========================
 # ABAS PRINCIPAIS
@@ -8549,5 +8537,6 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
+
 
 
