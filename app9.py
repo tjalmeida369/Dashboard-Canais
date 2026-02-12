@@ -1460,7 +1460,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -3105,7 +3105,7 @@ with tab1:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -3210,6 +3210,10 @@ with tab1:
             )[['QTDE', 'DESAFIO_QTD', 'TEND_QTD']].sum()
         )
 
+    # Overrides robustos para LIGAÇÕES (plataforma/mês), preenchidos após leitura da base principal.
+    ligacoes_tend_override = {}
+    ligacoes_meta_override = {}
+
     def calcular_metricas_linha(
         df_base,
         aliases,
@@ -3262,6 +3266,17 @@ with tab1:
         valor_real_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'QTDE'].sum()
         valor_tend_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'TEND_QTD'].sum()
         valor_meta_indicador = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'DESAFIO_QTD'].sum()
+
+        # Para LIGAÇÕES, priorizar tendência/meta vindas da base principal por plataforma+mês.
+        if 'LIGACOES' in aliases_canon:
+            chave_lig = (str(plataforma).strip().upper(), str(mes_atual_ref).strip().lower())
+            tend_override = float(ligacoes_tend_override.get(chave_lig, 0) or 0)
+            meta_override = float(ligacoes_meta_override.get(chave_lig, 0) or 0)
+            if tend_override > 0:
+                valor_tend_mes_atual = tend_override
+            if meta_override > 0:
+                valor_meta_indicador = meta_override
+
         if meta_modo == 'zero':
             valor_meta_mes = 0
         elif meta_modo == 'plataforma':
@@ -3942,6 +3957,21 @@ with tab1:
             (df_perf_base['PLATAFORMA_NORM'].isin(['FIXA', 'CONTA']))
         ].copy()
 
+        # Consolidado por plataforma+mês para uso direto no cálculo da tabela (evita dependência de merge por regional).
+        if not base_ligacoes_origem.empty:
+            agg_lig_pm = (
+                base_ligacoes_origem.groupby(['PLATAFORMA_NORM', 'dat_tratada'], as_index=False, observed=True)[['TEND_QTD', 'DESAFIO_QTD']]
+                .sum()
+            )
+            ligacoes_tend_override = {
+                (str(row['PLATAFORMA_NORM']).strip().upper(), str(row['dat_tratada']).strip().lower()): float(row['TEND_QTD'] or 0)
+                for _, row in agg_lig_pm.iterrows()
+            }
+            ligacoes_meta_override = {
+                (str(row['PLATAFORMA_NORM']).strip().upper(), str(row['dat_tratada']).strip().lower()): float(row['DESAFIO_QTD'] or 0)
+                for _, row in agg_lig_pm.iterrows()
+            }
+
         df_meta_lig = base_ligacoes_origem.groupby(
             ['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
             as_index=False,
@@ -4221,7 +4251,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -6842,7 +6872,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -8549,5 +8579,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
-
