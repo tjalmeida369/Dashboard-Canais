@@ -1340,7 +1340,7 @@ def apply_standard_line_layout(fig, y_axis_title: str, height: int = 520):
             tickmode='array',
             tickvals=MESES_TICKVALS,
             tickfont=dict(size=12, color='#5B6578'),
-            showgrid=True,
+            showgrid=False,
             gridcolor='rgba(230, 236, 244, 0.85)',
             gridwidth=1,
             linecolor='#E6ECF4',
@@ -1351,10 +1351,10 @@ def apply_standard_line_layout(fig, y_axis_title: str, height: int = 520):
             zeroline=False
         ),
         yaxis=dict(
-            title=f'<b>{y_axis_title}</b>',
+            title='',
             title_font=dict(size=13, color='#2F3747'),
             tickfont=dict(size=12, color='#5B6578'),
-            showgrid=True,
+            showgrid=False,
             gridcolor='rgba(230, 236, 244, 0.85)',
             gridwidth=1,
             linecolor='#E6ECF4',
@@ -1492,7 +1492,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -2093,7 +2093,7 @@ with tab1:
             font=dict(family='Segoe UI', size=14, color='#333333'),
             margin=dict(l=20, r=150, t=100, b=80),
             yaxis=dict(
-                title='<b>CANAL</b>',
+                title='',
                 title_font=dict(size=16, weight=800, color='#333333'),
                 tickfont=dict(size=14, color='#666666', weight=600),
                 showgrid=False,
@@ -2103,11 +2103,11 @@ with tab1:
                 categoryorder='total ascending'
             ),
             xaxis=dict(
-                title='<b>VOLUME TOTAL</b>',
+                title='',
                 title_font=dict(size=16, weight=800, color='#333333'),
                 tickfont=dict(size=13, color='#666666', weight=600),
                 gridcolor='rgba(233, 236, 239, 0.7)',
-                showgrid=True,
+                showgrid=False,
                 gridwidth=1,
                 zeroline=False,
                 showline=True,
@@ -2495,7 +2495,7 @@ with tab1:
                 padding: 9px 8px; /* reduced height */
                 text-align: center;
                 border-bottom: 3px solid #5A0A06;
-                border-right: 1px solid rgba(255, 255, 255, 0.15);
+                border-right: 1px solid #FFFFFF;
                 white-space: nowrap;
                 font-size: 12px;
                 letter-spacing: 0.5px;
@@ -2538,8 +2538,8 @@ with tab1:
             .tabela-melhorada td {
                 padding: 8px 8px; /* reduced height */
                 text-align: center;
-                border-bottom: 1px solid #E8E8E8;
-                border-right: 1px solid #F0F0F0;
+                border-bottom: 1px solid #FFFFFF;
+                border-right: 1px solid #FFFFFF;
                 font-weight: 400;
                 transition: all 0.2s ease;
             }
@@ -2549,7 +2549,7 @@ with tab1:
                 text-align: left;
                 font-weight: 600;
                 color: #333;
-                background: linear-gradient(90deg, #fef5f4 0%, white 100%) !important;
+                background: transparent !important;
                 padding-left: 15px;
             }
             
@@ -2602,64 +2602,64 @@ with tab1:
             }
             
             .linha-regional-melhorada:nth-child(even) {
-                background-color: #FFF9F8 !important;
+                background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
             }
             
             .linha-regional-melhorada:nth-child(odd) {
-                background-color: white !important;
+                background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
             }
             
             .linha-regional-melhorada:hover {
-                background-color: #FFEBEE !important;
-                box-shadow: inset 0 0 0 1px #FFCDD2;
+                background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                box-shadow: inset 0 0 0 1px #F1CBC4;
                 transform: translateY(-1px);
             }
             
             .linha-regional-melhorada td.col-total-anual {
-                background: linear-gradient(135deg, #FDE8E6 0%, #FCE4E2 100%) !important;
+                background: transparent !important;
                 color: #790E09 !important;
                 font-weight: 600;
-                border-left: 2px solid #A23B36;
-                border-right: 2px solid #A23B36;
+                border-left: 1px solid #FFFFFF;
+                border-right: 1px solid #FFFFFF;
             }
             
             .linha-regional-melhorada td.col-mes {
-                background-color: #F9F0EF !important;
+                background: transparent !important;
                 color: #333 !important;
-                border-left: 1px solid #E8D6D5;
-                border-right: 1px solid #E8D6D5;
+                border-left: 1px solid #FFFFFF;
+                border-right: 1px solid #FFFFFF;
             }
             
             .linha-regional-melhorada td.col-real-mes {
-                background: linear-gradient(135deg, #F1F3F5 0%, #E9ECEF 100%) !important;
-                color: #495057 !important;
+                background: transparent !important;
+                color: #6B1F1A !important;
                 font-weight: 600;
-                border-left: 2px solid #ADB5BD;
-                border-right: 2px solid #ADB5BD;
+                border-left: 1px solid #FFFFFF;
+                border-right: 1px solid #FFFFFF;
             }
             
             .linha-regional-melhorada td.col-meta {
-                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                background: transparent !important;
                 color: #B71C1C !important;
                 font-weight: 600;
-                border-left: 2px solid #F44336;
-                border-right: 2px solid #F44336;
+                border-left: 1px solid #FFFFFF;
+                border-right: 1px solid #FFFFFF;
             }
             
             .linha-regional-melhorada td.col-alcance,
             .linha-regional-melhorada td.col-variacao {
-                background-color: #F8F9FA !important;
+                background-color: transparent !important;
             }
             
             .linha-regional-melhorada td.col-alcance.percentual-positivo,
             .linha-regional-melhorada td.col-variacao.percentual-positivo {
                 color: #1B5E20 !important;
-                background: linear-gradient(135deg, #E8F5E9 0%, #E6F4E7 100%) !important;
+                background: transparent !important;
                 font-weight: 700;
                 position: relative;
-                padding-left: 28px !important;
-                border-left: 3px solid #4CAF50 !important;
-                border-right: 1px solid #C8E6C9 !important;
+                padding-left: 24px !important;
+                border-left: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
             }
             
             .linha-regional-melhorada td.col-alcance.percentual-positivo::before,
@@ -2677,12 +2677,12 @@ with tab1:
             .linha-regional-melhorada td.col-alcance.percentual-negativo,
             .linha-regional-melhorada td.col-variacao.percentual-negativo {
                 color: #C62828 !important;
-                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                background: transparent !important;
                 font-weight: 700;
                 position: relative;
-                padding-left: 28px !important;
-                border-left: 3px solid #F44336 !important;
-                border-right: 1px solid #FFCDD2 !important;
+                padding-left: 24px !important;
+                border-left: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
             }
             
             .linha-regional-melhorada td.col-alcance.percentual-negativo::before,
@@ -2700,7 +2700,7 @@ with tab1:
             .linha-regional-melhorada td.col-alcance.percentual-neutro,
             .linha-regional-melhorada td.col-variacao.percentual-neutro {
                 color: #666666 !important;
-                background: #F8F9FA !important;
+                background: transparent !important;
                 font-weight: 500;
             }
             
@@ -3052,7 +3052,7 @@ with tab1:
                 fig_comparativo.update_layout(
                     height=430,
                     showlegend=False,
-                    xaxis_title='Volume 2025',
+                    xaxis_title='',
                     yaxis_title="",
                     coloraxis_showscale=False,
                     plot_bgcolor='white',
@@ -3061,7 +3061,7 @@ with tab1:
                     margin=dict(l=20, r=20, t=56, b=24),
                     xaxis=dict(
                         gridcolor='rgba(230, 236, 244, 0.85)',
-                        showgrid=True,
+                        showgrid=False,
                         zeroline=False,
                         linecolor='#E6ECF4',
                         linewidth=1.4,
@@ -3150,7 +3150,7 @@ with tab1:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -3260,13 +3260,17 @@ with tab1:
         aliases,
         plataforma,
         mes_atual_ref,
-        mes_anterior_ref,
+        mes_m1_ref,
+        mes_m2_ref,
+        mes_m3_ref,
         meta_modo='indicador'
     ):
         if df_base is None or df_base.empty:
             return {
                 'v_2024': 0,
                 'v_2025': 0,
+                'v_mes_m3': 0,
+                'v_mes_m2': 0,
                 'v_mes_ant': 0,
                 'v_mes_atu': 0,
                 'v_meta_mes': 0,
@@ -3296,7 +3300,9 @@ with tab1:
         valor_2024 = base_linha.loc[base_linha['ANO_REF'] == '24', 'QTDE'].sum()
         valor_2025 = base_linha.loc[base_linha['ANO_REF'] == '25', 'QTDE'].sum()
 
-        valor_mes_anterior = base_linha.loc[base_linha['dat_tratada'] == mes_anterior_ref, 'QTDE'].sum()
+        valor_mes_m3 = base_linha.loc[base_linha['dat_tratada'] == mes_m3_ref, 'QTDE'].sum()
+        valor_mes_m2 = base_linha.loc[base_linha['dat_tratada'] == mes_m2_ref, 'QTDE'].sum()
+        valor_mes_anterior = base_linha.loc[base_linha['dat_tratada'] == mes_m1_ref, 'QTDE'].sum()
         valor_real_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'QTDE'].sum()
         valor_tend_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'TEND_QTD'].sum()
         valor_meta_indicador = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'DESAFIO_QTD'].sum()
@@ -3321,6 +3327,8 @@ with tab1:
         return {
             'v_2024': valor_2024,
             'v_2025': valor_2025,
+            'v_mes_m3': valor_mes_m3,
+            'v_mes_m2': valor_mes_m2,
             'v_mes_ant': valor_mes_anterior,
             'v_mes_atu': valor_mes_atual,
             'v_meta_mes': valor_meta_mes,
@@ -3354,6 +3362,8 @@ with tab1:
     def criar_linha_ratio_performance(nome_linha, met_numerador, met_denominador):
         r_2024 = calcular_ratio_pct(met_numerador.get('v_2024', 0), met_denominador.get('v_2024', 0))
         r_2025 = calcular_ratio_pct(met_numerador.get('v_2025', 0), met_denominador.get('v_2025', 0))
+        r_m3 = calcular_ratio_pct(met_numerador.get('v_mes_m3', 0), met_denominador.get('v_mes_m3', 0))
+        r_m2 = calcular_ratio_pct(met_numerador.get('v_mes_m2', 0), met_denominador.get('v_mes_m2', 0))
         r_ant = calcular_ratio_pct(met_numerador.get('v_mes_ant', 0), met_denominador.get('v_mes_ant', 0))
         r_atu = calcular_ratio_pct(met_numerador.get('v_mes_atu', 0), met_denominador.get('v_mes_atu', 0))
         yoy_delta = r_2025 - r_2024
@@ -3364,6 +3374,8 @@ with tab1:
             'indicador': nome_linha,
             '2024': formatar_pct_sem_sinal(r_2024),
             '2025': formatar_pct_sem_sinal(r_2025),
+            'MES_M3': formatar_pct_sem_sinal(r_m3),
+            'MES_M2': formatar_pct_sem_sinal(r_m2),
             'MES_ANT': formatar_pct_sem_sinal(r_ant),
             'MES_ATU': formatar_pct_sem_sinal(r_atu),
             'META_MES': '',
@@ -3383,6 +3395,8 @@ with tab1:
 
         r_2024 = calcular_ratio_pct(met_num.get('v_2024', 0), met_den.get('v_2024', 0))
         r_2025 = calcular_ratio_pct(met_num.get('v_2025', 0), met_den.get('v_2025', 0))
+        r_m3 = calcular_ratio_pct(met_num.get('v_mes_m3', 0), met_den.get('v_mes_m3', 0))
+        r_m2 = calcular_ratio_pct(met_num.get('v_mes_m2', 0), met_den.get('v_mes_m2', 0))
         r_ant = calcular_ratio_pct(met_num.get('v_mes_ant', 0), met_den.get('v_mes_ant', 0))
         r_atu = calcular_ratio_pct(met_num.get('v_mes_atu', 0), met_den.get('v_mes_atu', 0))
         yoy_delta = r_2025 - r_2024
@@ -3393,6 +3407,8 @@ with tab1:
             'indicador': nome_linha,
             '2024': formatar_pct_sem_sinal(r_2024),
             '2025': formatar_pct_sem_sinal(r_2025),
+            'MES_M3': formatar_pct_sem_sinal(r_m3),
+            'MES_M2': formatar_pct_sem_sinal(r_m2),
             'MES_ANT': formatar_pct_sem_sinal(r_ant),
             'MES_ATU': formatar_pct_sem_sinal(r_atu),
             'META_MES': '',
@@ -3415,7 +3431,7 @@ with tab1:
         except Exception:
             return "pct-neutro"
 
-    def criar_tabela_html_performance_canal(linhas, mes_atual_ref, mes_anterior_ref):
+    def criar_tabela_html_performance_canal(linhas, mes_atual_ref, mes_m1_ref, mes_m2_ref, mes_m3_ref):
         html = """
         <style>
             .tabela-container-performance-canal {
@@ -3538,8 +3554,10 @@ with tab1:
 
             .linha-item-performance td:nth-child(2),
             .linha-item-performance td:nth-child(3),
-            .linha-item-performance td:nth-child(7),
-            .linha-item-performance td:nth-child(8) {
+            .linha-item-performance td:nth-child(4),
+            .linha-item-performance td:nth-child(5),
+            .linha-item-performance td:nth-child(9),
+            .linha-item-performance td:nth-child(10) {
                 background-color: #FCF8F8;
             }
 
@@ -3646,7 +3664,7 @@ with tab1:
             .tabela-performance-canal th {
                 background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                 padding: 9px 7px !important;
-                border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+                border-right: 1px solid #FFFFFF !important;
                 border-bottom: 3px solid #5A0A06 !important;
                 font-size: 10.5px !important;
                 box-shadow: none !important;
@@ -3670,17 +3688,17 @@ with tab1:
                 box-shadow: none !important;
             }
 
-            .linha-item-performance:nth-child(even) {
-                background-color: #FFF9F8 !important;
+            .linha-item-performance:nth-child(even) td {
+                background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
             }
 
-            .linha-item-performance:nth-child(odd) {
-                background-color: #FFFFFF !important;
+            .linha-item-performance:nth-child(odd) td {
+                background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
             }
 
-            .linha-item-performance:hover {
-                background-color: #FFF2EF !important;
-                box-shadow: inset 0 0 0 1px #FFD9CF !important;
+            .linha-item-performance:hover td {
+                background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                box-shadow: inset 0 0 0 1px #F1CBC4 !important;
             }
 
             .linha-item-performance td.col-indicador {
@@ -3692,14 +3710,14 @@ with tab1:
                 text-align: left !important;
                 font-weight: 600 !important;
                 color: #333333 !important;
-                background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
+                background: transparent !important;
                 padding-left: 10px !important;
             }
 
             .linha-item-performance td.col-mes,
             .linha-item-performance td.col-total-anual,
             .linha-item-performance td.col-meta {
-                background: #F9F0EF !important;
+                background: transparent !important;
                 color: #333 !important;
                 font-weight: 400 !important;
             }
@@ -3711,7 +3729,7 @@ with tab1:
 
             .linha-item-performance td.col-variacao,
             .linha-item-performance td.col-alcance {
-                background-color: #F8F9FA !important;
+                background-color: transparent !important;
             }
 
             .tabela-container-performance-canal::-webkit-scrollbar {
@@ -3763,6 +3781,13 @@ with tab1:
             .linha-item-performance td.pct-positivo,
             .linha-item-performance td.pct-negativo {
                 padding-left: 20px !important;
+                background: transparent !important;
+                border-left: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
+            }
+
+            .linha-item-performance td.pct-neutro {
+                background: transparent !important;
             }
 
             .linha-item-performance td.pct-positivo::before,
@@ -3786,34 +3811,38 @@ with tab1:
             .tabela-performance-canal th:nth-child(2),
             .tabela-performance-canal td:nth-child(2),
             .tabela-performance-canal th:nth-child(3),
-            .tabela-performance-canal td:nth-child(3) {
-                width: 78px !important;
-                min-width: 78px !important;
-                max-width: 78px !important;
-            }
-
+            .tabela-performance-canal td:nth-child(3),
             .tabela-performance-canal th:nth-child(4),
             .tabela-performance-canal td:nth-child(4),
+            .tabela-performance-canal th:nth-child(5),
+            .tabela-performance-canal td:nth-child(5) {
+                width: 72px !important;
+                min-width: 72px !important;
+                max-width: 72px !important;
+            }
+
             .tabela-performance-canal th:nth-child(6),
             .tabela-performance-canal td:nth-child(6),
-            .tabela-performance-canal th:nth-child(9),
-            .tabela-performance-canal td:nth-child(9) {
+            .tabela-performance-canal th:nth-child(8),
+            .tabela-performance-canal td:nth-child(8),
+            .tabela-performance-canal th:nth-child(11),
+            .tabela-performance-canal td:nth-child(11) {
                 width: 74px !important;
                 min-width: 74px !important;
                 max-width: 74px !important;
             }
 
-            .tabela-performance-canal th:nth-child(5),
-            .tabela-performance-canal td:nth-child(5) {
+            .tabela-performance-canal th:nth-child(7),
+            .tabela-performance-canal td:nth-child(7) {
                 width: 86px !important;
                 min-width: 86px !important;
                 max-width: 86px !important;
             }
 
-            .tabela-performance-canal th:nth-child(7),
-            .tabela-performance-canal td:nth-child(7),
-            .tabela-performance-canal th:nth-child(8),
-            .tabela-performance-canal td:nth-child(8) {
+            .tabela-performance-canal th:nth-child(9),
+            .tabela-performance-canal td:nth-child(9),
+            .tabela-performance-canal th:nth-child(10),
+            .tabela-performance-canal td:nth-child(10) {
                 width: 68px !important;
                 min-width: 68px !important;
                 max-width: 68px !important;
@@ -3825,7 +3854,9 @@ with tab1:
                 <thead>
                     <tr>
                         <th>Indicador</th>
-                        <th class="col-mes">""" + str(mes_anterior_ref) + """</th>
+                        <th class="col-mes">""" + str(mes_m3_ref) + """</th>
+                        <th class="col-mes">""" + str(mes_m2_ref) + """</th>
+                        <th class="col-mes">""" + str(mes_m1_ref) + """</th>
                         <th class="col-mes">""" + str(mes_atual_ref) + """</th>
                         <th class="col-variacao">MoM</th>
                         <th class="col-meta">""" + f"Meta {mes_atual_ref}" + """</th>
@@ -3840,15 +3871,17 @@ with tab1:
 
         for linha in linhas:
             if linha['tipo'] == 'grupo':
-                html += f'<tr class="linha-grupo-performance"><td colspan="9">{linha["grupo"]}</td></tr>'
+                html += f'<tr class="linha-grupo-performance"><td colspan="11">{linha["grupo"]}</td></tr>'
                 continue
 
             if linha['tipo'] == 'separador':
-                html += '<tr class="linha-separador-performance"><td colspan="9"></td></tr>'
+                html += '<tr class="linha-separador-performance"><td colspan="11"></td></tr>'
                 continue
 
             html += '<tr class="linha-item-performance">'
             html += f'<td class="col-indicador">&nbsp;&nbsp;&nbsp;{linha["indicador"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_M3"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_M2"]}</td>'
             html += f'<td class="col-mes">{linha["MES_ANT"]}</td>'
             html += f'<td class="col-mes">{linha["MES_ATU"]}</td>'
             html += f'<td class="col-variacao {classe_pct(linha["MOM_RAW"])}">{linha["MOM"]}</td>'
@@ -4019,6 +4052,8 @@ with tab1:
                 df_perf_filtrado = df_perf_filtrado[df_perf_filtrado['CANAL_NORM'] == canal_norm_sel]
 
             mes_anterior_perf = get_mes_anterior(mes_perf_sel)
+            mes_m2_perf = get_mes_anterior(mes_anterior_perf)
+            mes_m3_perf = get_mes_anterior(mes_m2_perf)
             mes_yoy_perf = get_mes_mesmo_ano_anterior(mes_perf_sel)
 
             mostrar_pedidos = (canal_perf_sel == "Todos") or (canal_norm_sel == "E COMMERCE")
@@ -4059,6 +4094,8 @@ with tab1:
                         plataforma_ref,
                         mes_perf_sel,
                         mes_anterior_perf,
+                        mes_m2_perf,
+                        mes_m3_perf,
                         meta_modo_ref
                     )
 
@@ -4127,6 +4164,8 @@ with tab1:
                                 'indicador': nome_indicador,
                                 '2024': formatar_numero_brasileiro(metricas_exibir['v_2024'], 0),
                                 '2025': formatar_numero_brasileiro(metricas_exibir['v_2025'], 0),
+                                'MES_M3': formatar_numero_brasileiro(metricas_exibir['v_mes_m3'], 0),
+                                'MES_M2': formatar_numero_brasileiro(metricas_exibir['v_mes_m2'], 0),
                                 'MES_ANT': formatar_numero_brasileiro(metricas_exibir['v_mes_ant'], 0),
                                 'MES_ATU': formatar_numero_brasileiro(metricas_exibir['v_mes_atu'], 0),
                                 'META_MES': formatar_numero_brasileiro(metricas_exibir['v_meta_mes'], 0),
@@ -4160,7 +4199,13 @@ with tab1:
                 f"Mês atual da análise: {mes_perf_sel} | Mês anterior: {mes_anterior_perf} | YoY referência: {mes_yoy_perf}"
             )
             st.markdown(
-                criar_tabela_html_performance_canal(linhas_tabela_perf, mes_perf_sel, mes_anterior_perf),
+                criar_tabela_html_performance_canal(
+                    linhas_tabela_perf,
+                    mes_perf_sel,
+                    mes_anterior_perf,
+                    mes_m2_perf,
+                    mes_m3_perf
+                ),
                 unsafe_allow_html=True
             )
 
@@ -4175,7 +4220,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -4571,7 +4616,7 @@ with tab2:
                     title='',
                     tickfont=dict(size=11, color='#5B6578'),
                     gridcolor='rgba(230, 236, 244, 0.85)',
-                    showgrid=True,
+                    showgrid=False,
                     showline=True,
                     linecolor='#E6ECF4',
                     linewidth=1.3,
@@ -4808,7 +4853,7 @@ with tab2:
             margin=dict(l=24, r=24, t=92, b=98),
             height=560,
             xaxis=dict(
-                title='<b>CANAL</b>',
+                title='',
                 title_font=dict(size=14, color='#2F3747'),
                 tickfont=dict(size=12, color='#5B6578'),
                 showgrid=False,
@@ -4819,11 +4864,11 @@ with tab2:
                 categoryarray=dados_barras['CANAL_PLAN'].tolist()
             ),
             yaxis=dict(
-                title='<b>QUANTIDADE</b>',
+                title='',
                 title_font=dict(size=13, color='#2F3747'),
                 tickfont=dict(size=12, color='#5B6578'),
                 gridcolor='rgba(230, 236, 244, 0.85)',
-                showgrid=True,
+                showgrid=False,
                 gridwidth=1,
                 zeroline=False,
                 showline=True,
@@ -5114,7 +5159,7 @@ with tab2:
                     padding: 9px 8px; /* reduced height */
                     text-align: center;
                     border-bottom: 3px solid #5A0A06;
-                    border-right: 1px solid rgba(255, 255, 255, 0.15);
+                    border-right: 1px solid #FFFFFF;
                     white-space: nowrap;
                     font-size: 12px;
                     letter-spacing: 0.5px;
@@ -5135,8 +5180,8 @@ with tab2:
                 .tabela-desativados td {
                     padding: 8px 8px; /* reduced height */
                     text-align: center;
-                    border-bottom: 1px solid #E8E8E8;
-                    border-right: 1px solid #F0F0F0;
+                    border-bottom: 1px solid #FFFFFF;
+                    border-right: 1px solid #FFFFFF;
                     font-weight: 400;
                 }
                 
@@ -5176,15 +5221,15 @@ with tab2:
                 }
                 
                 .linha-regional-desativados:nth-child(even) {
-                    background-color: #FFF9F8 !important;
+                    background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
                 }
                 
                 .linha-regional-desativados:nth-child(odd) {
-                    background-color: white !important;
+                    background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
                 }
                 
                 .linha-regional-desativados:hover {
-                    background-color: #FFEBEE !important;
+                    background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
                 }
                 
                 .tabela-container-desativados::-webkit-scrollbar {
@@ -5223,8 +5268,52 @@ with tab2:
                 }
 
                 .linha-regional-desativados:hover {
-                    background-color: #FFF2EF !important;
-                    box-shadow: inset 0 0 0 1px #FFD9CF !important;
+                    background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                    box-shadow: inset 0 0 0 1px #F1CBC4 !important;
+                }
+
+                .tabela-desativados td.percentual-positivo-desativados {
+                    color: #1B5E20 !important;
+                    font-weight: 700;
+                    position: relative;
+                    padding-left: 22px !important;
+                    background: transparent !important;
+                }
+
+                .tabela-desativados td.percentual-positivo-desativados::before {
+                    content: "▲";
+                    position: absolute;
+                    left: 8px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 10px;
+                    font-weight: 900;
+                    color: #2E7D32;
+                }
+
+                .tabela-desativados td.percentual-negativo-desativados {
+                    color: #C62828 !important;
+                    font-weight: 700;
+                    position: relative;
+                    padding-left: 22px !important;
+                    background: transparent !important;
+                }
+
+                .tabela-desativados td.percentual-negativo-desativados::before {
+                    content: "▼";
+                    position: absolute;
+                    left: 8px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 10px;
+                    font-weight: 900;
+                    color: #C62828;
+                }
+
+                .tabela-desativados td.percentual-neutro-desativados {
+                    color: #666666 !important;
+                    font-weight: 600;
+                    background: transparent !important;
                 }
             </style>
             
@@ -5246,7 +5335,27 @@ with tab2:
                 
                 for col in df.columns:
                     valor = row[col]
-                    html += f'<td>{valor}</td>'
+                    classe_celula = ""
+                    col_str = str(col).strip()
+                    eh_coluna_percentual = (
+                        col_str in ['Var MoM', '% Silentes'] or
+                        col_str.startswith('%') or
+                        'Var' in col_str
+                    )
+                    if (not is_total) and eh_coluna_percentual:
+                        try:
+                            valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
+                            num_valor = float(valor_limpo)
+                            if num_valor > 0:
+                                classe_celula = "percentual-positivo-desativados"
+                            elif num_valor < 0:
+                                classe_celula = "percentual-negativo-desativados"
+                            else:
+                                classe_celula = "percentual-neutro-desativados"
+                        except Exception:
+                            classe_celula = "percentual-neutro-desativados"
+
+                    html += f'<td class="{classe_celula}">{valor}</td>'
                 
                 html += "</tr>"
             
@@ -6027,7 +6136,7 @@ with tab3:
                 padding: 9px 8px; /* reduced height */
                 text-align: center;
                 border-bottom: 3px solid #5A0A06;
-                border-right: 1px solid rgba(255, 255, 255, 0.15);
+                border-right: 1px solid #FFFFFF;
                 white-space: nowrap;
                 font-size: 12px;
                 letter-spacing: 0.5px;
@@ -6074,8 +6183,8 @@ with tab3:
             .tabela-pedidos td {
                 padding: 8px 8px; /* reduced height */
                 text-align: center;
-                border-bottom: 1px solid #E8E8E8;
-                border-right: 1px solid #F0F0F0;
+                border-bottom: 1px solid #FFFFFF;
+                border-right: 1px solid #FFFFFF;
                 font-weight: 400;
                 transition: all 0.2s ease;
             }
@@ -6085,7 +6194,7 @@ with tab3:
                         text-align: left;
                         font-weight: 600;
                         color: #333;
-                        background: linear-gradient(90deg, #fef5f4 0%, white 100%) !important;
+                        background: transparent !important;
                         padding-left: 15px;
                     }
                     
@@ -6138,64 +6247,64 @@ with tab3:
                     }
                     
                     .linha-regional-pedidos:nth-child(even) {
-                        background-color: #FFF9F8 !important;
+                        background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
                     }
                     
                     .linha-regional-pedidos:nth-child(odd) {
-                        background-color: white !important;
+                        background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
                     }
                     
                     .linha-regional-pedidos:hover {
-                        background-color: #FFEBEE !important;
-                        box-shadow: inset 0 0 0 1px #FFCDD2;
+                        background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                        box-shadow: inset 0 0 0 1px #F1CBC4;
                         transform: translateY(-1px);
                     }
                     
                     .linha-regional-pedidos td.col-total-anual-pedidos {
-                        background: linear-gradient(135deg, #FDE8E6 0%, #FCE4E2 100%) !important;
+                        background: transparent !important;
                         color: #790E09 !important;
                         font-weight: 600;
-                        border-left: 2px solid #A23B36;
-                        border-right: 2px solid #A23B36;
+                        border-left: 1px solid #FFFFFF;
+                        border-right: 1px solid #FFFFFF;
                     }
                     
                     .linha-regional-pedidos td.col-mes-pedidos {
-                        background-color: #F9F0EF !important;
+                        background: transparent !important;
                         color: #333 !important;
-                        border-left: 1px solid #E8D6D5;
-                        border-right: 1px solid #E8D6D5;
+                        border-left: 1px solid #FFFFFF;
+                        border-right: 1px solid #FFFFFF;
                     }
                     
                     .linha-regional-pedidos td.col-real-jan26-pedidos {
-                        background: linear-gradient(135deg, #F1F3F5 0%, #E9ECEF 100%) !important;
-                        color: #495057 !important;
+                        background: transparent !important;
+                        color: #6B1F1A !important;
                         font-weight: 600;
-                        border-left: 2px solid #ADB5BD;
-                        border-right: 2px solid #ADB5BD;
+                        border-left: 1px solid #FFFFFF;
+                        border-right: 1px solid #FFFFFF;
                     }
                     
                     .linha-regional-pedidos td.col-meta-pedidos {
-                        background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                        background: transparent !important;
                         color: #B71C1C !important;
                         font-weight: 600;
-                        border-left: 2px solid #F44336;
-                        border-right: 2px solid #F44336;
+                        border-left: 1px solid #FFFFFF;
+                        border-right: 1px solid #FFFFFF;
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos {
-                        background-color: #F8F9FA !important;
+                        background-color: transparent !important;
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-positivo-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos.percentual-positivo-pedidos {
                         color: #1B5E20 !important;
-                        background: linear-gradient(135deg, #E8F5E9 0%, #E6F4E7 100%) !important;
+                        background: transparent !important;
                         font-weight: 700;
                         position: relative;
-                        padding-left: 28px !important;
-                        border-left: 3px solid #4CAF50 !important;
-                        border-right: 1px solid #C8E6C9 !important;
+                        padding-left: 24px !important;
+                        border-left: 1px solid #FFFFFF !important;
+                        border-right: 1px solid #FFFFFF !important;
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-positivo-pedidos::before,
@@ -6213,12 +6322,12 @@ with tab3:
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-negativo-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos.percentual-negativo-pedidos {
                         color: #C62828 !important;
-                        background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                        background: transparent !important;
                         font-weight: 700;
                         position: relative;
-                        padding-left: 28px !important;
-                        border-left: 3px solid #F44336 !important;
-                        border-right: 1px solid #FFCDD2 !important;
+                        padding-left: 24px !important;
+                        border-left: 1px solid #FFFFFF !important;
+                        border-right: 1px solid #FFFFFF !important;
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-negativo-pedidos::before,
@@ -6236,7 +6345,7 @@ with tab3:
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-neutro-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos.percentual-neutro-pedidos {
                         color: #666666 !important;
-                        background: #F8F9FA !important;
+                        background: transparent !important;
                         font-weight: 500;
                     }
                     
@@ -6320,8 +6429,8 @@ with tab3:
                     }
 
                     .linha-regional-pedidos:hover {
-                        background-color: #FFF2EF !important;
-                        box-shadow: inset 0 0 0 1px #FFD9CF !important;
+                        background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                        box-shadow: inset 0 0 0 1px #F1CBC4 !important;
                     }
 
                     .linha-regional-pedidos td.performance-excelente-pedidos,
@@ -6731,7 +6840,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -6834,7 +6943,7 @@ with tab4:
     def load_metas_ligacoes():
         """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
         try:
-            metas_path = "base_final_trt_new3.xlsx"
+            metas_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
             
             # Carregar dados
             df_metas = pd.read_excel(metas_path)
@@ -7941,7 +8050,7 @@ with tab4:
                             padding: 8px 6px; /* reduced height */
                             text-align: center;
                             border-bottom: 3px solid #5A0A06;
-                            border-right: 1px solid rgba(255, 255, 255, 0.15);
+                            border-right: 1px solid #FFFFFF;
                             white-space: nowrap;
                             font-size: 11px;
                             letter-spacing: 0.3px;
@@ -7992,8 +8101,8 @@ with tab4:
                         .tabela-ligacoes td {
                             padding: 7px 6px; /* reduced height */
                             text-align: center;
-                            border-bottom: 1px solid #E8E8E8;
-                            border-right: 1px solid #F0F0F0;
+                            border-bottom: 1px solid #FFFFFF;
+                            border-right: 1px solid #FFFFFF;
                             font-weight: 500;
                             transition: all 0.2s ease;
                             font-size: 11px;
@@ -8008,7 +8117,7 @@ with tab4:
                             position: sticky;
                             left: 0;
                             z-index: 10;
-                            border-right: 2px solid #E9ECEF;
+                            border-right: 1px solid #FFFFFF;
                             min-width: 100px;
                         }
                         
@@ -8038,21 +8147,53 @@ with tab4:
                         }
                         
                         .linha-regional-ligacoes:nth-child(even) {
-                            background-color: #FFF9F8 !important;
+                            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
                         }
                         
                         .linha-regional-ligacoes:nth-child(odd) {
-                            background-color: white !important;
+                            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
                         }
                         
                         .linha-regional-ligacoes:hover {
-                            background-color: #FFEBEE !important;
+                            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
                             transform: translateY(-1px);
                             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                         }
                         
-                        .valor-negativo { color: #C62828 !important; font-weight: 700; }
-                        .valor-positivo { color: #1B5E20 !important; font-weight: 700; }
+                        .valor-negativo {
+                            color: #C62828 !important;
+                            font-weight: 700;
+                            position: relative;
+                            padding-left: 22px !important;
+                            background: transparent !important;
+                        }
+                        .valor-positivo {
+                            color: #1B5E20 !important;
+                            font-weight: 700;
+                            position: relative;
+                            padding-left: 22px !important;
+                            background: transparent !important;
+                        }
+                        .valor-positivo::before {
+                            content: "▲";
+                            position: absolute;
+                            left: 8px;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            font-size: 10px;
+                            font-weight: 900;
+                            color: #2E7D32;
+                        }
+                        .valor-negativo::before {
+                            content: "▼";
+                            position: absolute;
+                            left: 8px;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            font-size: 10px;
+                            font-weight: 900;
+                            color: #C62828;
+                        }
                         .valor-destaque {
                             background-color: rgba(121, 14, 9, 0.08) !important;
                             border: 1px solid rgba(121, 14, 9, 0.25) !important;
@@ -8120,8 +8261,8 @@ with tab4:
                         }
 
                         .linha-regional-ligacoes:hover {
-                            background-color: #FFF2EF !important;
-                            box-shadow: inset 0 0 0 1px #FFD9CF !important;
+                            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                            box-shadow: inset 0 0 0 1px #F1CBC4 !important;
                         }
                     </style>
                     
@@ -8408,4 +8549,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
