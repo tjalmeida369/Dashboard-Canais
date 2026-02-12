@@ -7,6 +7,7 @@ import streamlit.components.v1 as components
 from datetime import datetime, date
 from io import BytesIO
 from pathlib import Path
+from zoneinfo import ZoneInfo
 import locale
 import re
 import unicodedata
@@ -1013,42 +1014,6 @@ st.markdown("""
             padding-bottom: 8px;
         }
 
-        .data-freshness-banner {
-            width: 100%;
-            overflow: hidden;
-            border: 1px solid #E6ECF4;
-            border-left: 4px solid #FF2800;
-            border-radius: 12px;
-            background: linear-gradient(90deg, #FFF4F2 0%, #FFFFFF 45%, #FFF4F2 100%);
-            box-shadow: 0 4px 14px rgba(121, 14, 9, 0.08);
-            margin: 6px 0 16px 0;
-            height: 42px;
-            display: flex;
-            align-items: center;
-        }
-
-        .data-freshness-track {
-            display: inline-flex;
-            align-items: center;
-            white-space: nowrap;
-            animation: dataFreshnessSlide 22s linear infinite;
-            will-change: transform;
-            padding-left: 100%;
-        }
-
-        .data-freshness-text {
-            color: #7A120C;
-            font-size: 13px;
-            font-weight: 800;
-            letter-spacing: 0.2px;
-            margin-right: 42px;
-        }
-
-        @keyframes dataFreshnessSlide {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-100%); }
-        }
-
         .info-box {
             background: var(--ds-surface) !important;
             border: 1px solid var(--ds-border) !important;
@@ -1225,7 +1190,10 @@ def mes_ano_para_data(mes_ano_str: str) -> datetime:
 
 def get_mes_atual_formatado() -> str:
     """Retorna o mês atual no formato 'mmm/aa'"""
-    hoje = date.today()
+    try:
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    except Exception:
+        hoje = date.today()
     meses_abreviados = {
         1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
         7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
@@ -1492,7 +1460,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -1881,7 +1849,7 @@ with tab1:
         st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL - COMPARATIVO ANUAL</div>', unsafe_allow_html=True)
         
         with st.container():
-            col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns(4)
+            col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
             
             with col_filtro1:
                 render_filter_label("CANAL")
@@ -1902,15 +1870,6 @@ with tab1:
                 )
             
             with col_filtro3:
-                render_filter_label("INDICADOR")
-                indicador_selecionado = st.selectbox(
-                    "Selecione o Indicador",
-                    options=["Todos"] + sorted(df_filtered['DSC_INDICADOR'].unique()),
-                    key="filtro_indicador_linhas",
-                    label_visibility="collapsed"
-                )
-            
-            with col_filtro4:
                 render_filter_label("PRODUTO")
                 plataforma_selecionada = st.selectbox(
                     "Selecione o Produto",
@@ -1926,8 +1885,6 @@ with tab1:
             df_grafico = df_grafico[df_grafico['CANAL_PLAN'] == canal_selecionado]
         if regional_selecionada != "Todos":
             df_grafico = df_grafico[df_grafico['REGIONAL'] == regional_selecionada]
-        if indicador_selecionado != "Todos":
-            df_grafico = df_grafico[df_grafico['DSC_INDICADOR'] == indicador_selecionado]
         if plataforma_selecionada != "Todos":
             df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
         
@@ -1940,8 +1897,6 @@ with tab1:
             filtros_ativos.append(f"Canal: {canal_selecionado}")
         if regional_selecionada != "Todos":
             filtros_ativos.append(f"Regional: {regional_selecionada}")
-        if indicador_selecionado != "Todos":
-            filtros_ativos.append(f"Indicador: {indicador_selecionado}")
         if plataforma_selecionada != "Todos":
             filtros_ativos.append(f"Produto: {plataforma_selecionada}")
         
@@ -3150,7 +3105,7 @@ with tab1:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -3263,7 +3218,8 @@ with tab1:
         mes_m1_ref,
         mes_m2_ref,
         mes_m3_ref,
-        meta_modo='indicador'
+        meta_modo='indicador',
+        mes_tendencia_ref=None
     ):
         if df_base is None or df_base.empty:
             return {
@@ -3317,7 +3273,13 @@ with tab1:
             # Padrão: meta por indicador + plataforma + canal + mês (mesma lógica dos filtros da linha)
             valor_meta_mes = valor_meta_indicador
 
-        usar_tendencia_mes = (str(mes_atual_ref).strip().lower() == mes_corrente_ref) and (valor_tend_mes_atual > 0)
+        mes_atual_norm = str(mes_atual_ref).strip().lower()
+        mes_tendencia_norm = str(mes_tendencia_ref or "").strip().lower()
+        mes_corrente_calendario = get_mes_atual_formatado().strip().lower()
+        usar_tendencia_mes = (
+            (mes_atual_norm == mes_corrente_calendario or (mes_tendencia_norm and mes_atual_norm == mes_tendencia_norm))
+            and (valor_tend_mes_atual > 0)
+        )
         valor_mes_atual = valor_tend_mes_atual if usar_tendencia_mes else valor_real_mes_atual
 
         yoy_pct = ((valor_2025 - valor_2024) / valor_2024 * 100) if valor_2024 > 0 else 0
@@ -4051,6 +4013,16 @@ with tab1:
             if canal_perf_sel != "Todos":
                 df_perf_filtrado = df_perf_filtrado[df_perf_filtrado['CANAL_NORM'] == canal_norm_sel]
 
+            meses_perf_filtrado = sorted(
+                [
+                    mes for mes in df_perf_filtrado['dat_tratada'].dropna().astype(str).str.strip().tolist()
+                    if re.match(r'^[a-z]{3}/\d{2}$', mes)
+                ],
+                key=mes_ano_para_data
+            )
+            meses_perf_filtrado = list(dict.fromkeys(meses_perf_filtrado))
+            mes_tendencia_ref = (meses_perf_filtrado[-1] if meses_perf_filtrado else meses_perf[-1]).strip().lower()
+
             mes_anterior_perf = get_mes_anterior(mes_perf_sel)
             mes_m2_perf = get_mes_anterior(mes_anterior_perf)
             mes_m3_perf = get_mes_anterior(mes_m2_perf)
@@ -4096,7 +4068,8 @@ with tab1:
                         mes_anterior_perf,
                         mes_m2_perf,
                         mes_m3_perf,
-                        meta_modo_ref
+                        meta_modo_ref,
+                        mes_tendencia_ref
                     )
 
                     metricas_base_grupo[nome_indicador] = metricas_item
@@ -4220,7 +4193,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -6840,7 +6813,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -6943,7 +6916,7 @@ with tab4:
     def load_metas_ligacoes():
         """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
         try:
-            metas_path = "base_final_trt_new3.xlsx"
+            metas_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
             
             # Carregar dados
             df_metas = pd.read_excel(metas_path)
@@ -8549,4 +8522,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
