@@ -8550,3 +8550,4 @@ with tab4:
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
 
+
