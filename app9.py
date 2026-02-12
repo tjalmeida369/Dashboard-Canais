@@ -1492,7 +1492,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -1588,7 +1588,19 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-
+# Tarja de atualização dos dados (antes das abas)
+data_realizado_max = get_data_realizado_max_formatada(df)
+st.markdown(
+    f"""
+    <div class="data-freshness-banner">
+        <div class="data-freshness-track">
+            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
+            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # =========================
 # ABAS PRINCIPAIS
@@ -2041,162 +2053,176 @@ with tab1:
         # Criar dados para gráfico
         bar_data, canal_totals = create_bar_chart_data(df_mes_selecionado)
         
-        # Definir paleta de cores vermelho e cinza conforme solicitado
+        # Paleta e ordem de produtos (priorizar CONTA/FIXA)
+        produtos_disponiveis = sorted(bar_data['COD_PLATAFORMA'].dropna().unique().tolist())
+        produtos_prioridade = ['CONTA', 'FIXA']
+        produtos_ordenados = [p for p in produtos_prioridade if p in produtos_disponiveis] + [
+            p for p in produtos_disponiveis if p not in produtos_prioridade
+        ]
+
         color_map = {
-            'CONTA': '#790E09',  # Vermelho especificado
-            'FIXA': '#495057'    # Cinza especificado
+            'CONTA': '#790E09',
+            'FIXA': '#495057'
         }
-        
-        # Se houver outras plataformas, atribua cores diferentes
-        plataformas_unicas = bar_data['COD_PLATAFORMA'].unique()
-        cores_adicionais = ['#C62828', '#78909C', '#B71C1C', '#546E7A']
-        
-        # Atribuir cores sequencialmente para outras plataformas
-        for i, plataforma in enumerate(plataformas_unicas):
-            if plataforma not in color_map:
-                color_map[plataforma] = cores_adicionais[i % len(cores_adicionais)]
-        
-        # Ordenar dados para garantir ordem correta das cores
-        bar_data_sorted = bar_data.sort_values('COD_PLATAFORMA')
-        
-        # Criar gráfico
-        fig_bar = px.bar(
-            bar_data_sorted, 
-            y='CANAL_PLAN',
-            x='QTDE',
-            color='COD_PLATAFORMA',
-            text='QTDE_Formatado',
-            barmode='stack',
-            color_discrete_map=color_map,
-            title=f'<b>DISTRIBUIÇÃO POR CANAL</b><br><span style="font-size: 14px; color: #666666;">Análise de {mes_selecionado}</span>',
-            labels={'QTDE': 'Volume', 'CANAL_PLAN': 'Canal'},
-            orientation='h',
-            height=550,
+        cores_adicionais = ['#B71C1C', '#8A4B45', '#546E7A', '#A23B36', '#6C757D']
+        for i, produto in enumerate(produtos_ordenados):
+            if produto not in color_map:
+                color_map[produto] = cores_adicionais[i % len(cores_adicionais)]
+
+        # Estruturar dados em formato empilhado por canal
+        df_stack = (
+            bar_data.pivot_table(
+                index='CANAL_PLAN',
+                columns='COD_PLATAFORMA',
+                values='QTDE',
+                aggfunc='sum',
+                observed=True
+            )
+            .reindex(canal_totals.index)
+            .fillna(0)
         )
-        
+        canais_plot = df_stack.index.tolist()
+        max_total_canal = float(canal_totals.max()) if not canal_totals.empty else 0.0
+        limite_texto_segmento = max_total_canal * 0.12 if max_total_canal > 0 else 0
+
+        fig_bar = go.Figure()
+        for produto in produtos_ordenados:
+            if produto not in df_stack.columns:
+                continue
+
+            valores_x = df_stack[produto].astype(float).tolist()
+            textos_segmento = []
+            customdata = []
+            for canal_nome, valor_seg in zip(canais_plot, valores_x):
+                total_canal = float(canal_totals.get(canal_nome, 0) or 0)
+                part_canal = (valor_seg / total_canal * 100) if total_canal > 0 else 0
+                customdata.append([total_canal, part_canal])
+                textos_segmento.append(
+                    formatar_numero_brasileiro(valor_seg, 0) if valor_seg >= limite_texto_segmento else ''
+                )
+
+            fig_bar.add_trace(go.Bar(
+                y=canais_plot,
+                x=valores_x,
+                name=produto,
+                orientation='h',
+                marker=dict(
+                    color=color_map.get(produto, '#6C757D'),
+                    line=dict(color='rgba(255,255,255,0.95)', width=1.2)
+                ),
+                text=textos_segmento,
+                textposition='inside',
+                insidetextanchor='middle',
+                textfont=dict(size=11, color='white'),
+                customdata=customdata,
+                hovertemplate=(
+                    "<b>Canal:</b> %{y}<br>"
+                    f"<b>Produto:</b> {produto}<br>"
+                    "<b>Volume:</b> %{x:,.0f}<br>"
+                    "<b>Participação no canal:</b> %{customdata[1]:.1f}%<br>"
+                    "<extra></extra>"
+                )
+            ))
+
+        total_geral = float(canal_totals.sum())
+        deslocamento_rotulo = max_total_canal * 0.025 if max_total_canal > 0 else 1
+        for canal_nome in canais_plot:
+            total_canal = float(canal_totals.get(canal_nome, 0) or 0)
+            percentual = (total_canal / total_geral * 100) if total_geral > 0 else 0
+            fig_bar.add_annotation(
+                x=total_canal + deslocamento_rotulo,
+                y=canal_nome,
+                text=(
+                    f"<b>{formatar_numero_brasileiro(total_canal, 0)}</b>"
+                    f"<br><span style='font-size:11px;color:#6B7280;'>({percentual:.1f}%)</span>"
+                ),
+                showarrow=False,
+                xanchor='left',
+                yanchor='middle',
+                align='left',
+                bgcolor='rgba(255,255,255,0.90)',
+                bordercolor='#E9ECEF',
+                borderwidth=1,
+                borderpad=4,
+                font=dict(size=12, color='#2F3747')
+            )
+
+        eixo_x_max = max_total_canal * 1.24 if max_total_canal > 0 else 1
         fig_bar.update_layout(
             barmode='stack',
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font=dict(family='Segoe UI', size=14, color='#333333'),
-            margin=dict(l=20, r=150, t=100, b=80),
-            yaxis=dict(
-                title='',
-                title_font=dict(size=16, weight=800, color='#333333'),
-                tickfont=dict(size=14, color='#666666', weight=600),
-                showgrid=False,
-                linecolor='#E9ECEF',
-                linewidth=2,
-                ticksuffix="  ",
-                categoryorder='total ascending'
-            ),
+            plot_bgcolor='#FFFFFF',
+            paper_bgcolor='#FCFCFD',
+            font=dict(family='Segoe UI', size=13, color='#2F3747'),
+            margin=dict(l=26, r=190, t=92, b=46),
+            height=max(470, 66 * len(canais_plot) + 110),
             xaxis=dict(
                 title='',
-                title_font=dict(size=16, weight=800, color='#333333'),
-                tickfont=dict(size=13, color='#666666', weight=600),
-                gridcolor='rgba(233, 236, 239, 0.7)',
                 showgrid=False,
-                gridwidth=1,
-                zeroline=False,
                 showline=True,
                 linecolor='#E9ECEF',
-                linewidth=2
+                linewidth=1.4,
+                zeroline=False,
+                showticklabels=False,
+                range=[0, eixo_x_max]
+            ),
+            yaxis=dict(
+                title='',
+                showgrid=False,
+                tickfont=dict(size=12, color='#4B5563'),
+                ticksuffix='  ',
+                categoryorder='array',
+                categoryarray=canais_plot[::-1]
             ),
             legend=dict(
-                title=dict(text='<b>PRODUTO</b>', font=dict(size=14, weight=800, color='#333333')),
-                orientation="v",
-                yanchor="middle",
-                y=0.5,
-                xanchor="left",
-                x=1.05,
-                bgcolor='rgba(255, 255, 255, 0.95)',
+                title=dict(text='<b>PRODUTO</b>', font=dict(size=12, color='#2F3747')),
+                orientation='h',
+                yanchor='bottom',
+                y=1.02,
+                xanchor='right',
+                x=1.0,
+                bgcolor='rgba(255,255,255,0.92)',
                 bordercolor='#E9ECEF',
-                borderwidth=2,
-                font=dict(size=13, color='#333333', weight=600),
-                itemwidth=40,
-                traceorder='normal',
-                itemsizing='constant'
+                borderwidth=1,
+                font=dict(size=11, color='#2F3747')
             ),
             title=dict(
-                x=0.02,
+                text=f"<b>DISTRIBUIÇÃO POR CANAL</b><br><span style='font-size:13px;color:#6B7280;'>Análise de {mes_selecionado}</span>",
+                x=0.01,
                 xanchor='left',
-                yanchor='top',
-                font=dict(size=16, color='#333333', weight=800),
-                y=0.95
+                y=0.97,
+                yanchor='top'
             ),
             hovermode='y unified',
             hoverlabel=dict(
                 bgcolor='white',
-                font_size=14,
+                bordercolor='#E9ECEF',
+                font_size=12,
                 font_family='Segoe UI',
-                bordercolor='#E9ECEF',
-                font_color='#333333',
-                font_weight=600
+                font_color='#2F3747'
             ),
-            bargap=0.3,
-            bargroupgap=0.1,
-            showlegend=True,
-            transition=dict(duration=300)
+            bargap=0.36,
+            bargroupgap=0.08,
+            uniformtext_minsize=10,
+            uniformtext_mode='hide'
         )
-        
-        fig_bar.update_traces(
-            texttemplate='<b>%{text}</b>',
-            textposition='inside',
-            textfont=dict(size=12, color='white', weight=700),
-            marker=dict(line=dict(width=1.5, color='white'), opacity=0.95),
-            hovertemplate=(
-                "<b>Canal: %{y}</b><br>" +
-                "<b>Produto: %{fullData.name}</b><br>" +
-                "<b>Volume: %{x:,.0f}</b><br>" +
-                "<extra></extra>"
-            )
-        )
-        
-        # Adicionar totais
-        total_geral = canal_totals.sum()
-        for i, canal in enumerate(canal_totals.index):
-            total_canal = canal_totals[canal]
-            percentual = (total_canal / total_geral * 100) if total_geral > 0 else 0
-            
-            fig_bar.add_annotation(
-                x=total_canal,
-                y=canal,
-                text=f'<b>{total_canal:,.0f}</b><br><span style="font-size: 12px; color: #666666;">({percentual:.1f}%)</span>',
-                showarrow=False,
-                xshift=60,
-                font=dict(size=13, color='#333333', weight=700),
-                align='left',
-                bgcolor='rgba(255, 255, 255, 0.95)',
-                bordercolor='#E9ECEF',
-                borderwidth=2,
-                borderpad=6,
-                width=80
-            )
-            
-            fig_bar.add_shape(
-                type="line",
-                x0=total_canal,
-                y0=i,
-                x1=total_canal + 50,
-                y1=i,
-                line=dict(color="#CCCCCC", width=1, dash="dash"),
-                layer="below"
-            )
-        
-        # Adicionar total geral
+
         fig_bar.add_annotation(
-            xref="paper",
-            yref="paper",
-            x=1.15,
-            y=1.05,
-            text=f"<b>TOTAL GERAL</b><br><span style='font-size: 24px; color: #790E09; font-weight: 900;'>{total_geral:,.0f}</span>",
+            xref='paper',
+            yref='paper',
+            x=1.0,
+            y=1.13,
+            xanchor='right',
+            yanchor='top',
+            text=(
+                "<span style='font-size:10px;color:#6B7280;'>TOTAL GERAL</span><br>"
+                f"<span style='font-size:22px;color:#790E09;'><b>{formatar_numero_brasileiro(total_geral, 0)}</b></span>"
+            ),
             showarrow=False,
-            font=dict(size=14, color='#333333', weight=700),
-            align="center",
-            bgcolor='#F8F9FA',
+            align='right',
+            bgcolor='rgba(248,249,250,0.92)',
             bordercolor='#E9ECEF',
-            borderwidth=2,
-            borderpad=10
+            borderwidth=1,
+            borderpad=6
         )
         
         # Exibir gráfico
@@ -3138,7 +3164,7 @@ with tab1:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -4208,7 +4234,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -6828,7 +6854,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -6931,7 +6957,7 @@ with tab4:
     def load_metas_ligacoes():
         """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
         try:
-            metas_path = "base_final_trt_new3.xlsx"
+            metas_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
             
             # Carregar dados
             df_metas = pd.read_excel(metas_path)
@@ -8537,6 +8563,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
-
-
