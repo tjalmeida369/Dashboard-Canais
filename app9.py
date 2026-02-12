@@ -9,6 +9,7 @@ from io import BytesIO
 from pathlib import Path
 import locale
 import re
+import unicodedata
 from textwrap import dedent
 
 # Harmonizar tema plotly com títulos menores
@@ -19,7 +20,7 @@ base_template = go.layout.Template(
     )
 )
 px.defaults.template = base_template
-px.defaults.color_discrete_sequence = ["#FF2800", "#790E09", "#5A6268", "#2E7D32", "#FF9800", "#2196F3"]
+px.defaults.color_discrete_sequence = ["#D12405", "#961009", "#AEAFAF", "#16FDE6", "#EB6969", "#DEEAF4"]
 
 # Configurar locale para português
 try:
@@ -108,7 +109,7 @@ st.set_page_config(page_title="Dashboard - Canais Estratégicos", layout="wide")
 
 def render_header_logo():
     """Render top-right logo if the local PNG file exists."""
-    logo_path = Path("logo_claro_empresas222.png")
+    logo_path = Path(r"C:\Users\F270665\Downloads\logo_claro_empresas.png")
     if not logo_path.exists():
         return
 
@@ -1491,7 +1492,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -1593,8 +1594,8 @@ st.markdown(
     f"""
     <div class="data-freshness-banner">
         <div class="data-freshness-track">
-            <span class="data-freshness-text">DASHBOARD DE CANAIS ESTRATÉGICOS - PME | Realizado atualizado até {data_realizado_max} | Base oficial consolidada</span>
-            <span class="data-freshness-text">DASHBOARD DE CANAIS ESTRATÉGICOS - PME | Realizado atualizado até {data_realizado_max} | Base oficial consolidada</span>
+            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
+            <span class="data-freshness-text">Relatório atualizado com dados até {data_realizado_max}</span>
         </div>
     </div>
     """,
@@ -1755,6 +1756,13 @@ with tab1:
         )['TEND_QTD'].sum()
 
         usar_tendencia_mes = str(mes_atual).strip().lower() == mes_corrente_ref
+        # Fallback: quando TEND_QTD não vier no recorte filtrado (ex.: indicador),
+        # tenta recuperar no dataset completo para não perder a sinalização de parcial.
+        if usar_tendencia_mes and tendencia_atual <= 0:
+            tendencia_atual = df.query(
+                "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
+            )['TEND_QTD'].sum()
+
         usar_tendencia = usar_tendencia_mes and (tendencia_atual > 0)
         atual = tendencia_atual if usar_tendencia else realizado_atual
         
@@ -1778,6 +1786,7 @@ with tab1:
             'real_atual': realizado_atual,
             'tend_atual': tendencia_atual,
             'usa_tendencia': usar_tendencia,
+            'mostrar_parcial': usar_tendencia_mes and (realizado_atual > 0),
             'anterior': anterior,
             'meta': meta,
             'variacao_mom': variacao_mom,
@@ -1823,6 +1832,7 @@ with tab1:
                 atual = metricas['atual']
                 real_atual = metricas['real_atual']
                 usa_tendencia = metricas['usa_tendencia']
+                mostrar_parcial = metricas.get('mostrar_parcial', False)
                 anterior = metricas['anterior']
                 meta = metricas['meta']
                 variacao_mom = metricas['variacao_mom']
@@ -1834,7 +1844,7 @@ with tab1:
                 meta_formatado = f"{meta:,.0f}".replace(",", ".")
                 real_hint_html = (
                     f'<div style="font-size: 11px; color: #666666; font-weight: 700; margin-top: 4px;">Parcial: {real_atual_formatado}</div>'
-                    if usa_tendencia else ''
+                    if mostrar_parcial else ''
                 )
                 
                 if variacao_mom >= 0:
@@ -1885,7 +1895,7 @@ with tab1:
         st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL - COMPARATIVO ANUAL</div>', unsafe_allow_html=True)
         
         with st.container():
-            col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
+            col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns(4)
             
             with col_filtro1:
                 render_filter_label("CANAL")
@@ -1906,6 +1916,15 @@ with tab1:
                 )
             
             with col_filtro3:
+                render_filter_label("INDICADOR")
+                indicador_selecionado = st.selectbox(
+                    "Selecione o Indicador",
+                    options=["Todos"] + sorted(df_filtered['DSC_INDICADOR'].unique()),
+                    key="filtro_indicador_linhas",
+                    label_visibility="collapsed"
+                )
+            
+            with col_filtro4:
                 render_filter_label("PRODUTO")
                 plataforma_selecionada = st.selectbox(
                     "Selecione o Produto",
@@ -1921,6 +1940,8 @@ with tab1:
             df_grafico = df_grafico[df_grafico['CANAL_PLAN'] == canal_selecionado]
         if regional_selecionada != "Todos":
             df_grafico = df_grafico[df_grafico['REGIONAL'] == regional_selecionada]
+        if indicador_selecionado != "Todos":
+            df_grafico = df_grafico[df_grafico['DSC_INDICADOR'] == indicador_selecionado]
         if plataforma_selecionada != "Todos":
             df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
         
@@ -1933,6 +1954,8 @@ with tab1:
             filtros_ativos.append(f"Canal: {canal_selecionado}")
         if regional_selecionada != "Todos":
             filtros_ativos.append(f"Regional: {regional_selecionada}")
+        if indicador_selecionado != "Todos":
+            filtros_ativos.append(f"Indicador: {indicador_selecionado}")
         if plataforma_selecionada != "Todos":
             filtros_ativos.append(f"Produto: {plataforma_selecionada}")
         
@@ -3063,6 +3086,1084 @@ with tab1:
     else:
         st.warning("Não há dados disponíveis para exibir a tabela dinâmica com os filtros atuais.")
 
+    # =========================
+    # NOVA TABELA DINÂMICA: ANÁLISE DE PERFORMANCE POR CANAL
+    # =========================
+    st.markdown(
+        '<div class="section-title"><span class="section-icon">📊</span> ANÁLISE DE PERFORMANCE POR CANAL</div>',
+        unsafe_allow_html=True
+    )
+
+    def normalizar_texto_chave(valor):
+        if pd.isna(valor):
+            return ""
+        texto = unicodedata.normalize("NFKD", str(valor))
+        texto = texto.encode("ASCII", "ignore").decode("ASCII")
+        texto = texto.strip().upper()
+        texto = re.sub(r"[^A-Z0-9]+", " ", texto)
+        texto = re.sub(r"\s+", " ", texto).strip()
+        return texto
+
+    def normalizar_plataforma_chave(valor):
+        texto = normalizar_texto_chave(valor)
+        if 'FIXA' in texto:
+            return 'FIXA'
+        if 'CONTA' in texto:
+            return 'CONTA'
+        return texto
+
+    def mapear_indicador_canonico(valor):
+        texto = normalizar_texto_chave(valor)
+        if not texto:
+            return ""
+        if 'LIGAC' in texto:
+            return 'LIGACOES'
+        if 'PEDID' in texto:
+            return 'PEDIDOS'
+        if 'GROSS' in texto and 'LIQ' in texto:
+            return 'INSTALACAO'
+        if 'GROSS' in texto and 'LIQ' in texto:
+            return 'GROSS LIQUIDO'
+        if 'GROSS' in texto and 'BRUT' in texto:
+            return 'GROSS BRUTO'
+        if 'Vend' in texto and 'Brut' in texto:
+            return 'VENDA BRUTA'
+        return texto
+
+    def get_mes_mesmo_ano_anterior(mes_ref):
+        try:
+            data_ref = mes_ano_para_data(mes_ref)
+            meses_rev = {
+                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+            }
+            mes_txt = meses_rev.get(data_ref.month, 'jan')
+            ano_txt = str(data_ref.year - 1)[-2:]
+            return f"{mes_txt}/{ano_txt}"
+        except Exception:
+            return mes_ref
+
+    @st.cache_data(ttl=3600)
+    def load_ligacoes_para_performance():
+        colunas_saida = [
+            'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
+            'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
+        ]
+        try:
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+            if not Path(ligacoes_path).exists():
+                return pd.DataFrame(columns=colunas_saida)
+
+            df_lig = pd.read_excel(ligacoes_path)
+            colunas_min = ['PERIODO', 'CABEADO', 'QTD', 'DSC_REGIONAL_CMV']
+            if any(col not in df_lig.columns for col in colunas_min):
+                return pd.DataFrame(columns=colunas_saida)
+
+            df_lig['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig['PERIODO'], errors='coerce')
+            df_lig = df_lig[df_lig['DAT_MOVIMENTO2'].notna()].copy()
+            if df_lig.empty:
+                return pd.DataFrame(columns=colunas_saida)
+
+            meses_pt = {
+                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+            }
+
+            df_lig['dat_tratada'] = df_lig['DAT_MOVIMENTO2'].apply(
+                lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
+            )
+            df_lig['REGIONAL'] = (
+                df_lig['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
+            )
+            df_lig['QTDE'] = pd.to_numeric(df_lig['QTD'], errors='coerce').fillna(0)
+            df_lig['DESAFIO_QTD'] = 0
+            df_lig['TEND_QTD'] = df_lig['QTDE']
+            df_lig['CANAL_PLAN'] = 'Televendas Receptivo'
+            df_lig['DSC_INDICADOR'] = 'LIGACOES'
+
+            # Replicar a mesma regra dos KPIs da aba Ligações:
+            # FIXA = CABEADO == SIM | CONTA = TIPO_CHAMADA == DEMAIS
+            if 'TELEFONE' in df_lig.columns:
+                telefone_str = df_lig['TELEFONE'].astype(str)
+                is_click_to_call = telefone_str.str.contains('0960|8449', regex=True, na=False)
+                df_lig['TIPO_CHAMADA'] = np.where(is_click_to_call, 'Click to Call', 'DEMAIS')
+            else:
+                df_lig['TIPO_CHAMADA'] = 'DEMAIS'
+
+            cabeado_norm = df_lig['CABEADO'].astype(str).str.strip().str.upper()
+            mask_fixa = cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
+            mask_conta = df_lig['TIPO_CHAMADA'].eq('DEMAIS')
+
+            df_lig_fixa = df_lig[mask_fixa].copy()
+            df_lig_fixa['COD_PLATAFORMA'] = 'FIXA'
+
+            df_lig_conta = df_lig[mask_conta].copy()
+            df_lig_conta['COD_PLATAFORMA'] = 'CONTA'
+
+            df_lig_saida = pd.concat([df_lig_fixa, df_lig_conta], ignore_index=True)
+            return df_lig_saida[colunas_saida]
+        except Exception:
+            return pd.DataFrame(columns=colunas_saida)
+
+    def preparar_base_performance(df_base):
+        colunas_saida = [
+            'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+            'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF',
+            'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
+        ]
+        if df_base is None or df_base.empty:
+            return pd.DataFrame(columns=colunas_saida)
+
+        colunas_minimas = {'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada', 'QTDE'}
+        if not colunas_minimas.issubset(set(df_base.columns)):
+            return pd.DataFrame(columns=colunas_saida)
+
+        df_work = df_base.copy()
+        df_work['REGIONAL'] = df_work['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
+        df_work['CANAL_PLAN'] = df_work['CANAL_PLAN'].astype(str).str.strip()
+        df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
+        df_work['DSC_INDICADOR'] = df_work['DSC_INDICADOR'].astype(str).str.strip()
+        df_work['dat_tratada'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
+        df_work = df_work[df_work['dat_tratada'].str.match(r'^[a-z]{3}/\d{2}$', na=False)].copy()
+
+        if 'DESAFIO_QTD' not in df_work.columns:
+            df_work['DESAFIO_QTD'] = 0
+        if 'TEND_QTD' not in df_work.columns:
+            df_work['TEND_QTD'] = df_work['QTDE']
+
+        df_work['QTDE'] = normalizar_numerico_serie(df_work['QTDE']).fillna(0)
+        df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work['DESAFIO_QTD']).fillna(0)
+        df_work['TEND_QTD'] = normalizar_numerico_serie(df_work['TEND_QTD']).fillna(0)
+
+        df_work['CANAL_NORM'] = df_work['CANAL_PLAN'].apply(normalizar_texto_chave)
+        df_work['PLATAFORMA_NORM'] = df_work['COD_PLATAFORMA'].apply(normalizar_plataforma_chave)
+        df_work['INDICADOR_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave)
+        df_work['INDICADOR_CANONICO'] = df_work['INDICADOR_NORM'].apply(mapear_indicador_canonico)
+        df_work['ANO_REF'] = df_work['dat_tratada'].str.split('/').str[1].fillna("")
+
+        if df_work.empty:
+            return pd.DataFrame(columns=colunas_saida)
+
+        return (
+            df_work.groupby(
+                [
+                    'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+                    'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF'
+                ],
+                as_index=False,
+                observed=True
+            )[['QTDE', 'DESAFIO_QTD', 'TEND_QTD']].sum()
+        )
+
+    def calcular_metricas_linha(
+        df_base,
+        aliases,
+        plataforma,
+        mes_atual_ref,
+        mes_anterior_ref,
+        meta_modo='indicador'
+    ):
+        if df_base is None or df_base.empty:
+            return {
+                'v_2024': 0,
+                'v_2025': 0,
+                'v_mes_ant': 0,
+                'v_mes_atu': 0,
+                'v_meta_mes': 0,
+                'v_yoy': 0,
+                'v_mom': 0,
+                'v_ating_meta': 0
+            }
+
+        aliases_norm = {
+            normalizar_texto_chave(alias)
+            for alias in aliases
+            if str(alias).strip()
+        }
+        aliases_canon = {
+            mapear_indicador_canonico(alias)
+            for alias in aliases_norm
+            if alias
+        }
+        aliases_canon = {alias for alias in aliases_canon if alias}
+
+        indicador_serie = df_base['INDICADOR_CANONICO'].fillna('')
+        match_indicador = indicador_serie.isin(aliases_canon)
+
+        filtro = df_base['PLATAFORMA_NORM'].eq(plataforma) & match_indicador
+        base_linha = df_base[filtro].copy()
+
+        valor_2024 = base_linha.loc[base_linha['ANO_REF'] == '24', 'QTDE'].sum()
+        valor_2025 = base_linha.loc[base_linha['ANO_REF'] == '25', 'QTDE'].sum()
+
+        valor_mes_anterior = base_linha.loc[base_linha['dat_tratada'] == mes_anterior_ref, 'QTDE'].sum()
+        valor_real_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'QTDE'].sum()
+        valor_tend_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'TEND_QTD'].sum()
+        valor_meta_indicador = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'DESAFIO_QTD'].sum()
+        if meta_modo == 'zero':
+            valor_meta_mes = 0
+        elif meta_modo == 'plataforma':
+            valor_meta_mes = df_base.loc[
+                df_base['PLATAFORMA_NORM'].eq(plataforma) & df_base['dat_tratada'].eq(mes_atual_ref),
+                'DESAFIO_QTD'
+            ].sum()
+        else:
+            # Padrão: meta por indicador + plataforma + canal + mês (mesma lógica dos filtros da linha)
+            valor_meta_mes = valor_meta_indicador
+
+        usar_tendencia_mes = (str(mes_atual_ref).strip().lower() == mes_corrente_ref) and (valor_tend_mes_atual > 0)
+        valor_mes_atual = valor_tend_mes_atual if usar_tendencia_mes else valor_real_mes_atual
+
+        yoy_pct = ((valor_2025 - valor_2024) / valor_2024 * 100) if valor_2024 > 0 else 0
+        mom_pct = ((valor_mes_atual - valor_mes_anterior) / valor_mes_anterior * 100) if valor_mes_anterior > 0 else 0
+        ating_meta_pct = (((valor_mes_atual / valor_meta_mes) - 1) * 100) if valor_meta_mes > 0 else 0
+
+        return {
+            'v_2024': valor_2024,
+            'v_2025': valor_2025,
+            'v_mes_ant': valor_mes_anterior,
+            'v_mes_atu': valor_mes_atual,
+            'v_meta_mes': valor_meta_mes,
+            'v_yoy': yoy_pct,
+            'v_mom': mom_pct,
+            'v_ating_meta': ating_meta_pct
+        }
+
+    def formatar_pct_tabela(valor):
+        try:
+            return f"{float(valor):+.1f}%".replace('.', ',')
+        except Exception:
+            return "0,0%"
+
+    def formatar_pct_sem_sinal(valor):
+        try:
+            return f"{float(valor):.1f}%".replace('.', ',')
+        except Exception:
+            return "0,0%"
+
+    def calcular_ratio_pct(numerador, denominador):
+        try:
+            num = float(numerador or 0)
+            den = float(denominador or 0)
+            if den <= 0:
+                return 0.0
+            return (num / den) * 100.0
+        except Exception:
+            return 0.0
+
+    def criar_linha_ratio_performance(nome_linha, met_numerador, met_denominador):
+        r_2024 = calcular_ratio_pct(met_numerador.get('v_2024', 0), met_denominador.get('v_2024', 0))
+        r_2025 = calcular_ratio_pct(met_numerador.get('v_2025', 0), met_denominador.get('v_2025', 0))
+        r_ant = calcular_ratio_pct(met_numerador.get('v_mes_ant', 0), met_denominador.get('v_mes_ant', 0))
+        r_atu = calcular_ratio_pct(met_numerador.get('v_mes_atu', 0), met_denominador.get('v_mes_atu', 0))
+        yoy_delta = r_2025 - r_2024
+        mom_delta = r_atu - r_ant
+
+        return {
+            'tipo': 'item',
+            'indicador': nome_linha,
+            '2024': formatar_pct_sem_sinal(r_2024),
+            '2025': formatar_pct_sem_sinal(r_2025),
+            'MES_ANT': formatar_pct_sem_sinal(r_ant),
+            'MES_ATU': formatar_pct_sem_sinal(r_atu),
+            'META_MES': '',
+            'YOY': formatar_pct_tabela(yoy_delta),
+            'MOM': formatar_pct_tabela(mom_delta),
+            'ATING_META': '',
+            'YOY_RAW': yoy_delta,
+            'MOM_RAW': mom_delta,
+            'ATING_META_RAW': 0
+        }
+
+    def criar_linha_ratio_por_chaves(nome_linha, metricas_por_indicador, chave_numerador, chave_denominador):
+        met_num = metricas_por_indicador.get(chave_numerador)
+        met_den = metricas_por_indicador.get(chave_denominador)
+        if not met_num or not met_den:
+            return None
+
+        r_2024 = calcular_ratio_pct(met_num.get('v_2024', 0), met_den.get('v_2024', 0))
+        r_2025 = calcular_ratio_pct(met_num.get('v_2025', 0), met_den.get('v_2025', 0))
+        r_ant = calcular_ratio_pct(met_num.get('v_mes_ant', 0), met_den.get('v_mes_ant', 0))
+        r_atu = calcular_ratio_pct(met_num.get('v_mes_atu', 0), met_den.get('v_mes_atu', 0))
+        yoy_delta = r_2025 - r_2024
+        mom_delta = r_atu - r_ant
+
+        return {
+            'tipo': 'item',
+            'indicador': nome_linha,
+            '2024': formatar_pct_sem_sinal(r_2024),
+            '2025': formatar_pct_sem_sinal(r_2025),
+            'MES_ANT': formatar_pct_sem_sinal(r_ant),
+            'MES_ATU': formatar_pct_sem_sinal(r_atu),
+            'META_MES': '',
+            'YOY': formatar_pct_tabela(yoy_delta),
+            'MOM': formatar_pct_tabela(mom_delta),
+            'ATING_META': '',
+            'YOY_RAW': yoy_delta,
+            'MOM_RAW': mom_delta,
+            'ATING_META_RAW': 0
+        }
+
+    def classe_pct(valor):
+        try:
+            valor_num = float(valor)
+            if valor_num > 0:
+                return "pct-positivo"
+            if valor_num < 0:
+                return "pct-negativo"
+            return "pct-neutro"
+        except Exception:
+            return "pct-neutro"
+
+    def criar_tabela_html_performance_canal(linhas, mes_atual_ref, mes_anterior_ref):
+        html = """
+        <style>
+            .tabela-container-performance-canal {
+                width: 100%;
+                max-height: 620px;
+                overflow-y: auto;
+                overflow-x: auto;
+                border: 1px solid #DCC2BE;
+                border-radius: 14px;
+                box-shadow: 0 10px 28px rgba(121, 14, 9, 0.14), 0 2px 8px rgba(61, 7, 4, 0.08);
+                margin: 18px 0;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%);
+                position: relative;
+            }
+
+            .tabela-performance-canal {
+                width: max-content;
+                min-width: 100%;
+                border-collapse: collapse;
+                border-spacing: 0;
+                font-size: 10px;
+                line-height: 1.2;
+            }
+
+            .tabela-performance-canal thead {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                box-shadow: 0 4px 8px rgba(61, 7, 4, 0.16);
+            }
+
+            .tabela-performance-canal th {
+                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+                color: white !important;
+                font-weight: 700;
+                padding: 7px 8px !important;
+                text-align: center;
+                border-bottom: 2px solid #5A0A06;
+                border-right: 1px solid rgba(255, 255, 255, 0.14);
+                white-space: nowrap;
+                letter-spacing: 0.35px;
+                text-transform: uppercase;
+                font-size: 9.6px;
+                min-width: 92px;
+            }
+
+            .tabela-performance-canal td {
+                padding: 6px 8px !important;
+                border-bottom: 1px solid #E8E8E8;
+                border-right: 1px solid #EFE5E3;
+                text-align: right;
+                font-variant-numeric: tabular-nums;
+                color: #2F3747;
+                white-space: nowrap;
+                font-size: 10px;
+                transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            .tabela-performance-canal tr td:last-child,
+            .tabela-performance-canal tr th:last-child {
+                border-right: none;
+            }
+
+            .tabela-performance-canal th:first-child {
+                position: sticky;
+                left: 0;
+                z-index: 130;
+                min-width: 180px;
+                background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
+                box-shadow: 2px 0 0 rgba(255, 255, 255, 0.12);
+            }
+
+            .linha-grupo-performance td {
+                text-align: left !important;
+                font-weight: 800 !important;
+                text-transform: uppercase;
+                color: #FFFFFF !important;
+                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+                padding: 9px 12px !important;
+                letter-spacing: 0.4px;
+                position: sticky;
+                left: 0;
+                z-index: 40;
+            }
+
+            .linha-item-performance:nth-child(even) {
+                background-color: #FFFDFC !important;
+            }
+
+            .linha-item-performance:nth-child(odd) {
+                background-color: #FFFFFF !important;
+            }
+
+            .linha-item-performance:hover {
+                background-color: #FFF3F1 !important;
+                box-shadow: inset 0 0 0 1px #FFD8D1 !important;
+            }
+
+            .linha-item-performance td.col-indicador {
+                text-align: left !important;
+                font-weight: 600;
+                color: #3A302F;
+                background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
+                padding-left: 11px !important;
+                min-width: 180px;
+                position: sticky;
+                left: 0;
+                z-index: 35;
+                box-shadow: 2px 0 0 #F2E6E4;
+            }
+
+            .linha-item-performance td.col-meta {
+                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                color: #B71C1C !important;
+                font-weight: 600;
+                border-left: 1px solid #F2C8CC !important;
+                border-right: 1px solid #F2C8CC !important;
+            }
+
+            .linha-item-performance td:nth-child(2),
+            .linha-item-performance td:nth-child(3),
+            .linha-item-performance td:nth-child(7),
+            .linha-item-performance td:nth-child(8) {
+                background-color: #FCF8F8;
+            }
+
+            .linha-item-performance td.pct-positivo {
+                color: #1B5E20 !important;
+                background: linear-gradient(135deg, #E8F5E9 0%, #E6F4E7 100%) !important;
+                font-weight: 700;
+                position: relative;
+                padding-left: 25px !important;
+                border-left: 3px solid #4CAF50 !important;
+            }
+
+            .linha-item-performance td.pct-positivo::before {
+                content: "▲";
+                position: absolute;
+                left: 9px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 10px;
+                font-weight: 900;
+                color: #2E7D32;
+            }
+
+            .linha-item-performance td.pct-negativo {
+                color: #C62828 !important;
+                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                font-weight: 700;
+                position: relative;
+                padding-left: 25px !important;
+                border-left: 3px solid #F44336 !important;
+            }
+
+            .linha-item-performance td.pct-negativo::before {
+                content: "▼";
+                position: absolute;
+                left: 9px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 10px;
+                font-weight: 900;
+                color: #C62828;
+            }
+
+            .linha-item-performance td.pct-neutro {
+                color: #666666 !important;
+                background: #F8F9FA !important;
+                font-weight: 600;
+            }
+
+            .linha-separador-performance td {
+                padding: 0 !important;
+                height: 2px;
+                background: linear-gradient(90deg, #FF2800, #790E09);
+                border: none !important;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-track {
+                background: #F7F3F2;
+                border-radius: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+                border-radius: 10px;
+                border: 2px solid #F7F3F2;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(135deg, #8F2C27 0%, #5A0A06 100%);
+            }
+
+            @media (max-width: 768px) {
+                .tabela-performance-canal th,
+                .tabela-performance-canal td {
+                    font-size: 9px !important;
+                    padding: 5px 5px !important;
+                }
+
+                .tabela-performance-canal th:first-child,
+                .linha-item-performance td.col-indicador {
+                    min-width: 145px;
+                }
+            }
+
+            /* Override visual para alinhar com "CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL" */
+            .tabela-container-performance-canal {
+                border: 2px solid #790E09 !important;
+                border-radius: 10px !important;
+                box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15) !important;
+                background: #FFFFFF !important;
+            }
+
+            .tabela-performance-canal {
+                width: 100% !important;
+                font-size: 10.5px !important;
+                line-height: 1.25 !important;
+            }
+
+            .tabela-performance-canal th {
+                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+                padding: 9px 7px !important;
+                border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+                border-bottom: 3px solid #5A0A06 !important;
+                font-size: 10.5px !important;
+                box-shadow: none !important;
+                min-width: auto !important;
+            }
+
+            .tabela-performance-canal th:first-child {
+                position: static !important;
+                left: auto !important;
+                z-index: auto !important;
+                min-width: auto !important;
+                box-shadow: none !important;
+                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+            }
+
+            .tabela-performance-canal td {
+                padding: 7px 7px !important;
+                border-bottom: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
+                font-size: 10.5px !important;
+                box-shadow: none !important;
+            }
+
+            .linha-item-performance:nth-child(even) {
+                background-color: #FFF9F8 !important;
+            }
+
+            .linha-item-performance:nth-child(odd) {
+                background-color: #FFFFFF !important;
+            }
+
+            .linha-item-performance:hover {
+                background-color: #FFF2EF !important;
+                box-shadow: inset 0 0 0 1px #FFD9CF !important;
+            }
+
+            .linha-item-performance td.col-indicador {
+                position: static !important;
+                left: auto !important;
+                z-index: auto !important;
+                min-width: auto !important;
+                box-shadow: none !important;
+                text-align: left !important;
+                font-weight: 600 !important;
+                color: #333333 !important;
+                background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
+                padding-left: 10px !important;
+            }
+
+            .linha-item-performance td.col-mes,
+            .linha-item-performance td.col-total-anual,
+            .linha-item-performance td.col-meta {
+                background: #F9F0EF !important;
+                color: #333 !important;
+                font-weight: 400 !important;
+            }
+
+            .linha-item-performance td.col-meta {
+                border-left: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
+            }
+
+            .linha-item-performance td.col-variacao,
+            .linha-item-performance td.col-alcance {
+                background-color: #F8F9FA !important;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-track {
+                background: #F5F5F5;
+                border-radius: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+                border-radius: 10px;
+                border: 2px solid #F5F5F5;
+            }
+
+            /* Compactação final */
+            .tabela-performance-canal {
+                font-size: 9.6px !important;
+                line-height: 1.15 !important;
+                table-layout: fixed !important;
+                width: 100% !important;
+            }
+
+            .tabela-performance-canal th {
+                padding: 5px 6px !important;
+                font-size: 9.3px !important;
+                letter-spacing: 0.25px !important;
+            }
+
+            .tabela-performance-canal td {
+                padding: 4px 6px !important;
+                font-size: 9.6px !important;
+                line-height: 1.1 !important;
+            }
+
+            .linha-grupo-performance td {
+                padding: 6px 9px !important;
+                font-size: 9.6px !important;
+                letter-spacing: 0.25px !important;
+            }
+
+            .linha-item-performance td.col-indicador {
+                padding-left: 8px !important;
+            }
+
+            .linha-item-performance td.pct-positivo,
+            .linha-item-performance td.pct-negativo {
+                padding-left: 20px !important;
+            }
+
+            .linha-item-performance td.pct-positivo::before,
+            .linha-item-performance td.pct-negativo::before {
+                left: 6px !important;
+                font-size: 9px !important;
+            }
+
+            .linha-separador-performance td {
+                height: 1px !important;
+            }
+
+            /* Compactação horizontal por coluna */
+            .tabela-performance-canal th:nth-child(1),
+            .tabela-performance-canal td:nth-child(1) {
+                width: 138px !important;
+                min-width: 138px !important;
+                max-width: 138px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(2),
+            .tabela-performance-canal td:nth-child(2),
+            .tabela-performance-canal th:nth-child(3),
+            .tabela-performance-canal td:nth-child(3) {
+                width: 78px !important;
+                min-width: 78px !important;
+                max-width: 78px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(4),
+            .tabela-performance-canal td:nth-child(4),
+            .tabela-performance-canal th:nth-child(6),
+            .tabela-performance-canal td:nth-child(6),
+            .tabela-performance-canal th:nth-child(9),
+            .tabela-performance-canal td:nth-child(9) {
+                width: 74px !important;
+                min-width: 74px !important;
+                max-width: 74px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(5),
+            .tabela-performance-canal td:nth-child(5) {
+                width: 86px !important;
+                min-width: 86px !important;
+                max-width: 86px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(7),
+            .tabela-performance-canal td:nth-child(7),
+            .tabela-performance-canal th:nth-child(8),
+            .tabela-performance-canal td:nth-child(8) {
+                width: 68px !important;
+                min-width: 68px !important;
+                max-width: 68px !important;
+            }
+        </style>
+
+        <div class="tabela-container-performance-canal">
+            <table class="tabela-performance-canal">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th class="col-mes">""" + str(mes_anterior_ref) + """</th>
+                        <th class="col-mes">""" + str(mes_atual_ref) + """</th>
+                        <th class="col-variacao">MoM</th>
+                        <th class="col-meta">""" + f"Meta {mes_atual_ref}" + """</th>
+                        <th class="col-alcance">Ating Meta</th>
+                        <th class="col-total-anual">2024</th>
+                        <th class="col-total-anual">2025</th>
+                        <th class="col-variacao">YoY</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        for linha in linhas:
+            if linha['tipo'] == 'grupo':
+                html += f'<tr class="linha-grupo-performance"><td colspan="9">{linha["grupo"]}</td></tr>'
+                continue
+
+            if linha['tipo'] == 'separador':
+                html += '<tr class="linha-separador-performance"><td colspan="9"></td></tr>'
+                continue
+
+            html += '<tr class="linha-item-performance">'
+            html += f'<td class="col-indicador">&nbsp;&nbsp;&nbsp;{linha["indicador"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_ANT"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_ATU"]}</td>'
+            html += f'<td class="col-variacao {classe_pct(linha["MOM_RAW"])}">{linha["MOM"]}</td>'
+            html += f'<td class="col-meta">{linha["META_MES"]}</td>'
+            html += f'<td class="col-alcance {classe_pct(linha["ATING_META_RAW"])}">{linha["ATING_META"]}</td>'
+            html += f'<td class="col-total-anual">{linha["2024"]}</td>'
+            html += f'<td class="col-total-anual">{linha["2025"]}</td>'
+            html += f'<td class="col-variacao {classe_pct(linha["YOY_RAW"])}">{linha["YOY"]}</td>'
+            html += '</tr>'
+
+        html += """
+                </tbody>
+            </table>
+        </div>
+        """
+        return html
+
+    def criar_painel_insights_performance(insights_por_grupo, mes_atual_ref, mes_anterior_ref):
+        partes = [
+            "<style>",
+            ".insights-conversao-canal{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:8px 0 16px 0;}",
+            ".insight-conversao-card{border:1px solid #E3D6D3;border-radius:12px;background:linear-gradient(180deg,#FFFFFF 0%,#FFF9F8 100%);box-shadow:0 4px 14px rgba(121,14,9,.08);overflow:hidden;}",
+            ".insight-conversao-header{background:linear-gradient(135deg,#790E09 0%,#5A0A06 100%);color:#FFF;font-size:11px;font-weight:800;letter-spacing:.3px;padding:8px 10px;text-transform:uppercase;}",
+            ".insight-conversao-table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;}",
+            ".insight-conversao-table th,.insight-conversao-table td{border:1px solid #FFF;padding:6px 6px;text-align:right;white-space:nowrap;}",
+            ".insight-conversao-table th{background:#F7ECEA;color:#3A302F;font-weight:700;}",
+            ".insight-conversao-table td{background:#FFF5F3;color:#2F3747;}",
+            ".insight-conversao-table td:first-child,.insight-conversao-table th:first-child{text-align:left;width:44%;}",
+            ".insight-conversao-table tr:nth-child(even) td{background:#FFF1EF;}",
+            "</style>",
+            "<div class=\"insights-conversao-canal\">",
+        ]
+
+        for grupo in ['FIXA', 'CONTA']:
+            linhas = insights_por_grupo.get(grupo, [])
+            if not linhas:
+                continue
+
+            partes.extend([
+                "<div class=\"insight-conversao-card\">",
+                f"<div class=\"insight-conversao-header\">{grupo}</div>",
+                "<table class=\"insight-conversao-table\">",
+                "<thead><tr>",
+                "<th>Indicador</th>",
+                f"<th>{mes_anterior_ref}</th>",
+                f"<th>{mes_atual_ref}</th>",
+                "<th>2024</th>",
+                "<th>2025</th>",
+                "</tr></thead>",
+                "<tbody>",
+            ])
+
+            for linha in linhas:
+                partes.extend([
+                    "<tr>",
+                    f"<td>{linha.get('indicador', '')}</td>",
+                    f"<td>{linha.get('MES_ANT', '0,0%')}</td>",
+                    f"<td>{linha.get('MES_ATU', '0,0%')}</td>",
+                    f"<td>{linha.get('2024', '0,0%')}</td>",
+                    f"<td>{linha.get('2025', '0,0%')}</td>",
+                    "</tr>",
+                ])
+
+            partes.extend([
+                "</tbody>",
+                "</table>",
+                "</div>",
+            ])
+
+        partes.append("</div>")
+        return "".join(partes)
+
+    df_perf_base = preparar_base_performance(df)
+    df_lig_raw = load_ligacoes_para_performance()
+    df_lig_perf = preparar_base_performance(df_lig_raw)
+
+    if not df_lig_perf.empty:
+        base_ligacoes_origem = df_perf_base[
+            (df_perf_base['INDICADOR_NORM'] == 'LIGACOES') &
+            (df_perf_base['CANAL_NORM'] == 'TELEVENDAS RECEPTIVO') &
+            (df_perf_base['PLATAFORMA_NORM'].isin(['FIXA', 'CONTA']))
+        ].copy()
+
+        df_meta_lig = base_ligacoes_origem.groupby(
+            ['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+            as_index=False,
+            observed=True
+        )['DESAFIO_QTD'].sum()
+
+        df_tend_lig = base_ligacoes_origem.groupby(
+            ['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+            as_index=False,
+            observed=True
+        )['TEND_QTD'].sum()
+
+        if not df_meta_lig.empty or not df_tend_lig.empty:
+            df_lig_perf = (
+                df_lig_perf.drop(columns=['DESAFIO_QTD', 'TEND_QTD'], errors='ignore')
+                .merge(
+                    df_meta_lig,
+                    on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+                    how='left'
+                )
+                .merge(
+                    df_tend_lig,
+                    on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+                    how='left'
+                )
+            )
+            df_lig_perf['DESAFIO_QTD'] = pd.to_numeric(df_lig_perf['DESAFIO_QTD'], errors='coerce').fillna(0)
+            df_lig_perf['TEND_QTD'] = pd.to_numeric(df_lig_perf['TEND_QTD'], errors='coerce').fillna(df_lig_perf['QTDE'])
+        else:
+            df_lig_perf['DESAFIO_QTD'] = 0
+            df_lig_perf['TEND_QTD'] = df_lig_perf['QTDE']
+
+        mask_remove_lig = (
+            (df_perf_base['INDICADOR_NORM'] == 'LIGACOES') &
+            (df_perf_base['CANAL_NORM'] == 'TELEVENDAS RECEPTIVO')
+        )
+        df_perf_base = pd.concat([df_perf_base[~mask_remove_lig], df_lig_perf], ignore_index=True)
+
+    if df_perf_base.empty:
+        st.warning("Não há dados suficientes para montar a análise de performance por canal.")
+    else:
+        canais_perf = sorted(
+            df_perf_base['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist()
+        )
+        meses_perf = sorted(
+            [
+                mes for mes in df_perf_base['dat_tratada'].dropna().astype(str).str.strip().tolist()
+                if re.match(r'^[a-z]{3}/\d{2}$', mes)
+            ],
+            key=mes_ano_para_data
+        )
+        meses_perf = list(dict.fromkeys(meses_perf))
+
+        if not meses_perf:
+            st.warning("Não há meses válidos para exibir a análise de performance por canal.")
+        else:
+            col_perf_f1, col_perf_f2 = st.columns(2)
+
+            opcoes_canal = ["Todos"] + canais_perf
+            canal_padrao = "Todos"
+            idx_canal_padrao = opcoes_canal.index(canal_padrao) if canal_padrao in opcoes_canal else 0
+
+            with col_perf_f1:
+                canal_perf_sel = st.selectbox(
+                    "Canal:",
+                    options=opcoes_canal,
+                    index=idx_canal_padrao,
+                    key="filtro_canal_performance_ativados"
+                )
+
+            mes_padrao = get_mes_atual_formatado() if get_mes_atual_formatado() in meses_perf else meses_perf[-1]
+            idx_mes_padrao = meses_perf.index(mes_padrao) if (mes_padrao in meses_perf) else 0
+
+            with col_perf_f2:
+                mes_perf_sel = st.selectbox(
+                    "Mês de referência:",
+                    options=meses_perf,
+                    index=idx_mes_padrao,
+                    key="filtro_mes_performance_ativados"
+                )
+
+            canal_norm_sel = normalizar_texto_chave(canal_perf_sel)
+            df_perf_filtrado = df_perf_base.copy()
+            if canal_perf_sel != "Todos":
+                df_perf_filtrado = df_perf_filtrado[df_perf_filtrado['CANAL_NORM'] == canal_norm_sel]
+
+            mes_anterior_perf = get_mes_anterior(mes_perf_sel)
+            mes_yoy_perf = get_mes_mesmo_ano_anterior(mes_perf_sel)
+
+            mostrar_pedidos = (canal_perf_sel == "Todos") or (canal_norm_sel == "E COMMERCE")
+            mostrar_ligacoes = (canal_perf_sel == "Todos") or (canal_norm_sel == "TELEVENDAS RECEPTIVO")
+
+            config_indicadores = {
+                'FIXA': [
+                    ('LIGAÇÕES', 'FIXA', {'LIGACOES'}, 'indicador'),
+                    ('PEDIDOS', 'FIXA', {'PEDIDOS'}, 'indicador'),
+                    ('VENDA BRUTA', 'FIXA', {'VENDA BRUTA', 'VENDAS BRUTAS'}, 'zero'),
+                    ('INSTALADOS', 'FIXA', {'INSTALADOS', 'INSTALACAO', 'INSTALACOES', 'INSTAL'}, 'indicador')
+                ],
+                'CONTA': [
+                    ('LIGAÇÕES', 'CONTA', {'LIGACOES'}, 'indicador'),
+                    ('PEDIDOS', 'CONTA', {'PEDIDOS'}, 'indicador'),
+                    ('GROSS BRUTO', 'CONTA', {'GROSS BRUTO'}, 'zero'),
+                    ('GROSS LIQUIDO', 'CONTA', {'GROSS LIQUIDO'}, 'indicador')
+                ]
+            }
+
+            linhas_tabela_perf = []
+            for grupo, itens in config_indicadores.items():
+                linhas_tabela_perf.append({'tipo': 'grupo', 'grupo': grupo})
+
+                metricas_base_grupo = {}
+                metricas_exibir_grupo = {}
+                plataforma_base_grupo = {}
+
+                for nome_indicador, plataforma_ref, aliases_ref, meta_modo_ref in itens:
+                    if nome_indicador == 'PEDIDOS' and not mostrar_pedidos:
+                        continue
+                    if nome_indicador == 'LIGAÇÕES' and not mostrar_ligacoes:
+                        continue
+
+                    metricas_item = calcular_metricas_linha(
+                        df_perf_filtrado,
+                        aliases_ref,
+                        plataforma_ref,
+                        mes_perf_sel,
+                        mes_anterior_perf,
+                        meta_modo_ref
+                    )
+
+                    metricas_base_grupo[nome_indicador] = metricas_item
+                    plataforma_base_grupo[nome_indicador] = plataforma_ref
+
+                # Projeção de meta usando apenas informações já calculadas no próprio bloco:
+                # meta_proj = (realizado_indicador_mes_anterior / realizado_base_mes_anterior) * meta_base_mes_atual
+                # Base FIXA: INSTALADOS | Base CONTA: GROSS LIQUIDO
+                for nome_indicador, metricas_item in metricas_base_grupo.items():
+                    plataforma_ref = plataforma_base_grupo.get(nome_indicador, grupo)
+                    metricas_exibir = metricas_item.copy()
+                    if nome_indicador in {'VENDA BRUTA', 'GROSS BRUTO'}:
+                        nome_base = 'INSTALADOS' if plataforma_ref == 'FIXA' else 'GROSS LIQUIDO'
+                        base_ref = metricas_base_grupo.get(nome_base)
+                        if base_ref:
+                            base_mes_ant = float(base_ref.get('v_mes_ant', 0) or 0)
+                            base_meta_mes = float(base_ref.get('v_meta_mes', 0) or 0)
+                            ind_mes_ant = float(metricas_item.get('v_mes_ant', 0) or 0)
+                            if base_mes_ant > 0 and base_meta_mes > 0:
+                                meta_proj = (ind_mes_ant / base_mes_ant) * base_meta_mes
+                                metricas_exibir['v_meta_mes'] = meta_proj
+                                mes_atu = float(metricas_item.get('v_mes_atu', 0) or 0)
+                                metricas_exibir['v_ating_meta'] = (((mes_atu / meta_proj) - 1) * 100) if meta_proj > 0 else 0
+                            else:
+                                metricas_exibir['v_meta_mes'] = 0
+                                metricas_exibir['v_ating_meta'] = 0
+
+                    metricas_exibir_grupo[nome_indicador] = metricas_exibir
+
+                # Ordem de storytelling solicitada com linhas de conversão dentro da tabela
+                layout_grupo = {
+                    'FIXA': [
+                        ('base', 'LIGAÇÕES'),
+                        ('base', 'PEDIDOS'),
+                        ('base', 'VENDA BRUTA'),
+                        ('ratio', 'LIGAÇÕES VS V. BRUTA', 'VENDA BRUTA', 'LIGAÇÕES', mostrar_ligacoes),
+                        ('ratio', 'PEDIDOS VS V. BRUTA', 'VENDA BRUTA', 'PEDIDOS', mostrar_pedidos),
+                        ('base', 'INSTALADOS'),
+                        ('ratio', 'V. BRUTA VS INSTALADOS', 'INSTALADOS', 'VENDA BRUTA', True),
+                    ],
+                    'CONTA': [
+                        ('base', 'LIGAÇÕES'),
+                        ('base', 'PEDIDOS'),
+                        ('base', 'GROSS BRUTO'),
+                        ('ratio', 'LIGAÇÕES VS V. BRUTA', 'GROSS BRUTO', 'LIGAÇÕES', mostrar_ligacoes),
+                        ('ratio', 'PEDIDOS VS V. BRUTA', 'GROSS BRUTO', 'PEDIDOS', mostrar_pedidos),
+                        ('base', 'GROSS LIQUIDO'),
+                        ('ratio', 'G. LIQUIDO VS G. BRUTO', 'GROSS LIQUIDO', 'GROSS BRUTO', True),
+                    ],
+                }
+
+                for regra in layout_grupo.get(grupo, []):
+                    if not regra:
+                        continue
+
+                    if regra[0] == 'base':
+                        nome_indicador = regra[1]
+                        metricas_exibir = metricas_exibir_grupo.get(nome_indicador)
+                        if not metricas_exibir:
+                            continue
+
+                        linhas_tabela_perf.append(
+                            {
+                                'tipo': 'item',
+                                'indicador': nome_indicador,
+                                '2024': formatar_numero_brasileiro(metricas_exibir['v_2024'], 0),
+                                '2025': formatar_numero_brasileiro(metricas_exibir['v_2025'], 0),
+                                'MES_ANT': formatar_numero_brasileiro(metricas_exibir['v_mes_ant'], 0),
+                                'MES_ATU': formatar_numero_brasileiro(metricas_exibir['v_mes_atu'], 0),
+                                'META_MES': formatar_numero_brasileiro(metricas_exibir['v_meta_mes'], 0),
+                                'YOY': formatar_pct_tabela(metricas_exibir['v_yoy']),
+                                'MOM': formatar_pct_tabela(metricas_exibir['v_mom']),
+                                'ATING_META': formatar_pct_tabela(metricas_exibir['v_ating_meta']),
+                                'YOY_RAW': metricas_exibir['v_yoy'],
+                                'MOM_RAW': metricas_exibir['v_mom'],
+                                'ATING_META_RAW': metricas_exibir['v_ating_meta']
+                            }
+                        )
+                        continue
+
+                    if regra[0] == 'ratio':
+                        _, rotulo_linha, chave_num, chave_den, condicao_exibir = regra
+                        if not condicao_exibir:
+                            continue
+                        linha_ratio = criar_linha_ratio_por_chaves(
+                            rotulo_linha,
+                            metricas_exibir_grupo,
+                            chave_num,
+                            chave_den
+                        )
+                        if linha_ratio:
+                            linhas_tabela_perf.append(linha_ratio)
+
+                if grupo == 'FIXA':
+                    linhas_tabela_perf.append({'tipo': 'separador'})
+
+            st.caption(
+                f"Mês atual da análise: {mes_perf_sel} | Mês anterior: {mes_anterior_perf} | YoY referência: {mes_yoy_perf}"
+            )
+            st.markdown(
+                criar_tabela_html_performance_canal(linhas_tabela_perf, mes_perf_sel, mes_anterior_perf),
+                unsafe_allow_html=True
+            )
+
 # =========================
 # ABA 2: DESATIVADOS - VERSÃO COMPLETA E CORRIGIDA
 # =========================
@@ -3074,7 +4175,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -3161,7 +4262,7 @@ with tab2:
             <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📉</span>
             DESATIVADOS
             <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE CHURN/DESATIVAÇÃO - LINHAS SILENTES e INADIMPLENTES
+                ANÁLISE DE CHURN/DESATIVAÇOES - LINHAS SILENTES E INADIMPLENTES
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -4198,7 +5299,7 @@ with tab3:
             <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📋</span>
             PEDIDOS E-Commerce
             <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE PEDIDOS E-COMMERCE - MÊS
+                ANÁLISE DE PEDIDOS E CONVERSÃO - E-Commerce
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -5630,7 +6731,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -5733,7 +6834,7 @@ with tab4:
     def load_metas_ligacoes():
         """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
         try:
-            metas_path = "base_final_trt_new3.xlsx"
+            metas_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
             
             # Carregar dados
             df_metas = pd.read_excel(metas_path)
@@ -7307,8 +8408,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
-
-
-
-
