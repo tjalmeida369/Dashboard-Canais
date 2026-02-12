@@ -1460,7 +1460,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -3105,7 +3105,7 @@ with tab1:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -3276,8 +3276,23 @@ with tab1:
         mes_atual_norm = str(mes_atual_ref).strip().lower()
         mes_tendencia_norm = str(mes_tendencia_ref or "").strip().lower()
         mes_corrente_calendario = get_mes_atual_formatado().strip().lower()
+        meses_tend_linha = sorted(
+            base_linha.loc[
+                pd.to_numeric(base_linha['TEND_QTD'], errors='coerce').fillna(0) > 0,
+                'dat_tratada'
+            ].dropna().astype(str).str.strip().tolist(),
+            key=mes_ano_para_data
+        )
+        mes_tendencia_linha_norm = (
+            meses_tend_linha[-1].strip().lower()
+            if meses_tend_linha else ""
+        )
         usar_tendencia_mes = (
-            (mes_atual_norm == mes_corrente_calendario or (mes_tendencia_norm and mes_atual_norm == mes_tendencia_norm))
+            (
+                mes_atual_norm == mes_corrente_calendario
+                or (mes_tendencia_norm and mes_atual_norm == mes_tendencia_norm)
+                or (mes_tendencia_linha_norm and mes_atual_norm == mes_tendencia_linha_norm)
+            )
             and (valor_tend_mes_atual > 0)
         )
         valor_mes_atual = valor_tend_mes_atual if usar_tendencia_mes else valor_real_mes_atual
@@ -3940,21 +3955,34 @@ with tab1:
         )['TEND_QTD'].sum()
 
         if not df_meta_lig.empty or not df_tend_lig.empty:
+            # Preservar fallback de tendência da base de ligações (não deixar 0 da base principal sobrescrever)
+            df_lig_perf_work = df_lig_perf.copy()
+            df_lig_perf_work['TEND_QTD_FALLBACK'] = pd.to_numeric(
+                df_lig_perf_work.get('TEND_QTD', df_lig_perf_work['QTDE']),
+                errors='coerce'
+            ).fillna(df_lig_perf_work['QTDE'])
+
             df_lig_perf = (
-                df_lig_perf.drop(columns=['DESAFIO_QTD', 'TEND_QTD'], errors='ignore')
+                df_lig_perf_work.drop(columns=['DESAFIO_QTD', 'TEND_QTD'], errors='ignore')
                 .merge(
                     df_meta_lig,
                     on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
                     how='left'
                 )
                 .merge(
-                    df_tend_lig,
+                    df_tend_lig.rename(columns={'TEND_QTD': 'TEND_QTD_BASE'}),
                     on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
                     how='left'
                 )
             )
             df_lig_perf['DESAFIO_QTD'] = pd.to_numeric(df_lig_perf['DESAFIO_QTD'], errors='coerce').fillna(0)
-            df_lig_perf['TEND_QTD'] = pd.to_numeric(df_lig_perf['TEND_QTD'], errors='coerce').fillna(df_lig_perf['QTDE'])
+            df_lig_perf['TEND_QTD_BASE'] = pd.to_numeric(df_lig_perf['TEND_QTD_BASE'], errors='coerce').fillna(0)
+            df_lig_perf['TEND_QTD'] = np.where(
+                df_lig_perf['TEND_QTD_BASE'] > 0,
+                df_lig_perf['TEND_QTD_BASE'],
+                df_lig_perf['TEND_QTD_FALLBACK']
+            )
+            df_lig_perf.drop(columns=['TEND_QTD_BASE', 'TEND_QTD_FALLBACK'], errors='ignore', inplace=True)
         else:
             df_lig_perf['DESAFIO_QTD'] = 0
             df_lig_perf['TEND_QTD'] = df_lig_perf['QTDE']
@@ -4193,7 +4221,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -5395,7 +5423,8 @@ with tab3:
     # - Meta = soma de DESAFIO_QTD
     # - Período baseado em DAT_MOVIMENTO2
     # =========================
-    df_pedidos = load_data(file_path).copy()
+    # Reutilizar a base principal já carregada (evita nova leitura do mesmo arquivo)
+    df_pedidos = df.copy()
 
     # Normalizar regional para evitar tabela vazia por coluna inconsistente
     if 'REGIONAL' not in df_pedidos.columns and 'DSC_REGIONAL_CMV' in df_pedidos.columns:
@@ -6813,7 +6842,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -6914,12 +6943,10 @@ with tab4:
     # =========================
     @st.cache_data(ttl=3600)
     def load_metas_ligacoes():
-        """Carrega METAS de ligações do arquivo base_final_trt_new3.xlsx"""
+        """Carrega METAS de ligações a partir da base principal já carregada."""
         try:
-            metas_path = "base_final_trt_new3.xlsx"
-            
-            # Carregar dados
-            df_metas = pd.read_excel(metas_path)
+            # Reutilizar o mesmo DataFrame principal (base_final_trt_new3.xlsx)
+            df_metas = df.copy()
             
             # Verificar se as colunas necessárias existem
             colunas_necessarias = ['DESAFIO_QTD', 'DSC_INDICADOR', 'COD_PLATAFORMA', 'DAT_MOVIMENTO2', 'REGIONAL', 'CANAL_PLAN', 'dat_tratada']
@@ -8522,4 +8549,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
