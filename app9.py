@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 import locale
 import re
 import unicodedata
+from html import escape
 from textwrap import dedent
 
 # Harmonizar tema plotly com títulos menores
@@ -126,6 +127,7 @@ def render_header_logo():
 # Adicionar CSS personalizado (mantido igual)
 st.markdown("""
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Sora:wght@600;700;800&display=swap');
         * {font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;}
         html, body, .block-container {
             background: radial-gradient(circle at 20% 20%, rgba(255,40,0,0.05), transparent 35%),
@@ -813,6 +815,8 @@ st.markdown("""
             color: var(--ds-primary) !important;
             -webkit-text-fill-color: var(--ds-primary) !important;
             font-size: 15px !important;
+            font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+            font-weight: 800 !important;
             letter-spacing: 0.35px;
             margin-bottom: 9px !important;
             text-transform: uppercase;
@@ -829,6 +833,8 @@ st.markdown("""
             color: var(--ds-text) !important;
             background: none !important;
             -webkit-text-fill-color: var(--ds-text) !important;
+            font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+            font-weight: 800 !important;
             text-shadow: none;
             letter-spacing: -0.3px;
         }
@@ -839,6 +845,74 @@ st.markdown("""
             border-width: 1px !important;
             min-height: 24px;
             padding: 4px 10px !important;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            font-weight: 700 !important;
+        }
+
+        .kpi-meta-line {
+            font-size: 12.5px;
+            color: #666666;
+            margin: 6px 0;
+            line-height: 1.35;
+            font-weight: 500;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        .kpi-meta-label {
+            font-weight: 700;
+            color: #334155;
+            cursor: help;
+            border-bottom: 1px dotted #94A3B8;
+            text-underline-offset: 2px;
+            transition: color 0.2s ease, border-color 0.2s ease;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        .kpi-meta-label:hover {
+            color: #1E293B;
+            border-bottom-color: #64748B;
+        }
+
+        .kpi-parcial-note {
+            font-size: 11px;
+            color: #666666;
+            font-weight: 700;
+            margin-top: 4px;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        .kpi-value-wrap {
+            position: relative;
+            display: inline-block;
+            line-height: 1;
+            overflow: visible;
+        }
+
+        .kpi-value-wrap .kpi-value-dinamico {
+            display: block;
+            text-align: center;
+        }
+
+        .kpi-tooltip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            font-size: 9px;
+            font-weight: 800;
+            color: #334155;
+            background: #E2E8F0;
+            cursor: help;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        .kpi-tooltip-inline {
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translate(6px, -50%);
         }
 
         .variacao-positiva {
@@ -1234,6 +1308,52 @@ def render_filter_label(texto: str):
     """Renderiza rótulo padrão para filtros com label colapsado."""
     st.markdown(f'<div class="filter-label-standard">{texto}</div>', unsafe_allow_html=True)
 
+def build_tendencia_icon_html(usa_tendencia: bool) -> str:
+    """Retorna ícone de tendência no valor KPI quando aplicável."""
+    if not usa_tendencia:
+        return ""
+    return (
+        '<span class="kpi-tooltip kpi-tooltip-inline" '
+        'title="Tendência = projeção de fechamento do mês com base no ritmo atual." '
+        'aria-label="Tendência aplicada ao valor">i</span>'
+    )
+
+def build_kpi_meta_line(
+    anterior_valor: str,
+    meta_valor: str | None = None,
+    mes_anterior_ref: str | None = None,
+    mes_meta_ref: str | None = None,
+    break_line: bool = False
+) -> str:
+    """Gera linha de meta dos cards com tooltip de referência de mês."""
+    mes_anterior_txt = str(mes_anterior_ref).strip() if mes_anterior_ref else ""
+    mes_meta_txt = str(mes_meta_ref).strip() if mes_meta_ref else ""
+
+    hint_anterior = (
+        f"Anterior: mês anterior {mes_anterior_txt}"
+        if mes_anterior_txt
+        else "Anterior: valor do mês anterior"
+    )
+    label_anterior = (
+        f'<span class="kpi-meta-label" title="{escape(hint_anterior)}" '
+        f'aria-label="{escape(hint_anterior)}">Anterior:</span>'
+    )
+
+    if meta_valor is None:
+        return f"{label_anterior} {anterior_valor}"
+
+    hint_meta = (
+        f"Meta: referente ao mês {mes_meta_txt}"
+        if mes_meta_txt
+        else "Meta: valor de meta do mês selecionado"
+    )
+    label_meta = (
+        f'<span class="kpi-meta-label" title="{escape(hint_meta)}" '
+        f'aria-label="{escape(hint_meta)}">Meta:</span>'
+    )
+    separador = "<br>" if break_line else " | "
+    return f"{label_anterior} {anterior_valor}{separador}{label_meta} {meta_valor}"
+
 def get_data_realizado_max_formatada(df_base: pd.DataFrame) -> str:
     """Retorna a data máxima de realizado no formato dd/mm/aaaa."""
     if df_base is None or df_base.empty:
@@ -1419,12 +1539,40 @@ def apply_standard_title_style(fig, size: int = 16):
         )
     )
 
+def normalizar_rotulo_produto(valor) -> str:
+    """Normaliza rótulo de produto para uso em legenda e barras."""
+    if pd.isna(valor):
+        return "N/D"
+
+    texto = str(valor).strip()
+    if not texto:
+        return "N/D"
+
+    base = unicodedata.normalize("NFKD", texto)
+    base = base.encode("ASCII", "ignore").decode("ASCII")
+    base = base.upper().strip()
+    base = re.sub(r"\s+", " ", base)
+
+    if base in {"NAN", "NONE", "NULL", "N/D"}:
+        return "N/D"
+    if "FIXA" in base:
+        return "FIXA"
+    if "CONTA" in base:
+        return "CONTA"
+    if "CLICK" in base and "CALL" in base:
+        return "CLICK TO CALL"
+    if base in {"CTC"}:
+        return "CLICK TO CALL"
+    if re.fullmatch(r"\d+", base):
+        return f"PRODUTO {base}"
+    return base
+
 @st.cache_data
 def create_bar_chart_data(df_mes_selecionado):
     """Cria dados para gráfico de barras horizontais"""
     df_plot = df_mes_selecionado.copy()
     df_plot['CANAL_PLAN'] = df_plot['CANAL_PLAN'].astype(str).str.strip()
-    df_plot['COD_PLATAFORMA'] = df_plot['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
+    df_plot['COD_PLATAFORMA'] = df_plot['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
     df_plot['QTDE'] = pd.to_numeric(df_plot['QTDE'], errors='coerce').fillna(0)
     bar_data = df_plot.groupby(['CANAL_PLAN', 'COD_PLATAFORMA'], observed=True)['QTDE'].sum().reset_index()
     canal_totals = bar_data.groupby('CANAL_PLAN', observed=True)['QTDE'].sum().sort_values(ascending=False)
@@ -1460,7 +1608,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -1797,9 +1945,10 @@ with tab1:
                 anterior_formatado = f"{anterior:,.0f}".replace(",", ".")
                 meta_formatado = f"{meta:,.0f}".replace(",", ".")
                 real_hint_html = (
-                    f'<div style="font-size: 11px; color: #666666; font-weight: 700; margin-top: 4px;">Parcial: {real_atual_formatado}</div>'
+                    f'<div class="kpi-parcial-note">Parcial: {real_atual_formatado}</div>'
                     if mostrar_parcial else ''
                 )
+                tendencia_icon_html = build_tendencia_icon_html(usa_tendencia)
                 
                 if variacao_mom >= 0:
                     classe_mom = "variacao-positiva"
@@ -1819,11 +1968,10 @@ with tab1:
                 bloco_html += (
                     f'<div class="kpi-block-dinamico">'
                     f'<div style="font-size: 13px; color: #333333; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">{plataforma}</div>'
-                    f'<div class="kpi-value-dinamico">{atual_formatado}</div>'
+                    f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_formatado}</div>{tendencia_icon_html}</div>'
                     f'{real_hint_html}'
-                    f'<div style="font-size: 12.5px; color: #666666; margin: 5px 0; line-height: 1.4; font-weight: 500;">'
-                    f'<span style="font-weight: 600;">Anterior:</span> {anterior_formatado} | '
-                    f'<span style="font-weight: 600;">Meta:</span> {meta_formatado}'
+                    f'<div class="kpi-meta-line">'
+                    f'{build_kpi_meta_line(anterior_formatado, meta_formatado, mes_anterior_cards, mes_selecionado_cards)}'
                     f'</div>'
                     f'<div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 10px;">'
                     f'<div class="kpi-variacao-item {classe_mom}" style="flex: 1; font-size: 10px !important;">{variacao_mom:+.0f}% MoM</div>'
@@ -2003,9 +2151,11 @@ with tab1:
 
         color_map = {
             'CONTA': '#790E09',
-            'FIXA': '#495057'
+            'FIXA': '#475569',
+            'CLICK TO CALL': '#0F766E',
+            'N/D': '#9CA3AF'
         }
-        cores_adicionais = ['#B71C1C', '#8A4B45', '#546E7A', '#A23B36', '#6C757D']
+        cores_adicionais = ['#A23B36', '#7F1D1D', '#64748B', '#0F766E', '#9A3412']
         for i, produto in enumerate(produtos_ordenados):
             if produto not in color_map:
                 color_map[produto] = cores_adicionais[i % len(cores_adicionais)]
@@ -2092,9 +2242,9 @@ with tab1:
         fig_bar.update_layout(
             barmode='stack',
             plot_bgcolor='#FFFFFF',
-            paper_bgcolor='#FCFCFD',
-            font=dict(family='Segoe UI', size=13, color='#2F3747'),
-            margin=dict(l=26, r=190, t=92, b=46),
+            paper_bgcolor='#FFFFFF',
+            font=dict(family='Manrope', size=13, color='#2F3747'),
+            margin=dict(l=26, r=230, t=92, b=46),
             height=max(470, 66 * len(canais_plot) + 110),
             xaxis=dict(
                 title='',
@@ -2115,16 +2265,17 @@ with tab1:
                 categoryarray=canais_plot[::-1]
             ),
             legend=dict(
-                title=dict(text='<b>PRODUTO</b>', font=dict(size=12, color='#2F3747')),
-                orientation='h',
-                yanchor='bottom',
-                y=1.02,
-                xanchor='right',
-                x=1.0,
+                title=dict(text='<b>PRODUTOS</b>', font=dict(size=12, color='#2F3747')),
+                orientation='v',
+                yanchor='top',
+                y=1.0,
+                xanchor='left',
+                x=1.01,
                 bgcolor='rgba(255,255,255,0.92)',
                 bordercolor='#E9ECEF',
                 borderwidth=1,
-                font=dict(size=11, color='#2F3747')
+                font=dict(size=11, color='#2F3747'),
+                traceorder='normal'
             ),
             title=dict(
                 text=f"<b>DISTRIBUIÇÃO POR CANAL</b><br><span style='font-size:13px;color:#6B7280;'>Análise de {mes_selecionado}</span>",
@@ -3105,7 +3256,7 @@ with tab1:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -4251,7 +4402,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -4562,8 +4713,8 @@ with tab2:
                             <div class="kpi-title-dinamico">{canal}</div>
                             <div style="text-align: center; padding: 6px 0;">
                                 <div class="kpi-value-dinamico">{total_atual_fmt}</div>
-                                <div style="font-size: 12px; color: #666666; margin: 7px 0; line-height: 1.3; font-weight: 500;">
-                                    <span style="font-weight: 600;">Anterior ({mes_anterior}):</span> {total_anterior_fmt}<br>
+                                <div class="kpi-meta-line" style="margin: 7px 0;">
+                                    {build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}<br>
                                     <span style="font-weight: 600;">Silentes:</span> {silentes_fmt}
                                 </div>
                                 <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
@@ -5684,13 +5835,15 @@ with tab3:
         classe_mom_conta = "variacao-positiva" if metricas_conta['variacao_mom'] >= 0 else "variacao-negativa"
         classe_mom_fixa = "variacao-positiva" if metricas_fixa['variacao_mom'] >= 0 else "variacao-negativa"
         real_hint_conta = (
-            f'<div style="font-size: 11px; color: #666666; font-weight: 700; margin-top: 4px;">Parcial: {realizado_conta_fmt}</div>'
+            f'<div class="kpi-parcial-note">Parcial: {realizado_conta_fmt}</div>'
             if metricas_conta['usa_tendencia'] else ''
         )
         real_hint_fixa = (
-            f'<div style="font-size: 11px; color: #666666; font-weight: 700; margin-top: 4px;">Parcial: {realizado_fixa_fmt}</div>'
+            f'<div class="kpi-parcial-note">Parcial: {realizado_fixa_fmt}</div>'
             if metricas_fixa['usa_tendencia'] else ''
         )
+        tendencia_icon_conta = build_tendencia_icon_html(metricas_conta['usa_tendencia'])
+        tendencia_icon_fixa = build_tendencia_icon_html(metricas_fixa['usa_tendencia'])
         
         # HTML para meta
         if metricas_conta['desvio_meta'] is not None and np.isfinite(metricas_conta['desvio_meta']):
@@ -5713,11 +5866,10 @@ with tab3:
                 f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS CONTA</div>'
                 f'<div style="text-align: center; padding: 6px 0;">'
-                f'<div class="kpi-value-dinamico">{atual_conta_fmt}</div>'
+                f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_conta_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
-                f'<div style="font-size: 12px; color: #666666; margin: 7px 0; line-height: 1.3; font-weight: 500;">'
-                f'<span style="font-weight: 600;">Anterior ({mes_anterior_pedidos}):</span> {anterior_conta_fmt}<br>'
-                f'<span style="font-weight: 600;">Meta ({mes_selecionado_pedidos}):</span> {meta_conta_fmt}'
+                f'<div class="kpi-meta-line" style="margin: 7px 0;">'
+                f'{build_kpi_meta_line(anterior_conta_fmt, meta_conta_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=True)}'
                 f'</div>'
                 f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
                 f'<div class="kpi-variacao-item {classe_mom_conta}" style="font-size: 10px !important;">'
@@ -5734,11 +5886,10 @@ with tab3:
                 f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS FIXA</div>'
                 f'<div style="text-align: center; padding: 6px 0;">'
-                f'<div class="kpi-value-dinamico">{atual_fixa_fmt}</div>'
+                f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_fixa_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
-                f'<div style="font-size: 12px; color: #666666; margin: 7px 0; line-height: 1.3; font-weight: 500;">'
-                f'<span style="font-weight: 600;">Anterior ({mes_anterior_pedidos}):</span> {anterior_fixa_fmt}<br>'
-                f'<span style="font-weight: 600;">Meta ({mes_selecionado_pedidos}):</span> {meta_fixa_fmt}'
+                f'<div class="kpi-meta-line" style="margin: 7px 0;">'
+                f'{build_kpi_meta_line(anterior_fixa_fmt, meta_fixa_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=True)}'
                 f'</div>'
                 f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
                 f'<div class="kpi-variacao-item {classe_mom_fixa}" style="font-size: 10px !important;">'
@@ -6872,7 +7023,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -7005,6 +7156,15 @@ with tab4:
                 (df_metas['DSC_INDICADOR'] == 'LIGACOES') & 
                 (df_metas['CANAL_PLAN'] == 'Televendas Receptivo')
             ].copy()
+
+            # Normalizar coluna de tendência para uso nos cards do mês atual
+            if 'TEND_QTD' in df_metas.columns:
+                df_metas['TEND_QTD'] = normalizar_numerico_serie(df_metas['TEND_QTD']).fillna(0)
+            else:
+                df_metas['TEND_QTD'] = 0.0
+
+            df_metas['COD_PLATAFORMA'] = df_metas['COD_PLATAFORMA'].astype(str).str.upper().str.strip()
+            df_metas['mes_ano'] = df_metas['mes_ano'].astype(str).str.strip()
             
             # Verificar se temos dados
             if df_metas.empty:
@@ -7136,6 +7296,28 @@ with tab4:
             df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional_filtro]
         
         return df_filtrado['QTDE'].sum()
+
+    def calcular_tendencia_ligacoes(df_metas, mes, regional_filtro=None, plataforma=None):
+        """Calcula tendência (TEND_QTD) de ligações para o mês/recorte selecionado."""
+        if df_metas is None or df_metas.empty or 'TEND_QTD' not in df_metas.columns:
+            return 0.0
+
+        df_filtrado = df_metas[df_metas['mes_ano'] == mes].copy()
+        if df_filtrado.empty:
+            return 0.0
+
+        if regional_filtro and regional_filtro != "Todas":
+            df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional_filtro]
+
+        if plataforma:
+            plataforma_norm = str(plataforma).strip().upper()
+            df_filtrado = df_filtrado[df_filtrado['COD_PLATAFORMA'].astype(str).str.upper() == plataforma_norm]
+        else:
+            df_filtrado = df_filtrado[
+                df_filtrado['COD_PLATAFORMA'].astype(str).str.upper().isin(['FIXA', 'CONTA'])
+            ]
+
+        return float(pd.to_numeric(df_filtrado['TEND_QTD'], errors='coerce').fillna(0).sum())
     
     # FUNÇÕES DE META CORRIGIDAS
     def calcular_meta_fixa(df_metas, mes, regional_filtro=None):
@@ -7262,10 +7444,10 @@ with tab4:
             unsafe_allow_html=True
         )
         
-        # Calcular valores do mês atual
-        total_atual = calcular_total_ligacoes(df_lig, mes_selecionado, regional_selecionada)
-        fixa_atual = calcular_ligacoes_fixa(df_lig, mes_selecionado, regional_selecionada)
-        conta_atual = calcular_ligacoes_conta(df_lig, mes_selecionado, regional_selecionada)
+        # Calcular valores do mês atual (realizados)
+        total_real_atual = calcular_total_ligacoes(df_lig, mes_selecionado, regional_selecionada)
+        fixa_real_atual = calcular_ligacoes_fixa(df_lig, mes_selecionado, regional_selecionada)
+        conta_real_atual = calcular_ligacoes_conta(df_lig, mes_selecionado, regional_selecionada)
         clicktocall_atual = calcular_ligacoes_clicktocall(df_lig, mes_selecionado, regional_selecionada)
         
         # Calcular valores do mês anterior
@@ -7273,6 +7455,22 @@ with tab4:
         fixa_anterior = calcular_ligacoes_fixa(df_lig, mes_anterior, regional_selecionada)
         conta_anterior = calcular_ligacoes_conta(df_lig, mes_anterior, regional_selecionada)
         clicktocall_anterior = calcular_ligacoes_clicktocall(df_lig, mes_anterior, regional_selecionada)
+
+        # Aplicar tendência apenas no mês corrente
+        mes_corrente_lig_ref = get_mes_atual_formatado().strip().lower()
+        usar_tendencia_mes_lig = str(mes_selecionado).strip().lower() == mes_corrente_lig_ref
+
+        tend_total_atual = calcular_tendencia_ligacoes(df_metas_lig, mes_selecionado, regional_selecionada)
+        tend_fixa_atual = calcular_tendencia_ligacoes(df_metas_lig, mes_selecionado, regional_selecionada, 'FIXA')
+        tend_conta_atual = calcular_tendencia_ligacoes(df_metas_lig, mes_selecionado, regional_selecionada, 'CONTA')
+
+        usa_tendencia_total = usar_tendencia_mes_lig and (tend_total_atual > 0)
+        usa_tendencia_fixa = usar_tendencia_mes_lig and (tend_fixa_atual > 0)
+        usa_tendencia_conta = usar_tendencia_mes_lig and (tend_conta_atual > 0)
+
+        total_atual = tend_total_atual if usa_tendencia_total else total_real_atual
+        fixa_atual = tend_fixa_atual if usa_tendencia_fixa else fixa_real_atual
+        conta_atual = tend_conta_atual if usa_tendencia_conta else conta_real_atual
         
         # Calcular metas CORRETAS usando a função corrigida
         meta_fixa = calcular_meta_fixa(df_metas_lig, mes_selecionado, regional_selecionada)
@@ -7305,6 +7503,23 @@ with tab4:
         clicktocall_anterior_fmt = formatar_numero_brasileiro(clicktocall_anterior, 0)
         meta_fixa_fmt = formatar_numero_brasileiro(meta_fixa, 0)  # Meta sem casas decimais
         meta_conta_fmt = formatar_numero_brasileiro(meta_conta, 0)  # Meta sem casas decimais
+
+        # Indicadores visuais de tendência (mês atual)
+        tendencia_icon_total = build_tendencia_icon_html(usa_tendencia_total)
+        tendencia_icon_fixa = build_tendencia_icon_html(usa_tendencia_fixa)
+        tendencia_icon_conta = build_tendencia_icon_html(usa_tendencia_conta)
+        real_hint_total = (
+            f'<div class="kpi-parcial-note">Parcial: {formatar_numero_brasileiro(total_real_atual, 0)}</div>'
+            if usa_tendencia_total else ''
+        )
+        real_hint_fixa = (
+            f'<div class="kpi-parcial-note">Parcial: {formatar_numero_brasileiro(fixa_real_atual, 0)}</div>'
+            if usa_tendencia_fixa else ''
+        )
+        real_hint_conta = (
+            f'<div class="kpi-parcial-note">Parcial: {formatar_numero_brasileiro(conta_real_atual, 0)}</div>'
+            if usa_tendencia_conta else ''
+        )
         
         # HTML para meta
         if meta_fixa > 0:
@@ -7328,9 +7543,10 @@ with tab4:
                 <div class="kpi-card-dinamico animate-fade-in-up">
                     <div class="kpi-title-dinamico">TOTAL LIGAÇÕES</div>
                     <div style="text-align: center; padding: 15px 0;">
-                        <div class="kpi-value-dinamico">{total_atual_fmt}</div>
-                        <div style="font-size: 12.5px; color: #666666; margin: 10px 0; line-height: 1.4; font-weight: 500;">
-                            <span style="font-weight: 600;">Anterior ({mes_anterior}):</span> {total_anterior_fmt}
+                        <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{total_atual_fmt}</div>{tendencia_icon_total}</div>
+                        {real_hint_total}
+                        <div class="kpi-meta-line" style="margin: 10px 0;">
+                            {build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}
                         </div>
                         <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
                             <div class="kpi-variacao-item {classe_total}" style="font-size: 10px !important;">
@@ -7349,10 +7565,10 @@ with tab4:
                 <div class="kpi-card-dinamico animate-fade-in-up">
                     <div class="kpi-title-dinamico">LIGAÇÕES FIXA</div>
                     <div style="text-align: center; padding: 15px 0;">
-                        <div class="kpi-value-dinamico">{fixa_atual_fmt}</div>
-                        <div style="font-size: 12.5px; color: #666666; margin: 10px 0; line-height: 1.4; font-weight: 500;">
-                            <span style="font-weight: 600;">Anterior ({mes_anterior}):</span> {fixa_anterior_fmt}<br>
-                            <span style="font-weight: 600;">Meta:</span> {meta_fixa_fmt}
+                        <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{fixa_atual_fmt}</div>{tendencia_icon_fixa}</div>
+                        {real_hint_fixa}
+                        <div class="kpi-meta-line" style="margin: 10px 0;">
+                            {build_kpi_meta_line(fixa_anterior_fmt, meta_fixa_fmt, mes_anterior, mes_selecionado, break_line=True)}
                         </div>
                         <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
                             <div class="kpi-variacao-item {classe_fixa}" style="font-size: 10px !important;">
@@ -7372,10 +7588,10 @@ with tab4:
                 <div class="kpi-card-dinamico animate-fade-in-up">
                     <div class="kpi-title-dinamico">LIGAÇÕES CONTA</div>
                     <div style="text-align: center; padding: 15px 0;">
-                        <div class="kpi-value-dinamico">{conta_atual_fmt}</div>
-                        <div style="font-size: 12.5px; color: #666666; margin: 10px 0; line-height: 1.4; font-weight: 500;">
-                            <span style="font-weight: 600;">Anterior ({mes_anterior}):</span> {conta_anterior_fmt}<br>
-                            <span style="font-weight: 600;">Meta:</span> {meta_conta_fmt}
+                        <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{conta_atual_fmt}</div>{tendencia_icon_conta}</div>
+                        {real_hint_conta}
+                        <div class="kpi-meta-line" style="margin: 10px 0;">
+                            {build_kpi_meta_line(conta_anterior_fmt, meta_conta_fmt, mes_anterior, mes_selecionado, break_line=True)}
                         </div>
                         <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
                             <div class="kpi-variacao-item {classe_conta}" style="font-size: 10px !important;">
@@ -7396,8 +7612,8 @@ with tab4:
                     <div class="kpi-title-dinamico">CLICK TO CALL</div>
                     <div style="text-align: center; padding: 15px 0;">
                         <div class="kpi-value-dinamico">{clicktocall_atual_fmt}</div>
-                        <div style="font-size: 12.5px; color: #666666; margin: 10px 0; line-height: 1.4; font-weight: 500;">
-                            <span style="font-weight: 600;">Anterior ({mes_anterior}):</span> {clicktocall_anterior_fmt}
+                        <div class="kpi-meta-line" style="margin: 10px 0;">
+                            {build_kpi_meta_line(clicktocall_anterior_fmt, mes_anterior_ref=mes_anterior)}
                         </div>
                         <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
                             <div class="kpi-variacao-item {classe_clicktocall}" style="font-size: 10px !important;">
@@ -8579,4 +8795,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
