@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -902,9 +902,13 @@ st.markdown("""
             border-radius: 50%;
             font-size: 9px;
             font-weight: 800;
-            color: #334155;
-            background: #E2E8F0;
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+            background: #790E09 !important;
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 1px 4px rgba(121, 14, 9, 0.35);
             cursor: help;
+            line-height: 1;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
         }
 
@@ -913,6 +917,7 @@ st.markdown("""
             left: 100%;
             top: 50%;
             transform: translate(6px, -50%);
+            z-index: 2;
         }
 
         .variacao-positiva {
@@ -1314,6 +1319,9 @@ def build_tendencia_icon_html(usa_tendencia: bool) -> str:
         return ""
     return (
         '<span class="kpi-tooltip kpi-tooltip-inline" '
+        'style="background:#790E09 !important;color:#FFFFFF !important;'
+        '-webkit-text-fill-color:#FFFFFF !important;border:1px solid rgba(255,255,255,0.9);'
+        'box-shadow:0 1px 4px rgba(121,14,9,0.35);" '
         'title="Tendência = projeção de fechamento do mês com base no ritmo atual." '
         'aria-label="Tendência aplicada ao valor">i</span>'
     )
@@ -8795,4 +8803,3 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
-
