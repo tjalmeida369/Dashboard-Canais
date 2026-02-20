@@ -1,10 +1,10 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from io import BytesIO
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -587,6 +587,40 @@ st.markdown("""
             text-transform: uppercase;
             margin: 0 0 8px 0;
             line-height: 1.1;
+        }
+
+        .analitico-corte-info {
+            margin: 8px 0 14px 0;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid #F0D8D5;
+            background: linear-gradient(90deg, #FFF7F6 0%, #FFFFFF 100%);
+            color: #243041;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
+            box-shadow: 0 2px 8px rgba(121, 14, 9, 0.08);
+        }
+
+        .analitico-corte-info .analitico-corte-label {
+            color: #790E09;
+            font-weight: 800;
+        }
+
+        .analitico-corte-info .analitico-corte-date {
+            color: #1E293B;
+            font-weight: 700;
+        }
+
+        .analitico-corte-info .analitico-corte-sep {
+            color: #94A3B8;
+            padding: 0 4px;
+        }
+
+        .analitico-corte-info .analitico-corte-days {
+            color: #334155;
+            font-weight: 700;
+            letter-spacing: 0.2px;
         }
 
         [data-testid="stWidgetLabel"] p {
@@ -1216,15 +1250,130 @@ st.markdown("""
             opacity: 1 !important;
         }
 
+        /* Compactacao geral de espacamento (sem alterar estrutura dos blocos) */
+        .block-container {
+            padding-top: 9px !important;
+            padding-bottom: 11px !important;
+        }
+
+        div[data-testid="stVerticalBlock"] {
+            gap: 0.42rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0.86rem !important;
+        }
+
+        .element-container,
+        div[data-testid="stElementContainer"] {
+            margin-bottom: 0.20rem !important;
+        }
+
+        .main-title {
+            margin: 8px 0 14px 0 !important;
+            padding: 22px 0 36px 0 !important;
+            line-height: 1.14 !important;
+        }
+
+        /* Evita sobreposição do subtítulo com o título principal */
+        .main-title::after {
+            position: static !important;
+            display: block !important;
+            transform: none !important;
+            left: auto !important;
+            bottom: auto !important;
+            margin: 10px auto 0 auto !important;
+            width: fit-content;
+        }
+
+        .section-title {
+            margin: 20px 0 11px 0 !important;
+            padding: 11px 14px !important;
+        }
+
+        .subsection-title {
+            margin: 14px 0 9px 0 !important;
+            padding: 10px 12px !important;
+        }
+
+        .card-title {
+            margin: 0 0 11px 0 !important;
+            padding: 11px 12px !important;
+        }
+
+        .filter-title {
+            margin: 0 0 10px 0 !important;
+            padding-bottom: 6px !important;
+        }
+
+        /* Microajuste: mais respiro apenas nos filtros */
+        [data-testid="stWidgetLabel"] {
+            margin-bottom: 10px !important;
+        }
+
+        [data-testid="stWidgetLabel"] p {
+            margin: 0 !important;
+            line-height: 1.2 !important;
+        }
+
+        [data-testid="stSelectbox"],
+        [data-testid="stMultiSelect"] {
+            margin: 0 0 12px 0 !important;
+        }
+
+        [data-testid="stSelectbox"] > div,
+        [data-testid="stMultiSelect"] > div {
+            margin-top: 2px !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stSelectbox"],
+        [data-testid="stSidebar"] [data-testid="stMultiSelect"] {
+            margin-bottom: 14px !important;
+        }
+
+        .info-box {
+            margin: 11px 0 !important;
+            padding: 12px 14px !important;
+        }
+
+        .stTabs [data-baseweb="tab-list"] {
+            margin-bottom: 12px !important;
+            padding: 7px !important;
+        }
+
+        .stPlotlyChart,
+        div[data-testid="stPlotlyChart"] {
+            margin-top: 0.10rem !important;
+            margin-bottom: 0.34rem !important;
+        }
+
+        [data-testid="stDataFrame"] {
+            margin-top: 0.16rem !important;
+            margin-bottom: 0.30rem !important;
+        }
+
+        [data-testid="stMarkdownContainer"] p {
+            margin-bottom: 0.36rem !important;
+        }
+
+        hr {
+            margin: 0.46rem 0 !important;
+        }
+
         @media (max-width: 768px) {
             .section-title {
                 font-size: 22px;
-                padding: 12px 14px;
-                margin: 20px 0 12px 0;
+                padding: 11px 13px;
+                margin: 17px 0 10px 0;
             }
 
             .kpi-card-dinamico {
-                min-height: 150px;
+                min-height: 145px;
+            }
+
+            .analitico-corte-info {
+                font-size: 12px;
+                padding: 8px 10px;
             }
         }
     </style>
@@ -1430,7 +1579,7 @@ def apply_standard_line_layout(fig, y_axis_title: str, height: int = 520):
         plot_bgcolor='#FFFFFF',
         paper_bgcolor='#FCFCFD',
         font=dict(family='Segoe UI', size=14, color='#2F3747'),
-        margin=dict(l=64, r=64, t=96, b=88),
+        margin=dict(l=44, r=44, t=64, b=50),
         xaxis=dict(
             title='',
             tickmode='array',
@@ -1464,7 +1613,7 @@ def apply_standard_line_layout(fig, y_axis_title: str, height: int = 520):
             title=dict(text='<b>ANO</b>', font=dict(size=13, color='#2F3747')),
             orientation='h',
             yanchor='bottom',
-            y=-0.26,
+            y=-0.16,
             xanchor='center',
             x=0.5,
             bgcolor='rgba(255, 255, 255, 0.92)',
@@ -1592,6 +1741,1252 @@ def create_bar_chart_data(df_mes_selecionado):
     
     return bar_data, canal_totals
 
+def contar_dias_restantes_semana(mes_ref: str, data_corte: date | None = None) -> dict[int, int]:
+    """
+    Conta quantas ocorrências de SEG..DOM restam até o fim do mês de referência.
+    Retorna dict com chaves 0..6 (segunda..domingo).
+    """
+    try:
+        inicio_mes = pd.Timestamp(mes_ano_para_data(mes_ref)).normalize().date()
+    except Exception:
+        return {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
+
+    fim_mes = (pd.Timestamp(inicio_mes) + pd.offsets.MonthEnd(0)).date()
+    try:
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    except Exception:
+        hoje = date.today()
+
+    if data_corte is None:
+        corte_base = inicio_mes - timedelta(days=1)
+    else:
+        corte_base = pd.Timestamp(data_corte).date()
+
+    # Para mês corrente, planejar a partir de hoje (ou do próximo dia após o último realizado, o que for maior).
+    if str(mes_ref).strip().lower() == get_mes_atual_formatado().strip().lower():
+        corte_base = max(corte_base, hoje - timedelta(days=1))
+
+    inicio_planejamento = max(inicio_mes, corte_base + timedelta(days=1))
+    if inicio_planejamento > fim_mes:
+        return {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
+
+    intervalo = pd.date_range(start=inicio_planejamento, end=fim_mes, freq='D')
+    return {wd: int((intervalo.weekday == wd).sum()) for wd in range(7)}
+
+def contar_dias_uteis_restantes(mes_ref: str, data_corte: date | None = None) -> dict[int, int]:
+    """
+    Compatibilidade retroativa: mantém assinatura antiga retornando SEG..DOM.
+    """
+    return contar_dias_restantes_semana(mes_ref, data_corte)
+
+def construir_tabela_analitica_produto(
+    df_base: pd.DataFrame,
+    mes_ref: str,
+    indicador_real_ref: str,
+    regional_ref: str,
+    produto_ref: str,
+    indicador_meta_ref: str | None = None
+) -> tuple[pd.DataFrame, dict]:
+    """
+    Monta tabela analítica por canal com meta diária SEG..DOM para atingir a meta do mês.
+    """
+    colunas_saida = [
+        'CANAL',
+        'MES_ANTERIOR',
+        'MES_ATUAL_REAL',
+        'META_MES',
+        'VAR_META_X_REAL',
+        'SEG',
+        'TER',
+        'QUA',
+        'QUI',
+        'SEX',
+        'SAB',
+        'DOM'
+    ]
+
+    if df_base is None or df_base.empty:
+        return pd.DataFrame(columns=colunas_saida), {
+            'mes_anterior': get_mes_anterior(mes_ref),
+            'dias_restantes': {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
+            'data_corte': None
+        }
+
+    df_work = df_base.copy()
+    for col in ['CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'REGIONAL', 'dat_tratada']:
+        if col in df_work.columns:
+            df_work[col] = df_work[col].astype(str).str.strip()
+
+    if 'COD_PLATAFORMA' not in df_work.columns:
+        return pd.DataFrame(columns=colunas_saida), {
+            'mes_anterior': get_mes_anterior(mes_ref),
+            'dias_restantes': {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
+            'data_corte': None
+        }
+
+    df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+    df_work['QTDE'] = normalizar_numerico_serie(df_work.get('QTDE', 0)).fillna(0)
+    df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work.get('DESAFIO_QTD', 0)).fillna(0)
+    df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work.get('DAT_MOVIMENTO2'), errors='coerce')
+
+    produto_norm = normalizar_rotulo_produto(produto_ref)
+    df_work = df_work[df_work['COD_PLATAFORMA'] == produto_norm].copy()
+
+    if regional_ref and regional_ref != "Todas":
+        df_work = df_work[df_work['REGIONAL'] == regional_ref].copy()
+
+    indicador_meta_ref = indicador_real_ref if indicador_meta_ref is None else indicador_meta_ref
+
+    def _filtrar_indicador(df_in: pd.DataFrame, indicador: str) -> pd.DataFrame:
+        if indicador and indicador != "Todos":
+            indicador_cmp = str(indicador).strip().upper()
+            return df_in[df_in['DSC_INDICADOR'].str.upper() == indicador_cmp].copy()
+        return df_in.copy()
+
+    df_real = _filtrar_indicador(df_work, indicador_real_ref)
+    df_meta = _filtrar_indicador(df_work, indicador_meta_ref)
+
+    mes_anterior_ref = get_mes_anterior(mes_ref)
+    df_mes_atual_real = df_real[df_real['dat_tratada'] == mes_ref].copy()
+    df_mes_anterior_real = df_real[df_real['dat_tratada'] == mes_anterior_ref].copy()
+    df_mes_atual_meta = df_meta[df_meta['dat_tratada'] == mes_ref].copy()
+
+    datas_validas = df_mes_atual_real['DAT_MOVIMENTO2'].dropna()
+    data_corte = datas_validas.max().date() if not datas_validas.empty else None
+    dias_restantes = contar_dias_restantes_semana(mes_ref, data_corte)
+
+    df_hist = df_real[df_real['DAT_MOVIMENTO2'].notna()].copy()
+    df_hist['DIA_SEMANA'] = df_hist['DAT_MOVIMENTO2'].dt.weekday
+    df_hist['DIA_SEMANA'] = pd.to_numeric(df_hist['DIA_SEMANA'], errors='coerce')
+    df_hist = df_hist[df_hist['DIA_SEMANA'].notna()].copy()
+    df_hist['DIA_SEMANA'] = df_hist['DIA_SEMANA'].astype(int)
+    df_hist['DATA_DIA'] = pd.to_datetime(df_hist['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
+
+    def _mes_ref_para_ts(valor_mes: str) -> pd.Timestamp:
+        try:
+            return pd.Timestamp(mes_ano_para_data(str(valor_mes))).normalize()
+        except Exception:
+            return pd.NaT
+
+    def _media_ponderada_robusta(valores: np.ndarray, decay: float = 0.88) -> float:
+        arr = np.asarray(valores, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if arr.size == 0:
+            return 0.0
+        if arr.size >= 5:
+            q_low, q_high = np.quantile(arr, [0.10, 0.90])
+            arr = np.clip(arr, q_low, q_high)
+        n = arr.size
+        pesos = np.array([decay ** (n - 1 - i) for i in range(n)], dtype=float)
+        soma_pesos = float(pesos.sum())
+        if soma_pesos <= 0:
+            return float(np.mean(arr))
+        return float(np.dot(arr, pesos) / soma_pesos)
+
+    df_hist['MES_REF_TS'] = df_hist['dat_tratada'].apply(_mes_ref_para_ts)
+    mes_ref_ts = _mes_ref_para_ts(mes_ref)
+    df_hist_treino = df_hist.copy()
+    if pd.notna(mes_ref_ts):
+        df_hist_treino = df_hist_treino[df_hist_treino['MES_REF_TS'] < mes_ref_ts].copy()
+        if df_hist_treino.empty:
+            df_hist_treino = df_hist.copy()
+
+    meses_hist = pd.to_datetime(df_hist_treino['MES_REF_TS'].dropna().unique(), errors='coerce')
+    meses_hist = sorted([m for m in meses_hist if pd.notna(m)])
+    if len(meses_hist) > 12:
+        mes_limite = meses_hist[-12]
+        df_hist_treino = df_hist_treino[df_hist_treino['MES_REF_TS'] >= mes_limite].copy()
+
+    base_mes_dia = (
+        df_hist_treino
+        .groupby(['CANAL_PLAN', 'MES_REF_TS', 'DIA_SEMANA'], observed=True)['QTDE']
+        .sum()
+        .reset_index(name='qtd')
+    )
+
+    cache_contagem_mes: dict[str, dict[int, int]] = {}
+    def _contar_weekday_mes(mes_ts: pd.Timestamp) -> dict[int, int]:
+        chave = pd.Timestamp(mes_ts).strftime('%Y-%m')
+        if chave in cache_contagem_mes:
+            return cache_contagem_mes[chave]
+        inicio = pd.Timestamp(mes_ts).normalize()
+        fim = (inicio + pd.offsets.MonthEnd(0)).normalize()
+        intervalo = pd.date_range(start=inicio, end=fim, freq='D')
+        counts = np.bincount(intervalo.weekday, minlength=7)
+        out = {wd: int(counts[wd]) for wd in range(7)}
+        cache_contagem_mes[chave] = out
+        return out
+
+    if base_mes_dia.empty:
+        agg_mes_dia = pd.DataFrame(columns=['CANAL_PLAN', 'MES_REF_TS', 'DIA_SEMANA', 'qtd', 'dias', 'taxa'])
+    else:
+        base_mes_dia['MES_REF_TS'] = pd.to_datetime(base_mes_dia['MES_REF_TS'], errors='coerce').dt.normalize()
+        combos = base_mes_dia[['CANAL_PLAN', 'MES_REF_TS']].dropna().drop_duplicates()
+        if combos.empty:
+            agg_mes_dia = pd.DataFrame(columns=['CANAL_PLAN', 'MES_REF_TS', 'DIA_SEMANA', 'qtd', 'dias', 'taxa'])
+        else:
+            wd_ref = pd.DataFrame({'DIA_SEMANA': list(range(7))})
+            combos = combos.assign(_k=1)
+            wd_ref = wd_ref.assign(_k=1)
+            grade = combos.merge(wd_ref, on='_k', how='inner').drop(columns=['_k'])
+
+            base_mes_dia['DIA_SEMANA'] = pd.to_numeric(base_mes_dia['DIA_SEMANA'], errors='coerce').astype('Int64')
+            base_mes_dia = base_mes_dia[base_mes_dia['DIA_SEMANA'].between(0, 6, inclusive='both')].copy()
+            base_mes_dia['DIA_SEMANA'] = base_mes_dia['DIA_SEMANA'].astype(int)
+
+            agg_mes_dia = grade.merge(
+                base_mes_dia[['CANAL_PLAN', 'MES_REF_TS', 'DIA_SEMANA', 'qtd']],
+                on=['CANAL_PLAN', 'MES_REF_TS', 'DIA_SEMANA'],
+                how='left'
+            )
+            agg_mes_dia['qtd'] = pd.to_numeric(agg_mes_dia['qtd'], errors='coerce').fillna(0.0)
+
+            meses_unicos = pd.to_datetime(combos['MES_REF_TS'].dropna().unique(), errors='coerce')
+            linhas_cal = []
+            for mes_calc in meses_unicos:
+                if pd.isna(mes_calc):
+                    continue
+                contagem = _contar_weekday_mes(pd.Timestamp(mes_calc))
+                for wd, qtd_wd in contagem.items():
+                    linhas_cal.append({
+                        'MES_REF_TS': pd.Timestamp(mes_calc).normalize(),
+                        'DIA_SEMANA': int(wd),
+                        'dias': float(qtd_wd)
+                    })
+            df_cal = pd.DataFrame(linhas_cal)
+            agg_mes_dia = agg_mes_dia.merge(df_cal, on=['MES_REF_TS', 'DIA_SEMANA'], how='left')
+            agg_mes_dia['dias'] = pd.to_numeric(agg_mes_dia['dias'], errors='coerce').fillna(0.0)
+            agg_mes_dia['taxa'] = np.where(agg_mes_dia['dias'] > 0, agg_mes_dia['qtd'] / agg_mes_dia['dias'], 0.0)
+
+    def _taxa_global(df_train_agg: pd.DataFrame) -> tuple[dict[int, float], float]:
+        if df_train_agg.empty:
+            return {wd: 1.0 for wd in range(7)}, 1.0
+        stats = (
+            df_train_agg
+            .groupby('DIA_SEMANA', observed=True)
+            .agg(qtd=('qtd', 'sum'), dias=('dias', 'sum'))
+        )
+        qtd_total = float(df_train_agg['qtd'].sum())
+        dias_total = float(df_train_agg['dias'].sum())
+        media_global = (qtd_total / dias_total) if dias_total > 0 else 1.0
+        if media_global <= 0:
+            media_global = 1.0
+        taxas = {}
+        for wd in range(7):
+            qtd_wd = float(stats['qtd'].get(wd, 0.0)) if 'qtd' in stats else 0.0
+            dias_wd = float(stats['dias'].get(wd, 0.0)) if 'dias' in stats else 0.0
+            taxa_wd = (qtd_wd / dias_wd) if dias_wd > 0 else 0.0
+            taxas[wd] = float(taxa_wd if taxa_wd > 0 else media_global)
+        return taxas, media_global
+
+    def _score_semana_from_taxa(taxas_ref: dict[int, float], contagem_semana: dict[int, int]) -> np.ndarray:
+        """Converte taxa por dia em score mensal considerando quantidade de ocorrências no mês."""
+        return np.array(
+            [
+                max(float(taxas_ref.get(wd, 0.0)), 0.0) * float(contagem_semana.get(wd, 0))
+                for wd in range(7)
+            ],
+            dtype=float
+        )
+
+    def _combinar_score_canal_global(
+        score_canal: np.ndarray,
+        score_global: np.ndarray,
+        volume_hist: float,
+        blend_alpha: float,
+        vol_k: float
+    ) -> np.ndarray:
+        """Combina score do canal com score global usando confiança baseada em volume histórico."""
+        vol_ref = max(float(volume_hist), 0.0)
+        vol_k_ref = max(float(vol_k), 1.0)
+        conf_volume = vol_ref / (vol_ref + vol_k_ref)
+        alpha_eff = float(np.clip(float(blend_alpha) * conf_volume, 0.0, 1.0))
+        return (alpha_eff * score_canal) + ((1.0 - alpha_eff) * score_global)
+
+    def _taxa_fallback_robusta(
+        hist_canal_agg: pd.DataFrame,
+        agg_hist_total: pd.DataFrame,
+        taxas_global_ref: dict[int, float],
+        media_global_ref: float,
+        meses_recencia_global: int = 4,
+        meses_recencia_canal: int = 2
+    ) -> dict[int, float]:
+        """Fallback estável: perfil global recente + ajuste leve do canal."""
+        taxas_out = taxas_global_ref.copy()
+        if agg_hist_total is None or agg_hist_total.empty:
+            return taxas_out
+
+        def _calc_rate_with_support(df_tmp: pd.DataFrame) -> tuple[dict[int, float], dict[int, float], dict[int, float]]:
+            if df_tmp is None or df_tmp.empty:
+                vazio_rate = {wd: 0.0 for wd in range(7)}
+                vazio_sup = {wd: 0.0 for wd in range(7)}
+                return vazio_rate, vazio_sup, vazio_sup
+            st = (
+                df_tmp
+                .groupby('DIA_SEMANA', observed=True)
+                .agg(q=('qtd', 'sum'), d=('dias', 'sum'))
+            )
+            out_rate: dict[int, float] = {}
+            out_dias: dict[int, float] = {}
+            out_qtd: dict[int, float] = {}
+            for wd in range(7):
+                q = float(st['q'].get(wd, 0.0)) if 'q' in st else 0.0
+                d = float(st['d'].get(wd, 0.0)) if 'd' in st else 0.0
+                out_rate[wd] = float((q / d) if d > 0 else 0.0)
+                out_dias[wd] = float(max(d, 0.0))
+                out_qtd[wd] = float(max(q, 0.0))
+            return out_rate, out_dias, out_qtd
+
+        meses_ord = sorted(pd.to_datetime(agg_hist_total['MES_REF_TS'].dropna().unique(), errors='coerce'))
+        meses_ord = [m for m in meses_ord if pd.notna(m)]
+        if not meses_ord:
+            return taxas_out
+
+        meses_global = set(meses_ord[-max(1, int(meses_recencia_global)):])
+        df_global_rec = agg_hist_total[agg_hist_total['MES_REF_TS'].isin(meses_global)]
+        taxa_global_rec, dias_global_rec, _ = _calc_rate_with_support(df_global_rec)
+
+        hist_canal = hist_canal_agg.copy() if hist_canal_agg is not None else pd.DataFrame()
+        if not hist_canal.empty:
+            meses_canal = sorted(pd.to_datetime(hist_canal['MES_REF_TS'].dropna().unique(), errors='coerce'))
+            meses_canal = [m for m in meses_canal if pd.notna(m)]
+            meses_canal_rec = set(meses_canal[-max(1, int(meses_recencia_canal)):]) if meses_canal else set()
+            hist_canal_rec = hist_canal[hist_canal['MES_REF_TS'].isin(meses_canal_rec)] if meses_canal_rec else hist_canal
+        else:
+            hist_canal_rec = hist_canal
+        taxa_canal_rec, dias_canal_rec, _ = _calc_rate_with_support(hist_canal_rec)
+
+        vol_canal_rec = float(hist_canal_rec['qtd'].sum()) if (hist_canal_rec is not None and not hist_canal_rec.empty) else 0.0
+        if hist_canal_rec is not None and not hist_canal_rec.empty:
+            meses_canal_rec_n = int(pd.to_datetime(hist_canal_rec['MES_REF_TS'], errors='coerce').dropna().nunique())
+        else:
+            meses_canal_rec_n = 0
+        alpha_vol = (vol_canal_rec / (vol_canal_rec + 2200.0)) if vol_canal_rec > 0 else 0.0
+        alpha_meses = min(1.0, meses_canal_rec_n / 6.0)
+
+        ratios_validos: list[float] = []
+        for wd in range(7):
+            tc = float(taxa_canal_rec.get(wd, 0.0))
+            tg = float(taxa_global_rec.get(wd, taxas_global_ref.get(wd, media_global_ref)))
+            sup_wd = float(dias_canal_rec.get(wd, 0.0))
+            if tc > 0 and tg > 0 and sup_wd >= 2.0:
+                ratios_validos.append(tc / tg)
+        if ratios_validos:
+            arr_ratio = np.array(ratios_validos, dtype=float)
+            media_ratio = float(np.mean(arr_ratio))
+            cv_ratio = float(np.std(arr_ratio) / media_ratio) if media_ratio > 0 else 1.0
+            estabilidade = float(np.clip(1.10 - (0.55 * cv_ratio), 0.35, 1.00))
+        else:
+            estabilidade = 0.55
+
+        alpha_base = 0.10 + (0.60 * ((0.65 * alpha_vol) + (0.35 * alpha_meses)))
+        alpha_canal = float(np.clip(alpha_base * estabilidade, 0.08, 0.62))
+
+        for wd in range(7):
+            tg = float(taxa_global_rec.get(wd, 0.0))
+            if tg <= 0:
+                tg = float(taxas_global_ref.get(wd, media_global_ref))
+            tc = float(taxa_canal_rec.get(wd, 0.0))
+            suporte_wd = float(dias_canal_rec.get(wd, 0.0))
+            conf_wd = suporte_wd / (suporte_wd + 6.0) if suporte_wd > 0 else 0.0
+            alpha_wd = float(np.clip(alpha_canal * conf_wd, 0.0, alpha_canal))
+            base = tc if tc > 0 else tg
+            taxas_out[wd] = float((alpha_wd * base) + ((1.0 - alpha_wd) * tg))
+
+        weekday_vals = np.array([max(float(taxas_out.get(wd, 0.0)), 0.0) for wd in [0, 1, 2, 3, 4]], dtype=float)
+        weekday_pos = weekday_vals[weekday_vals > 0]
+        if weekday_pos.size > 0:
+            media_weekday = float(np.mean(weekday_pos))
+            for wd in [0, 1, 2, 3, 4]:
+                taxa_wd = max(float(taxas_out.get(wd, media_weekday)), 0.0)
+                taxas_out[wd] = float((0.70 * taxa_wd) + (0.30 * media_weekday))
+
+            glob_wd = np.mean([
+                max(float(taxa_global_rec.get(wd, taxas_global_ref.get(wd, media_global_ref))), 0.0)
+                for wd in [0, 1, 2, 3, 4]
+            ])
+            glob_we = np.mean([
+                max(float(taxa_global_rec.get(wd, taxas_global_ref.get(wd, media_global_ref))), 0.0)
+                for wd in [5, 6]
+            ])
+            ratio_we = (glob_we / glob_wd) if glob_wd > 0 else 0.45
+            ratio_cap = float(np.clip(ratio_we * 1.15, 0.30, 0.90))
+            cap_we = media_weekday * ratio_cap
+            for wd in [5, 6]:
+                taxas_out[wd] = float(min(max(float(taxas_out.get(wd, cap_we)), 0.0), cap_we))
+
+            media_miolo = float(np.mean([taxas_out.get(2, media_weekday), taxas_out.get(3, media_weekday), taxas_out.get(4, media_weekday)]))
+            if media_miolo > 0:
+                taxas_out[1] = float(min(float(taxas_out.get(1, media_miolo)), media_miolo * 1.08))
+
+        arr = np.array([max(float(taxas_out.get(wd, 0.0)), 0.0) for wd in range(7)], dtype=float)
+        pos = arr[arr > 0]
+        if pos.size > 0:
+            media_ref = float(np.mean(pos))
+            piso = 0.40 * media_ref
+            teto = 1.90 * media_ref
+            for wd in range(7):
+                taxas_out[wd] = float(np.clip(float(taxas_out.get(wd, media_ref)), piso, teto))
+
+        # Se o canal historicamente quase não opera no fim de semana, reduzir ainda mais sáb/dom.
+        if hist_canal_agg is not None and not hist_canal_agg.empty:
+            total_q = float(pd.to_numeric(hist_canal_agg['qtd'], errors='coerce').fillna(0.0).sum())
+            if total_q > 0:
+                q_we = float(
+                    pd.to_numeric(
+                        hist_canal_agg.loc[hist_canal_agg['DIA_SEMANA'].isin([5, 6]), 'qtd'],
+                        errors='coerce'
+                    ).fillna(0.0).sum()
+                )
+                share_we = q_we / total_q
+                if total_q >= 300.0 and share_we <= 0.01:
+                    weekday_vals = [float(taxas_out.get(wd, 0.0)) for wd in [0, 1, 2, 3, 4] if float(taxas_out.get(wd, 0.0)) > 0]
+                    if weekday_vals:
+                        cap_we = float(np.mean(weekday_vals)) * 0.08
+                        taxas_out[5] = min(float(taxas_out.get(5, cap_we)), cap_we)
+                        taxas_out[6] = min(float(taxas_out.get(6, cap_we)), cap_we)
+
+        return taxas_out
+
+    def _taxa_canal_posterior(
+        hist_canal_agg: pd.DataFrame,
+        taxas_global_ref: dict[int, float],
+        media_global_ref: float,
+        decay: float,
+        tau_prior: float,
+        clip_low_mult: float,
+        clip_high_mult: float
+    ) -> dict[int, float]:
+        taxas = taxas_global_ref.copy()
+        if hist_canal_agg.empty:
+            return taxas
+
+        for wd in range(7):
+            wd_stats = hist_canal_agg[hist_canal_agg['DIA_SEMANA'] == wd].sort_values('MES_REF_TS')
+            if wd_stats.empty:
+                continue
+            taxas_wd = wd_stats['taxa'].to_numpy(dtype=float)
+            taxa_recente = _media_ponderada_robusta(taxas_wd, decay=decay)
+            ocorrencias = float(wd_stats['dias'].sum())
+            taxa_prior = float(taxas_global_ref.get(wd, media_global_ref))
+            tau_efetivo = float(tau_prior) * (1.6 if wd in {5, 6} else 1.0)
+            denominador = ocorrencias + tau_efetivo
+            taxa_post = (
+                ((ocorrencias * taxa_recente) + (tau_efetivo * taxa_prior)) / denominador
+                if denominador > 0 else taxa_prior
+            )
+            taxas[wd] = max(float(taxa_post), 0.0)
+
+        arr = np.array([float(taxas.get(wd, 0.0)) for wd in range(7)], dtype=float)
+        positivos = arr[arr > 0]
+        if positivos.size > 0:
+            media_ref = float(np.mean(positivos))
+            piso = max(0.05, clip_low_mult * media_ref)
+            teto = max(piso, clip_high_mult * media_ref)
+            for wd in range(7):
+                taxas[wd] = float(np.clip(taxas.get(wd, media_ref), piso, teto))
+
+        # Guardrail adicional para evitar superpeso de fim de semana em cenários esparsos
+        taxa_weekday = [float(taxas.get(wd, 0.0)) for wd in [0, 1, 2, 3, 4] if float(taxas.get(wd, 0.0)) > 0]
+        taxa_weekend_global = [float(taxas_global_ref.get(wd, media_global_ref)) for wd in [5, 6] if float(taxas_global_ref.get(wd, media_global_ref)) > 0]
+        taxa_weekday_global = [float(taxas_global_ref.get(wd, media_global_ref)) for wd in [0, 1, 2, 3, 4] if float(taxas_global_ref.get(wd, media_global_ref)) > 0]
+        if taxa_weekday:
+            media_weekday = float(np.mean(taxa_weekday))
+            if media_weekday > 0:
+                if taxa_weekend_global and taxa_weekday_global and float(np.mean(taxa_weekday_global)) > 0:
+                    ratio_global = float(np.mean(taxa_weekend_global)) / float(np.mean(taxa_weekday_global))
+                else:
+                    ratio_global = 0.45
+                ratio_cap = float(np.clip(ratio_global * 1.35, 0.35, 1.05))
+                cap_weekend = media_weekday * ratio_cap
+                for wd in [5, 6]:
+                    taxas[wd] = float(min(taxas.get(wd, cap_weekend), cap_weekend))
+
+        # Reforço de piso para QUA/QUI/SEX, evitando subalocação dos dias úteis centrais.
+        taxa_weekday = [float(taxas.get(wd, 0.0)) for wd in [0, 1, 2, 3, 4] if float(taxas.get(wd, 0.0)) > 0]
+        taxa_weekday_global = [float(taxas_global_ref.get(wd, media_global_ref)) for wd in [0, 1, 2, 3, 4] if float(taxas_global_ref.get(wd, media_global_ref)) > 0]
+        if taxa_weekday and taxa_weekday_global:
+            media_weekday = float(np.mean(taxa_weekday))
+            media_weekday_global = float(np.mean(taxa_weekday_global))
+            if media_weekday > 0 and media_weekday_global > 0:
+                # Multiplicadores calibrados para elevar QUA/QUI/SEX sem distorcer o perfil global.
+                boost_midweek = {2: 1.08, 3: 1.12, 4: 1.06}
+                piso_ratio_min = {2: 0.92, 3: 0.96, 4: 0.90}
+                for wd in [2, 3, 4]:
+                    ratio_global_dia = float(taxas_global_ref.get(wd, media_weekday_global)) / media_weekday_global
+                    ratio_ref = max(ratio_global_dia * boost_midweek[wd], piso_ratio_min[wd])
+                    piso_dia = media_weekday * ratio_ref * 0.90
+                    taxas[wd] = float(max(taxas.get(wd, piso_dia), piso_dia))
+
+                # Ajuste leve em TER para não ficar acima do miolo QUA/QUI/SEX.
+                taxas_miolo = [float(taxas.get(wd, 0.0)) for wd in [2, 3, 4] if float(taxas.get(wd, 0.0)) > 0]
+                if taxas_miolo and float(taxas.get(1, 0.0)) > 0:
+                    media_miolo = float(np.mean(taxas_miolo))
+                    ratio_global_ter = float(taxas_global_ref.get(1, media_weekday_global)) / media_weekday_global
+                    fator_cap_ter = float(np.clip(ratio_global_ter * 1.08, 0.95, 1.18))
+                    cap_ter = media_miolo * fator_cap_ter
+                    taxas[1] = float(min(taxas.get(1, cap_ter), cap_ter))
+
+        # Guardrail baseado no histórico real do canal: fim de semana quase inexistente.
+        if hist_canal_agg is not None and not hist_canal_agg.empty:
+            total_q = float(pd.to_numeric(hist_canal_agg['qtd'], errors='coerce').fillna(0.0).sum())
+            if total_q > 0:
+                q_we = float(
+                    pd.to_numeric(
+                        hist_canal_agg.loc[hist_canal_agg['DIA_SEMANA'].isin([5, 6]), 'qtd'],
+                        errors='coerce'
+                    ).fillna(0.0).sum()
+                )
+                share_we = q_we / total_q
+                if total_q >= 300.0 and share_we <= 0.01:
+                    weekday_vals = [float(taxas.get(wd, 0.0)) for wd in [0, 1, 2, 3, 4] if float(taxas.get(wd, 0.0)) > 0]
+                    if weekday_vals:
+                        cap_we = float(np.mean(weekday_vals)) * 0.10
+                        taxas[5] = min(float(taxas.get(5, cap_we)), cap_we)
+                        taxas[6] = min(float(taxas.get(6, cap_we)), cap_we)
+        return taxas
+
+    def _calibrar_parametros_modelo(df_agg_hist: pd.DataFrame) -> dict[str, float]:
+        padrao = {
+            'decay': 0.88,
+            'tau_prior': 20.0,
+            'clip_low_mult': 0.25,
+            'clip_high_mult': 2.20,
+            'blend_alpha': 0.55,
+            'vol_k': 900.0,
+            'wape_cv': np.nan,
+            'wape_global': np.nan,
+            'model_mode': 'padrao'
+        }
+        if df_agg_hist is None or df_agg_hist.empty:
+            return padrao
+
+        meses = sorted(pd.to_datetime(df_agg_hist['MES_REF_TS'].dropna().unique(), errors='coerce'))
+        meses = [m for m in meses if pd.notna(m)]
+        if len(meses) < 6:
+            return padrao
+
+        min_treino = 4
+        meses_valid = meses[min_treino:]
+        if len(meses_valid) > 6:
+            meses_valid = meses_valid[-6:]
+        if not meses_valid:
+            return padrao
+
+        def _avaliar_parametros(params_eval: dict[str, float]) -> float:
+            wapes_mes: list[float] = []
+            pesos_mes: list[float] = []
+
+            for mes_val in meses_valid:
+                erro_mes_abs = 0.0
+                base_mes_abs = 0.0
+                train = df_agg_hist[df_agg_hist['MES_REF_TS'] < mes_val]
+                valid = df_agg_hist[df_agg_hist['MES_REF_TS'] == mes_val]
+                if train.empty or valid.empty:
+                    continue
+
+                taxa_global_cv, media_global_cv = _taxa_global(train)
+                contagem_mes = _contar_weekday_mes(mes_val)
+                score_global_cv = _score_semana_from_taxa(taxa_global_cv, contagem_mes)
+                if float(score_global_cv.sum()) <= 0:
+                    continue
+
+                totais_valid = (
+                    valid.groupby('CANAL_PLAN', observed=True)['qtd']
+                    .sum()
+                    .astype(float)
+                )
+                if totais_valid.empty:
+                    continue
+
+                totais_valid_ord = totais_valid.sort_values(ascending=False)
+                total_mes_valid = float(totais_valid_ord.sum())
+                if total_mes_valid <= 0:
+                    continue
+
+                share_acum = totais_valid_ord.cumsum() / total_mes_valid
+                canais_relevantes = set(share_acum[share_acum <= 0.94].index.tolist())
+                if len(canais_relevantes) < 3:
+                    canais_relevantes = set(
+                        totais_valid_ord.head(min(8, len(totais_valid_ord))).index.tolist()
+                    )
+
+                n_canais_mes = int(len(totais_valid_ord))
+                if n_canais_mes >= 10:
+                    perc_corte = 35
+                    piso_corte = 90.0
+                elif n_canais_mes >= 6:
+                    perc_corte = 30
+                    piso_corte = 70.0
+                else:
+                    perc_corte = 20
+                    piso_corte = 45.0
+                try:
+                    min_real_cv = float(np.nanpercentile(totais_valid_ord.to_numpy(dtype=float), perc_corte))
+                except Exception:
+                    min_real_cv = piso_corte
+                min_real_cv = max(piso_corte, min_real_cv)
+
+                for canal, valid_canal in valid.groupby('CANAL_PLAN', observed=True):
+                    if canal not in canais_relevantes:
+                        continue
+
+                    total_real = float(valid_canal['qtd'].sum())
+                    if total_real <= 0 or total_real < min_real_cv:
+                        continue
+
+                    hist_canal_train = train[train['CANAL_PLAN'] == canal]
+                    model_mode_eval = str(params_eval.get('model_mode', 'hibrido_calibrado'))
+                    if model_mode_eval == 'fallback_robusto':
+                        taxa_canal_cv = _taxa_fallback_robusta(
+                            hist_canal_train,
+                            train,
+                            taxa_global_cv,
+                            media_global_cv,
+                            meses_recencia_global=4,
+                            meses_recencia_canal=2
+                        )
+                        score_mix = _score_semana_from_taxa(taxa_canal_cv, contagem_mes)
+                    else:
+                        taxa_canal_cv = _taxa_canal_posterior(
+                            hist_canal_train,
+                            taxa_global_cv,
+                            media_global_cv,
+                            params_eval['decay'],
+                            params_eval['tau_prior'],
+                            params_eval['clip_low_mult'],
+                            params_eval['clip_high_mult']
+                        )
+                        score_canal_cv = _score_semana_from_taxa(taxa_canal_cv, contagem_mes)
+                        volume_hist = float(hist_canal_train['qtd'].sum())
+                        score_mix = _combinar_score_canal_global(
+                            score_canal_cv,
+                            score_global_cv,
+                            volume_hist,
+                            params_eval['blend_alpha'],
+                            params_eval['vol_k']
+                        )
+
+                    soma_score = float(score_mix.sum())
+                    if soma_score <= 0:
+                        continue
+
+                    real_por_dia = np.zeros(7, dtype=float)
+                    for _, row_val in valid_canal.iterrows():
+                        wd_val = int(row_val['DIA_SEMANA'])
+                        if 0 <= wd_val <= 6:
+                            real_por_dia[wd_val] += float(row_val['qtd'])
+
+                    previsto = (score_mix / soma_score) * total_real
+                    erro_canal = float(np.abs(previsto - real_por_dia).sum())
+                    # WAPE robusto: limita outliers extremos de canal/mês.
+                    erro_mes_abs += float(min(erro_canal, total_real * 1.25))
+                    base_mes_abs += float(real_por_dia.sum())
+
+                if base_mes_abs > 0:
+                    wape_mes = float(erro_mes_abs / base_mes_abs)
+                    peso_mes = float(np.sqrt(base_mes_abs))
+                    wapes_mes.append(wape_mes)
+                    pesos_mes.append(max(peso_mes, 1.0))
+
+            if not wapes_mes:
+                return np.inf
+            return float(np.average(np.array(wapes_mes, dtype=float), weights=np.array(pesos_mes, dtype=float)))
+
+        grid = [
+            {'decay': 0.84, 'tau_prior': 20.0, 'clip_low_mult': 0.24, 'clip_high_mult': 2.40, 'blend_alpha': 0.20, 'vol_k': 1600.0},
+            {'decay': 0.90, 'tau_prior': 24.0, 'clip_low_mult': 0.24, 'clip_high_mult': 2.30, 'blend_alpha': 0.20, 'vol_k': 1800.0},
+            {'decay': 0.94, 'tau_prior': 28.0, 'clip_low_mult': 0.26, 'clip_high_mult': 2.20, 'blend_alpha': 0.20, 'vol_k': 2000.0},
+            {'decay': 0.84, 'tau_prior': 20.0, 'clip_low_mult': 0.23, 'clip_high_mult': 2.50, 'blend_alpha': 0.30, 'vol_k': 1400.0},
+            {'decay': 0.90, 'tau_prior': 28.0, 'clip_low_mult': 0.25, 'clip_high_mult': 2.35, 'blend_alpha': 0.30, 'vol_k': 1600.0},
+            {'decay': 0.94, 'tau_prior': 32.0, 'clip_low_mult': 0.28, 'clip_high_mult': 2.25, 'blend_alpha': 0.30, 'vol_k': 1800.0},
+            {'decay': 0.84, 'tau_prior': 16.0, 'clip_low_mult': 0.22, 'clip_high_mult': 2.60, 'blend_alpha': 0.45, 'vol_k': 800.0},
+            {'decay': 0.84, 'tau_prior': 24.0, 'clip_low_mult': 0.24, 'clip_high_mult': 2.40, 'blend_alpha': 0.45, 'vol_k': 1000.0},
+            {'decay': 0.90, 'tau_prior': 20.0, 'clip_low_mult': 0.22, 'clip_high_mult': 2.60, 'blend_alpha': 0.45, 'vol_k': 900.0},
+            {'decay': 0.90, 'tau_prior': 28.0, 'clip_low_mult': 0.25, 'clip_high_mult': 2.40, 'blend_alpha': 0.45, 'vol_k': 1200.0},
+            {'decay': 0.94, 'tau_prior': 24.0, 'clip_low_mult': 0.24, 'clip_high_mult': 2.40, 'blend_alpha': 0.45, 'vol_k': 1200.0},
+            {'decay': 0.94, 'tau_prior': 36.0, 'clip_low_mult': 0.28, 'clip_high_mult': 2.20, 'blend_alpha': 0.45, 'vol_k': 1500.0},
+            {'decay': 0.84, 'tau_prior': 20.0, 'clip_low_mult': 0.22, 'clip_high_mult': 2.60, 'blend_alpha': 0.60, 'vol_k': 900.0},
+            {'decay': 0.84, 'tau_prior': 28.0, 'clip_low_mult': 0.25, 'clip_high_mult': 2.40, 'blend_alpha': 0.60, 'vol_k': 1200.0},
+            {'decay': 0.90, 'tau_prior': 24.0, 'clip_low_mult': 0.24, 'clip_high_mult': 2.50, 'blend_alpha': 0.60, 'vol_k': 1000.0},
+            {'decay': 0.90, 'tau_prior': 32.0, 'clip_low_mult': 0.27, 'clip_high_mult': 2.30, 'blend_alpha': 0.60, 'vol_k': 1400.0},
+            {'decay': 0.94, 'tau_prior': 28.0, 'clip_low_mult': 0.26, 'clip_high_mult': 2.30, 'blend_alpha': 0.60, 'vol_k': 1400.0},
+            {'decay': 0.94, 'tau_prior': 36.0, 'clip_low_mult': 0.30, 'clip_high_mult': 2.20, 'blend_alpha': 0.60, 'vol_k': 1800.0},
+        ]
+
+        melhor = padrao.copy()
+        melhor_wape = np.inf
+        for params in grid:
+            wape = _avaliar_parametros(params)
+            if np.isfinite(wape) and wape < melhor_wape:
+                melhor_wape = wape
+                melhor = {
+                    'decay': float(params['decay']),
+                    'tau_prior': float(params['tau_prior']),
+                    'clip_low_mult': float(params['clip_low_mult']),
+                    'clip_high_mult': float(params['clip_high_mult']),
+                    'blend_alpha': float(params['blend_alpha']),
+                    'vol_k': float(params['vol_k']),
+                    'wape_cv': float(wape),
+                    'wape_global': np.nan,
+                    'model_mode': 'hibrido_calibrado'
+                }
+
+        params_global = {
+            'decay': padrao['decay'],
+            'tau_prior': padrao['tau_prior'],
+            'clip_low_mult': padrao['clip_low_mult'],
+            'clip_high_mult': padrao['clip_high_mult'],
+            'blend_alpha': 0.0,
+            'vol_k': 1200.0,
+            'model_mode': 'fallback_global'
+        }
+        params_fallback_robusto = {
+            'decay': 0.90,
+            'tau_prior': 28.0,
+            'clip_low_mult': 0.25,
+            'clip_high_mult': 2.30,
+            'blend_alpha': 0.0,
+            'vol_k': 1800.0,
+            'model_mode': 'fallback_robusto'
+        }
+        wape_global = _avaliar_parametros(params_global)
+        wape_fallback_robusto = _avaliar_parametros(params_fallback_robusto)
+
+        if np.isfinite(wape_global):
+            if (not np.isfinite(melhor_wape)) or (melhor_wape > (wape_global * 1.05)):
+                melhor = {
+                    'decay': params_global['decay'],
+                    'tau_prior': params_global['tau_prior'],
+                    'clip_low_mult': params_global['clip_low_mult'],
+                    'clip_high_mult': params_global['clip_high_mult'],
+                    'blend_alpha': params_global['blend_alpha'],
+                    'vol_k': params_global['vol_k'],
+                    'wape_cv': float(wape_global),
+                    'wape_global': float(wape_global),
+                    'model_mode': 'fallback_global'
+                }
+            else:
+                melhor['wape_global'] = float(wape_global)
+
+        if np.isfinite(wape_fallback_robusto):
+            wape_atual = float(melhor.get('wape_cv', np.inf))
+            if wape_fallback_robusto < (wape_atual * 0.98):
+                melhor = {
+                    'decay': params_fallback_robusto['decay'],
+                    'tau_prior': params_fallback_robusto['tau_prior'],
+                    'clip_low_mult': params_fallback_robusto['clip_low_mult'],
+                    'clip_high_mult': params_fallback_robusto['clip_high_mult'],
+                    'blend_alpha': params_fallback_robusto['blend_alpha'],
+                    'vol_k': params_fallback_robusto['vol_k'],
+                    'wape_cv': float(wape_fallback_robusto),
+                    'wape_global': float(wape_global) if np.isfinite(wape_global) else np.nan,
+                    'model_mode': 'fallback_robusto'
+                }
+
+        if np.isfinite(float(melhor.get('wape_cv', np.nan))) and float(melhor.get('wape_cv', np.nan)) > 1.20:
+            # Em cenários extremamente voláteis, forçar blend mais conservador.
+            if str(melhor.get('model_mode', '')) not in {'fallback_robusto', 'fallback_global'}:
+                melhor['blend_alpha'] = min(float(melhor.get('blend_alpha', 0.55)), 0.35)
+                melhor['vol_k'] = max(float(melhor.get('vol_k', 900.0)), 1400.0)
+                melhor['model_mode'] = 'calibrado_conservador'
+
+        for chave, valor_padrao in padrao.items():
+            if chave not in melhor:
+                melhor[chave] = valor_padrao
+
+        return melhor
+
+    params_modelo = _calibrar_parametros_modelo(agg_mes_dia)
+    decay_modelo = float(params_modelo.get('decay', 0.88))
+    tau_prior_modelo = float(params_modelo.get('tau_prior', 20.0))
+    clip_low_modelo = float(params_modelo.get('clip_low_mult', 0.25))
+    clip_high_modelo = float(params_modelo.get('clip_high_mult', 2.20))
+    blend_alpha_modelo = float(params_modelo.get('blend_alpha', 0.55))
+    vol_k_modelo = float(params_modelo.get('vol_k', 900.0))
+    wape_modelo = float(params_modelo.get('wape_cv', np.nan)) if pd.notna(params_modelo.get('wape_cv', np.nan)) else np.nan
+    mode_modelo = str(params_modelo.get('model_mode', 'hibrido_calibrado'))
+    usar_fallback_robusto = (mode_modelo == 'fallback_robusto')
+    if usar_fallback_robusto:
+        params_modelo['model_mode'] = 'fallback_robusto'
+        params_modelo['blend_alpha'] = 0.0
+        params_modelo['vol_k'] = max(vol_k_modelo, 2000.0)
+    elif pd.notna(wape_modelo) and (wape_modelo > 1.20):
+        # Em volatilidade extrema, aplica blend super conservador sem forçar fallback robusto.
+        params_modelo['model_mode'] = 'calibrado_super_conservador'
+        params_modelo['blend_alpha'] = min(blend_alpha_modelo, 0.20)
+        params_modelo['vol_k'] = max(vol_k_modelo, 1800.0)
+
+    blend_alpha_modelo = float(params_modelo.get('blend_alpha', blend_alpha_modelo))
+    vol_k_modelo = float(params_modelo.get('vol_k', vol_k_modelo))
+
+    taxa_global, taxa_media_global = _taxa_global(agg_mes_dia)
+
+    canais_real = set(df_real['CANAL_PLAN'].dropna().unique().tolist())
+    canais_meta = set(df_meta['CANAL_PLAN'].dropna().unique().tolist())
+    canais = sorted(canais_real | canais_meta)
+    rows = []
+    for canal in canais:
+        real_anterior = float(df_mes_anterior_real.loc[df_mes_anterior_real['CANAL_PLAN'] == canal, 'QTDE'].sum())
+        real_atual = float(df_mes_atual_real.loc[df_mes_atual_real['CANAL_PLAN'] == canal, 'QTDE'].sum())
+        meta_mes = float(df_mes_atual_meta.loc[df_mes_atual_meta['CANAL_PLAN'] == canal, 'DESAFIO_QTD'].sum())
+
+        var_meta_real = meta_mes - real_atual
+        faltante = max(var_meta_real, 0.0)
+
+        dias_validos = [wd for wd in range(7) if dias_restantes.get(wd, 0) > 0]
+        hist_canal = agg_mes_dia[agg_mes_dia['CANAL_PLAN'] == canal]
+        if usar_fallback_robusto:
+            taxa_canal = _taxa_fallback_robusta(
+                hist_canal,
+                agg_mes_dia,
+                taxa_global,
+                taxa_media_global,
+                meses_recencia_global=4,
+                meses_recencia_canal=2
+            )
+        else:
+            taxa_canal = _taxa_canal_posterior(
+                hist_canal,
+                taxa_global,
+                taxa_media_global,
+                decay_modelo,
+                tau_prior_modelo,
+                clip_low_modelo,
+                clip_high_modelo
+            )
+
+        # Participação ponderada por taxa por ocorrência (bayesiana) e dias restantes por dia da semana
+        participacao: dict[int, float] = {wd: 0.0 for wd in range(7)}
+        if dias_validos:
+            score_canal = _score_semana_from_taxa(taxa_canal, dias_restantes)
+            if usar_fallback_robusto:
+                score_mix = score_canal
+            else:
+                score_global = _score_semana_from_taxa(taxa_global, dias_restantes)
+                volume_hist_canal = float(hist_canal['qtd'].sum()) if not hist_canal.empty else 0.0
+                score_mix = _combinar_score_canal_global(
+                    score_canal,
+                    score_global,
+                    volume_hist_canal,
+                    blend_alpha_modelo,
+                    vol_k_modelo
+                )
+            peso_distrib = {
+                wd: float(score_mix[wd]) if 0 <= wd < len(score_mix) else 0.0
+                for wd in dias_validos
+            }
+            soma_distrib = float(sum(peso_distrib.values()))
+            if soma_distrib > 0:
+                for wd in dias_validos:
+                    participacao[wd] = float(peso_distrib.get(wd, 0.0)) / soma_distrib
+            else:
+                total_dias_rest = float(sum(dias_restantes.get(wd, 0) for wd in dias_validos))
+                if total_dias_rest > 0:
+                    for wd in dias_validos:
+                        participacao[wd] = float(dias_restantes.get(wd, 0)) / total_dias_rest
+
+        # Distribuição por dia da semana: primeiro calcula total por dia da semana (SEG..DOM),
+        # depois converte para valor por ocorrência do dia (ex.: valor de cada sábado).
+        metas_dia = {wd: 0.0 for wd in range(7)}
+        faltante_int = int(np.round(faltante))
+        if faltante_int > 0 and dias_validos:
+            aloc_float = {wd: faltante_int * participacao.get(wd, 0.0) for wd in dias_validos}
+            aloc_base = {wd: int(np.floor(v)) for wd, v in aloc_float.items()}
+            resto = faltante_int - int(sum(aloc_base.values()))
+
+            if resto > 0:
+                ordem_up = sorted(
+                    dias_validos,
+                    key=lambda wd: ((aloc_float[wd] - aloc_base[wd]), dias_restantes.get(wd, 0)),
+                    reverse=True
+                )
+                for wd in ordem_up[:resto]:
+                    aloc_base[wd] += 1
+            elif resto < 0:
+                ordem_down = sorted(
+                    dias_validos,
+                    key=lambda wd: (aloc_float[wd] - aloc_base[wd])
+                )
+                for wd in ordem_down:
+                    if resto == 0:
+                        break
+                    if aloc_base[wd] > 0:
+                        aloc_base[wd] -= 1
+                        resto += 1
+
+            for wd in dias_validos:
+                qtd_dias = int(dias_restantes.get(wd, 0))
+                total_dia_semana = float(aloc_base.get(wd, 0))
+                metas_dia[wd] = (total_dia_semana / qtd_dias) if qtd_dias > 0 else 0.0
+
+        rows.append({
+            'CANAL': canal,
+            'MES_ANTERIOR': real_anterior,
+            'MES_ATUAL_REAL': real_atual,
+            'META_MES': meta_mes,
+            'VAR_META_X_REAL': var_meta_real,
+            'SEG': metas_dia[0],
+            'TER': metas_dia[1],
+            'QUA': metas_dia[2],
+            'QUI': metas_dia[3],
+            'SEX': metas_dia[4],
+            'SAB': metas_dia[5],
+            'DOM': metas_dia[6]
+        })
+
+    df_out = pd.DataFrame(rows, columns=colunas_saida)
+    if not df_out.empty:
+        df_out = df_out.sort_values(['VAR_META_X_REAL', 'CANAL'], ascending=[False, True]).reset_index(drop=True)
+
+    return df_out, {
+        'mes_anterior': mes_anterior_ref,
+        'dias_restantes': dias_restantes,
+        'data_corte': data_corte,
+        'calibracao_modelo': params_modelo
+    }
+
+def _colunas_tabela_analitica(mes_ref: str, mes_anterior_ref: str) -> list[str]:
+    ano_meta = "26"
+    try:
+        ano_meta = str(mes_ref).split('/')[-1]
+    except Exception:
+        pass
+    mes_anterior_lbl = str(mes_anterior_ref).strip().upper()
+    mes_atual_lbl = str(mes_ref).strip().upper()
+    return [
+        'CANAL',
+        mes_anterior_lbl,
+        mes_atual_lbl,
+        f'META {ano_meta}',
+        'META X REAL',
+        'SEG',
+        'TER',
+        'QUA',
+        'QUI',
+        'SEX',
+        'SAB',
+        'DOM'
+    ]
+
+def montar_tabela_analitica_exibicao_numerica(
+    df_tabela: pd.DataFrame,
+    mes_ref: str,
+    mes_anterior_ref: str,
+    incluir_total: bool = False
+) -> pd.DataFrame:
+    """Monta tabela analítica com colunas de exibição e valores numéricos."""
+    colunas_saida = _colunas_tabela_analitica(mes_ref, mes_anterior_ref)
+    if df_tabela is None or df_tabela.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_num = pd.DataFrame({
+        'CANAL': df_tabela['CANAL'].astype(str),
+        colunas_saida[1]: normalizar_numerico_serie(df_tabela['MES_ANTERIOR']).fillna(0.0),
+        colunas_saida[2]: normalizar_numerico_serie(df_tabela['MES_ATUAL_REAL']).fillna(0.0),
+        colunas_saida[3]: normalizar_numerico_serie(df_tabela['META_MES']).fillna(0.0),
+        colunas_saida[4]: normalizar_numerico_serie(df_tabela['VAR_META_X_REAL']).fillna(0.0),
+        'SEG': normalizar_numerico_serie(df_tabela['SEG']).fillna(0.0),
+        'TER': normalizar_numerico_serie(df_tabela['TER']).fillna(0.0),
+        'QUA': normalizar_numerico_serie(df_tabela['QUA']).fillna(0.0),
+        'QUI': normalizar_numerico_serie(df_tabela['QUI']).fillna(0.0),
+        'SEX': normalizar_numerico_serie(df_tabela['SEX']).fillna(0.0),
+        'SAB': normalizar_numerico_serie(df_tabela['SAB']).fillna(0.0),
+        'DOM': normalizar_numerico_serie(df_tabela['DOM']).fillna(0.0)
+    })
+
+    if incluir_total and not df_num.empty:
+        total_atual = float(pd.to_numeric(df_num[colunas_saida[2]], errors='coerce').fillna(0.0).sum())
+        total_meta = float(pd.to_numeric(df_num[colunas_saida[3]], errors='coerce').fillna(0.0).sum())
+        pct_total = (100.0 * total_atual / total_meta) if total_meta > 0 else np.nan
+        if pd.notna(pct_total):
+            pct_total_txt = f"{pct_total:,.1f}%".replace(",", "X").replace(".", ",").replace("X", ".")
+            rotulo_total = f"TOTAL ({pct_total_txt})"
+        else:
+            rotulo_total = "TOTAL"
+
+        linha_total = {'CANAL': rotulo_total}
+        for col in df_num.columns:
+            if col != 'CANAL':
+                linha_total[col] = float(pd.to_numeric(df_num[col], errors='coerce').fillna(0.0).sum())
+        df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
+
+    return df_num
+
+def formatar_tabela_analitica(
+    df_tabela: pd.DataFrame,
+    mes_ref: str,
+    mes_anterior_ref: str,
+    incluir_total: bool = False
+) -> pd.DataFrame:
+    """Formata tabela analítica para exibição em padrão BR."""
+    df_num = montar_tabela_analitica_exibicao_numerica(
+        df_tabela=df_tabela,
+        mes_ref=mes_ref,
+        mes_anterior_ref=mes_anterior_ref,
+        incluir_total=incluir_total
+    )
+    if df_num.empty:
+        return df_num
+
+    df_fmt = df_num.copy()
+    for col in df_fmt.columns:
+        if col == 'CANAL':
+            continue
+        df_fmt[col] = pd.to_numeric(df_fmt[col], errors='coerce').fillna(0.0).apply(
+            lambda x: formatar_numero_brasileiro(x, 0)
+        )
+    return df_fmt
+
+def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.DataFrame, table_id: str) -> str:
+    """Cria tabela HTML estilizada para aba Analítico no padrão visual das tabelas do dashboard."""
+    if df_formatado is None or df_formatado.empty:
+        return ""
+
+    colunas = list(df_formatado.columns)
+    dias_semana_cols = {'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM'}
+    col_var = colunas[4] if len(colunas) > 4 else "META X REAL"
+    col_mes_anterior = colunas[1] if len(colunas) > 1 else ""
+    col_mes_atual = colunas[2] if len(colunas) > 2 else ""
+    col_meta = colunas[3] if len(colunas) > 3 else ""
+
+    html = f"""
+    <style>
+        #{table_id}.tabela-container-analitico {{
+            width: 100%;
+            max-height: 520px;
+            overflow-y: auto;
+            overflow-x: auto;
+            border: 2px solid #790E09;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 12px 0 18px 0;
+            background: white;
+        }}
+        #{table_id} .tabela-analitico {{
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            font-size: 11px;
+            line-height: 1.25;
+            min-width: 1080px;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        #{table_id} .tabela-analitico thead {{
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }}
+        #{table_id} .tabela-analitico th {{
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+            color: white !important;
+            font-weight: 700;
+            padding: 9px 8px;
+            text-align: center;
+            border-bottom: 3px solid #5A0A06;
+            border-right: 1px solid #FFFFFF;
+            white-space: nowrap;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-size: 11px;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        #{table_id} .tabela-analitico th.col-var {{
+            background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+        }}
+        #{table_id} .tabela-analitico th.col-meta {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+        }}
+        #{table_id} .tabela-analitico th.col-dia {{
+            background: linear-gradient(135deg, #6A7075 0%, #4B5258 100%) !important;
+        }}
+        #{table_id} .tabela-analitico td {{
+            padding: 7px 8px;
+            text-align: right;
+            border-bottom: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            color: #1F2937;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        #{table_id} .tabela-analitico td.col-canal {{
+            text-align: left;
+            font-weight: 400;
+            color: #2F3747;
+            background: linear-gradient(90deg, #fef5f4 0%, #ffffff 100%) !important;
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            min-width: 150px;
+            padding-left: 14px;
+        }}
+        #{table_id} .linha-canal-analitico:nth-child(even) {{
+            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+        }}
+        #{table_id} .linha-canal-analitico:nth-child(odd) {{
+            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+        }}
+        #{table_id} .linha-canal-analitico:hover {{
+            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+            box-shadow: inset 0 0 0 1px #F1CBC4;
+        }}
+        #{table_id} .tabela-analitico td.col-anterior {{
+            color: #475569;
+        }}
+        #{table_id} .tabela-analitico td.col-atual {{
+            color: #6B1F1A;
+            font-weight: 400;
+        }}
+        #{table_id} .tabela-analitico td.col-meta {{
+            color: #8C1D18;
+            font-weight: 400;
+        }}
+        #{table_id} .tabela-analitico td.col-dia {{
+            color: #0F172A;
+            font-weight: 400;
+        }}
+        #{table_id} .tabela-analitico td.col-var.status-gap {{
+            color: #B71C1C !important;
+            font-weight: 400;
+            position: relative;
+            padding-left: 22px !important;
+            background: rgba(183, 28, 28, 0.06) !important;
+        }}
+        #{table_id} .tabela-analitico td.col-var.status-gap::before {{
+            content: "▼";
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #C62828;
+            font-size: 10px;
+        }}
+        #{table_id} .tabela-analitico td.col-var.status-superavit {{
+            color: #1B5E20 !important;
+            font-weight: 400;
+            position: relative;
+            padding-left: 22px !important;
+            background: rgba(27, 94, 32, 0.06) !important;
+        }}
+        #{table_id} .tabela-analitico td.col-var.status-superavit::before {{
+            content: "▲";
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #2E7D32;
+            font-size: 10px;
+        }}
+        #{table_id} .tabela-analitico td.col-var.status-neutro {{
+            color: #475569 !important;
+            font-weight: 400;
+        }}
+        #{table_id} .linha-total-analitico {{
+            position: sticky;
+            top: 39px;
+            z-index: 95;
+            border-bottom: 2px solid #790E09;
+        }}
+        #{table_id} .linha-total-analitico td {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: white !important;
+            font-weight: 400;
+            font-size: 11px;
+            border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }}
+        #{table_id} .linha-total-analitico td.col-canal {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            z-index: 80;
+        }}
+        #{table_id} .linha-total-analitico td.col-var.status-gap,
+        #{table_id} .linha-total-analitico td.col-var.status-superavit,
+        #{table_id} .linha-total-analitico td.col-var.status-neutro {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            padding-left: 8px !important;
+        }}
+        #{table_id} .linha-total-analitico td.col-var::before {{
+            content: "" !important;
+        }}
+        #{table_id} .linha-total-analitico td.col-var.status-gap::before,
+        #{table_id} .linha-total-analitico td.col-var.status-superavit::before,
+        #{table_id} .linha-total-analitico td.col-var.status-neutro::before {{
+            content: "" !important;
+        }}
+        #{table_id}.tabela-container-analitico::-webkit-scrollbar {{
+            width: 8px;
+            height: 8px;
+        }}
+        #{table_id}.tabela-container-analitico::-webkit-scrollbar-track {{
+            background: #F5F5F5;
+            border-radius: 10px;
+        }}
+        #{table_id}.tabela-container-analitico::-webkit-scrollbar-thumb {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+            border-radius: 10px;
+        }}
+    </style>
+    <div id="{table_id}" class="tabela-container-analitico">
+    <table class="tabela-analitico">
+    <thead><tr>
+    """
+
+    for col in colunas:
+        classe = ""
+        col_upper = str(col).upper()
+        if col == col_meta:
+            classe = "col-meta"
+        elif col == col_var:
+            classe = "col-var"
+        elif col_upper in dias_semana_cols:
+            classe = "col-dia"
+        html += f'<th class="{classe}">{escape(str(col))}</th>'
+    html += "</tr></thead><tbody>"
+
+    for idx, row in df_formatado.iterrows():
+        canal_ref = str(df_numerico.iloc[idx, 0]) if idx < len(df_numerico) else str(row.iloc[0])
+        is_total = canal_ref.strip().upper().startswith("TOTAL")
+        classe_linha = "linha-total-analitico" if is_total else "linha-canal-analitico"
+        html += f'<tr class="{classe_linha}">'
+
+        for col_idx, col in enumerate(colunas):
+            valor_fmt = escape(str(row[col]))
+            classes = []
+            col_upper = str(col).upper()
+
+            if col_idx == 0:
+                classes.append("col-canal")
+            elif col == col_mes_anterior:
+                classes.append("col-anterior")
+            elif col == col_mes_atual:
+                classes.append("col-atual")
+            elif col == col_meta:
+                classes.append("col-meta")
+            elif col_upper in dias_semana_cols:
+                classes.append("col-dia")
+            elif col == col_var:
+                classes.append("col-var")
+                try:
+                    valor_raw = float(df_numerico.iloc[idx, col_idx])
+                    if valor_raw > 0:
+                        classes.append("status-gap")
+                    elif valor_raw < 0:
+                        classes.append("status-superavit")
+                    else:
+                        classes.append("status-neutro")
+                except Exception:
+                    classes.append("status-neutro")
+
+            classe_celula = " ".join(classes)
+            html += f'<td class="{classe_celula}">{valor_fmt}</td>'
+
+        html += "</tr>"
+
+    html += "</tbody></table></div>"
+    return html
+
 # =========================
 # VALIDAÇÃO DE DADOS
 # =========================
@@ -1616,7 +3011,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -1631,43 +3026,41 @@ else:
 # =========================
 # FILTROS GERAIS (SIDEBAR)
 # =========================
-st.sidebar.header("⚙️ FILTROS GERAIS")
-st.sidebar.markdown("---")
-
 with st.sidebar:
-    st.markdown("**🔍 Filtre os dados abaixo:**")
-    
-    region_filter = st.multiselect(
-        "**Regional:**", 
-        options=df['REGIONAL'].unique(), 
-        default=[],
-        help="Selecione uma ou mais regionais"
-    )
-    
-    canal_filter = st.multiselect(
-        "**Canal:**", 
-        options=df['CANAL_PLAN'].unique(), 
-        default=[],
-        help="Selecione um ou mais canais"
-    )
-    
-    data_filter = st.multiselect(
-        "**Período:**", 
-        options=df['dat_tratada'].unique(), 
-        default=[],
-        help="Selecione um ou mais períodos"
-    )
-    
-    indicador_filter = st.multiselect(
-        "**Indicador:**", 
-        options=df['DSC_INDICADOR'].unique(), 
-        default=["Instalação", "GROSS LIQUIDO"],
-        help="Selecione um ou mais indicadores"
-    )
-    
-    st.markdown("---")
-    st.markdown("**ℹ️ Informações:**")
-    st.info(f"Total de registros: {len(df):,}")
+    with st.expander("⚙️ FILTROS GERAIS", expanded=False):
+        st.markdown("**🔍 Filtre os dados abaixo:**")
+        
+        region_filter = st.multiselect(
+            "**Regional:**", 
+            options=df['REGIONAL'].unique(), 
+            default=[],
+            help="Selecione uma ou mais regionais"
+        )
+        
+        canal_filter = st.multiselect(
+            "**Canal:**", 
+            options=df['CANAL_PLAN'].unique(), 
+            default=[],
+            help="Selecione um ou mais canais"
+        )
+        
+        data_filter = st.multiselect(
+            "**Período:**", 
+            options=df['dat_tratada'].unique(), 
+            default=[],
+            help="Selecione um ou mais períodos"
+        )
+        
+        indicador_filter = st.multiselect(
+            "**Indicador:**", 
+            options=df['DSC_INDICADOR'].unique(), 
+            default=["Instalação", "GROSS LIQUIDO"],
+            help="Selecione um ou mais indicadores"
+        )
+        
+        st.markdown("---")
+        st.markdown("**ℹ️ Informações:**")
+        st.info(f"Total de registros: {len(df):,}")
 
 # Filtro vazio no widget = "Todos" para manter comportamento anterior
 region_filter_eff = region_filter if len(region_filter) > 0 else df['REGIONAL'].dropna().unique().tolist()
@@ -1698,7 +3091,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("""
-    <div style="margin: 15px 0 35px 0; text-align: center; position: relative;">
+    <div style="margin: 12px 0 24px 0; text-align: center; position: relative;">
         <div style="height: 2px; background: linear-gradient(90deg, 
                     rgba(255, 40, 0, 0) 0%, 
                     rgba(255, 40, 0, 0.3) 20%, 
@@ -1715,7 +3108,7 @@ st.markdown("""
 # =========================
 # ABAS PRINCIPAIS
 # =========================
-tab1, tab2, tab3, tab4 = st.tabs(["📱 Ativados", "📉 Desativados", "📋 Pedidos", "📞 Ligações"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📱 Ativados", "📉 Desativados", "📋 Pedidos", "📞 Ligações", "📊 Analítico"])
 
 # Persistir aba selecionada entre reruns para evitar voltar para Ativados ao filtrar
 components.html(
@@ -2252,7 +3645,7 @@ with tab1:
             plot_bgcolor='#FFFFFF',
             paper_bgcolor='#FFFFFF',
             font=dict(family='Manrope', size=13, color='#2F3747'),
-            margin=dict(l=26, r=230, t=92, b=46),
+            margin=dict(l=22, r=220, t=72, b=32),
             height=max(470, 66 * len(canais_plot) + 110),
             xaxis=dict(
                 title='',
@@ -2881,15 +4274,18 @@ with tab1:
             /* Unified table visual override */
             .tabela-melhorada th {
                 padding: 9px 7px !important;
-                font-size: 10.5px !important;
+                font-size: 11px !important;
                 box-shadow: none !important;
+                font-family: 'Manrope', 'Segoe UI', sans-serif !important;
             }
 
             .tabela-melhorada td {
                 padding: 7px 7px !important;
-                font-size: 10.5px !important;
+                font-size: 11px !important;
                 line-height: 1.25 !important;
                 box-shadow: none !important;
+                font-weight: 400 !important;
+                font-family: 'Manrope', 'Segoe UI', sans-serif !important;
             }
 
             .tabela-melhorada td:not(:first-child) {
@@ -2905,6 +4301,12 @@ with tab1:
             .linha-regional-melhorada td.performance-excelente,
             .linha-regional-melhorada td.performance-critica {
                 animation: none !important;
+            }
+
+            .tabela-melhorada tr td:first-child,
+            .linha-total-melhorada td,
+            .tabela-melhorada td[class*="percentual-"] {
+                font-weight: 400 !important;
             }
         </style>
         
@@ -3172,7 +4574,7 @@ with tab1:
                     plot_bgcolor='white',
                     paper_bgcolor='#FCFCFD',
                     font=dict(family='Segoe UI', size=13, color='#2F3747'),
-                    margin=dict(l=20, r=20, t=56, b=24),
+                    margin=dict(l=16, r=16, t=44, b=16),
                     xaxis=dict(
                         gridcolor='rgba(230, 236, 244, 0.85)',
                         showgrid=False,
@@ -3200,1205 +4602,6 @@ with tab1:
     else:
         st.warning("Não há dados disponíveis para exibir a tabela dinâmica com os filtros atuais.")
 
-    # =========================
-    # NOVA TABELA DINÂMICA: ANÁLISE DE PERFORMANCE POR CANAL
-    # =========================
-    st.markdown(
-        '<div class="section-title"><span class="section-icon">📊</span> ANÁLISE DE PERFORMANCE POR CANAL</div>',
-        unsafe_allow_html=True
-    )
-
-    def normalizar_texto_chave(valor):
-        if pd.isna(valor):
-            return ""
-        texto = unicodedata.normalize("NFKD", str(valor))
-        texto = texto.encode("ASCII", "ignore").decode("ASCII")
-        texto = texto.strip().upper()
-        texto = re.sub(r"[^A-Z0-9]+", " ", texto)
-        texto = re.sub(r"\s+", " ", texto).strip()
-        return texto
-
-    def normalizar_plataforma_chave(valor):
-        texto = normalizar_texto_chave(valor)
-        if 'FIXA' in texto:
-            return 'FIXA'
-        if 'CONTA' in texto:
-            return 'CONTA'
-        return texto
-
-    def mapear_indicador_canonico(valor):
-        texto = normalizar_texto_chave(valor)
-        if not texto:
-            return ""
-        if 'LIGAC' in texto:
-            return 'LIGACOES'
-        if 'PEDID' in texto:
-            return 'PEDIDOS'
-        if 'GROSS' in texto and 'LIQ' in texto:
-            return 'INSTALACAO'
-        if 'GROSS' in texto and 'LIQ' in texto:
-            return 'GROSS LIQUIDO'
-        if 'GROSS' in texto and 'BRUT' in texto:
-            return 'GROSS BRUTO'
-        if 'Vend' in texto and 'Brut' in texto:
-            return 'VENDA BRUTA'
-        return texto
-
-    def get_mes_mesmo_ano_anterior(mes_ref):
-        try:
-            data_ref = mes_ano_para_data(mes_ref)
-            meses_rev = {
-                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
-                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
-            }
-            mes_txt = meses_rev.get(data_ref.month, 'jan')
-            ano_txt = str(data_ref.year - 1)[-2:]
-            return f"{mes_txt}/{ano_txt}"
-        except Exception:
-            return mes_ref
-
-    @st.cache_data(ttl=3600)
-    def load_ligacoes_para_performance():
-        colunas_saida = [
-            'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
-            'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
-        ]
-        try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
-            if not Path(ligacoes_path).exists():
-                return pd.DataFrame(columns=colunas_saida)
-
-            df_lig = pd.read_excel(ligacoes_path)
-            colunas_min = ['PERIODO', 'CABEADO', 'QTD', 'DSC_REGIONAL_CMV']
-            if any(col not in df_lig.columns for col in colunas_min):
-                return pd.DataFrame(columns=colunas_saida)
-
-            df_lig['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig['PERIODO'], errors='coerce')
-            df_lig = df_lig[df_lig['DAT_MOVIMENTO2'].notna()].copy()
-            if df_lig.empty:
-                return pd.DataFrame(columns=colunas_saida)
-
-            meses_pt = {
-                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
-                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
-            }
-
-            df_lig['dat_tratada'] = df_lig['DAT_MOVIMENTO2'].apply(
-                lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
-            )
-            df_lig['REGIONAL'] = (
-                df_lig['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
-            )
-            df_lig['QTDE'] = pd.to_numeric(df_lig['QTD'], errors='coerce').fillna(0)
-            df_lig['DESAFIO_QTD'] = 0
-            df_lig['TEND_QTD'] = df_lig['QTDE']
-            df_lig['CANAL_PLAN'] = 'Televendas Receptivo'
-            df_lig['DSC_INDICADOR'] = 'LIGACOES'
-
-            # Replicar a mesma regra dos KPIs da aba Ligações:
-            # FIXA = CABEADO == SIM | CONTA = TIPO_CHAMADA == DEMAIS
-            if 'TELEFONE' in df_lig.columns:
-                telefone_str = df_lig['TELEFONE'].astype(str)
-                is_click_to_call = telefone_str.str.contains('0960|8449', regex=True, na=False)
-                df_lig['TIPO_CHAMADA'] = np.where(is_click_to_call, 'Click to Call', 'DEMAIS')
-            else:
-                df_lig['TIPO_CHAMADA'] = 'DEMAIS'
-
-            cabeado_norm = df_lig['CABEADO'].astype(str).str.strip().str.upper()
-            mask_fixa = cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
-            mask_conta = df_lig['TIPO_CHAMADA'].eq('DEMAIS')
-
-            df_lig_fixa = df_lig[mask_fixa].copy()
-            df_lig_fixa['COD_PLATAFORMA'] = 'FIXA'
-
-            df_lig_conta = df_lig[mask_conta].copy()
-            df_lig_conta['COD_PLATAFORMA'] = 'CONTA'
-
-            df_lig_saida = pd.concat([df_lig_fixa, df_lig_conta], ignore_index=True)
-            return df_lig_saida[colunas_saida]
-        except Exception:
-            return pd.DataFrame(columns=colunas_saida)
-
-    def preparar_base_performance(df_base):
-        colunas_saida = [
-            'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
-            'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF',
-            'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
-        ]
-        if df_base is None or df_base.empty:
-            return pd.DataFrame(columns=colunas_saida)
-
-        colunas_minimas = {'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada', 'QTDE'}
-        if not colunas_minimas.issubset(set(df_base.columns)):
-            return pd.DataFrame(columns=colunas_saida)
-
-        df_work = df_base.copy()
-        df_work['REGIONAL'] = df_work['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
-        df_work['CANAL_PLAN'] = df_work['CANAL_PLAN'].astype(str).str.strip()
-        df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
-        df_work['DSC_INDICADOR'] = df_work['DSC_INDICADOR'].astype(str).str.strip()
-        df_work['dat_tratada'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
-        df_work = df_work[df_work['dat_tratada'].str.match(r'^[a-z]{3}/\d{2}$', na=False)].copy()
-
-        if 'DESAFIO_QTD' not in df_work.columns:
-            df_work['DESAFIO_QTD'] = 0
-        if 'TEND_QTD' not in df_work.columns:
-            df_work['TEND_QTD'] = df_work['QTDE']
-
-        df_work['QTDE'] = normalizar_numerico_serie(df_work['QTDE']).fillna(0)
-        df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work['DESAFIO_QTD']).fillna(0)
-        df_work['TEND_QTD'] = normalizar_numerico_serie(df_work['TEND_QTD']).fillna(0)
-
-        df_work['CANAL_NORM'] = df_work['CANAL_PLAN'].apply(normalizar_texto_chave)
-        df_work['PLATAFORMA_NORM'] = df_work['COD_PLATAFORMA'].apply(normalizar_plataforma_chave)
-        df_work['INDICADOR_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave)
-        df_work['INDICADOR_CANONICO'] = df_work['INDICADOR_NORM'].apply(mapear_indicador_canonico)
-        df_work['ANO_REF'] = df_work['dat_tratada'].str.split('/').str[1].fillna("")
-
-        if df_work.empty:
-            return pd.DataFrame(columns=colunas_saida)
-
-        return (
-            df_work.groupby(
-                [
-                    'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
-                    'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF'
-                ],
-                as_index=False,
-                observed=True
-            )[['QTDE', 'DESAFIO_QTD', 'TEND_QTD']].sum()
-        )
-
-    # Overrides robustos para LIGAÇÕES (plataforma/mês), preenchidos após leitura da base principal.
-    ligacoes_tend_override = {}
-    ligacoes_meta_override = {}
-
-    def calcular_metricas_linha(
-        df_base,
-        aliases,
-        plataforma,
-        mes_atual_ref,
-        mes_m1_ref,
-        mes_m2_ref,
-        mes_m3_ref,
-        meta_modo='indicador',
-        mes_tendencia_ref=None
-    ):
-        if df_base is None or df_base.empty:
-            return {
-                'v_2024': 0,
-                'v_2025': 0,
-                'v_mes_m3': 0,
-                'v_mes_m2': 0,
-                'v_mes_ant': 0,
-                'v_mes_atu': 0,
-                'v_meta_mes': 0,
-                'v_yoy': 0,
-                'v_mom': 0,
-                'v_ating_meta': 0
-            }
-
-        aliases_norm = {
-            normalizar_texto_chave(alias)
-            for alias in aliases
-            if str(alias).strip()
-        }
-        aliases_canon = {
-            mapear_indicador_canonico(alias)
-            for alias in aliases_norm
-            if alias
-        }
-        aliases_canon = {alias for alias in aliases_canon if alias}
-
-        indicador_serie = df_base['INDICADOR_CANONICO'].fillna('')
-        match_indicador = indicador_serie.isin(aliases_canon)
-
-        filtro = df_base['PLATAFORMA_NORM'].eq(plataforma) & match_indicador
-        base_linha = df_base[filtro].copy()
-
-        valor_2024 = base_linha.loc[base_linha['ANO_REF'] == '24', 'QTDE'].sum()
-        valor_2025 = base_linha.loc[base_linha['ANO_REF'] == '25', 'QTDE'].sum()
-
-        valor_mes_m3 = base_linha.loc[base_linha['dat_tratada'] == mes_m3_ref, 'QTDE'].sum()
-        valor_mes_m2 = base_linha.loc[base_linha['dat_tratada'] == mes_m2_ref, 'QTDE'].sum()
-        valor_mes_anterior = base_linha.loc[base_linha['dat_tratada'] == mes_m1_ref, 'QTDE'].sum()
-        valor_real_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'QTDE'].sum()
-        valor_tend_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'TEND_QTD'].sum()
-        valor_meta_indicador = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'DESAFIO_QTD'].sum()
-
-        # Para LIGAÇÕES, priorizar tendência/meta vindas da base principal por plataforma+mês.
-        if 'LIGACOES' in aliases_canon:
-            chave_lig = (str(plataforma).strip().upper(), str(mes_atual_ref).strip().lower())
-            tend_override = float(ligacoes_tend_override.get(chave_lig, 0) or 0)
-            meta_override = float(ligacoes_meta_override.get(chave_lig, 0) or 0)
-            if tend_override > 0:
-                valor_tend_mes_atual = tend_override
-            if meta_override > 0:
-                valor_meta_indicador = meta_override
-
-        if meta_modo == 'zero':
-            valor_meta_mes = 0
-        elif meta_modo == 'plataforma':
-            valor_meta_mes = df_base.loc[
-                df_base['PLATAFORMA_NORM'].eq(plataforma) & df_base['dat_tratada'].eq(mes_atual_ref),
-                'DESAFIO_QTD'
-            ].sum()
-        else:
-            # Padrão: meta por indicador + plataforma + canal + mês (mesma lógica dos filtros da linha)
-            valor_meta_mes = valor_meta_indicador
-
-        mes_atual_norm = str(mes_atual_ref).strip().lower()
-        mes_tendencia_norm = str(mes_tendencia_ref or "").strip().lower()
-        mes_corrente_calendario = get_mes_atual_formatado().strip().lower()
-        meses_tend_linha = sorted(
-            base_linha.loc[
-                pd.to_numeric(base_linha['TEND_QTD'], errors='coerce').fillna(0) > 0,
-                'dat_tratada'
-            ].dropna().astype(str).str.strip().tolist(),
-            key=mes_ano_para_data
-        )
-        mes_tendencia_linha_norm = (
-            meses_tend_linha[-1].strip().lower()
-            if meses_tend_linha else ""
-        )
-        usar_tendencia_mes = (
-            (
-                mes_atual_norm == mes_corrente_calendario
-                or (mes_tendencia_norm and mes_atual_norm == mes_tendencia_norm)
-                or (mes_tendencia_linha_norm and mes_atual_norm == mes_tendencia_linha_norm)
-            )
-            and (valor_tend_mes_atual > 0)
-        )
-        valor_mes_atual = valor_tend_mes_atual if usar_tendencia_mes else valor_real_mes_atual
-
-        yoy_pct = ((valor_2025 - valor_2024) / valor_2024 * 100) if valor_2024 > 0 else 0
-        mom_pct = ((valor_mes_atual - valor_mes_anterior) / valor_mes_anterior * 100) if valor_mes_anterior > 0 else 0
-        ating_meta_pct = (((valor_mes_atual / valor_meta_mes) - 1) * 100) if valor_meta_mes > 0 else 0
-
-        return {
-            'v_2024': valor_2024,
-            'v_2025': valor_2025,
-            'v_mes_m3': valor_mes_m3,
-            'v_mes_m2': valor_mes_m2,
-            'v_mes_ant': valor_mes_anterior,
-            'v_mes_atu': valor_mes_atual,
-            'v_meta_mes': valor_meta_mes,
-            'v_yoy': yoy_pct,
-            'v_mom': mom_pct,
-            'v_ating_meta': ating_meta_pct
-        }
-
-    def formatar_pct_tabela(valor):
-        try:
-            return f"{float(valor):+.1f}%".replace('.', ',')
-        except Exception:
-            return "0,0%"
-
-    def formatar_pct_sem_sinal(valor):
-        try:
-            return f"{float(valor):.1f}%".replace('.', ',')
-        except Exception:
-            return "0,0%"
-
-    def calcular_ratio_pct(numerador, denominador):
-        try:
-            num = float(numerador or 0)
-            den = float(denominador or 0)
-            if den <= 0:
-                return 0.0
-            return (num / den) * 100.0
-        except Exception:
-            return 0.0
-
-    def criar_linha_ratio_performance(nome_linha, met_numerador, met_denominador):
-        r_2024 = calcular_ratio_pct(met_numerador.get('v_2024', 0), met_denominador.get('v_2024', 0))
-        r_2025 = calcular_ratio_pct(met_numerador.get('v_2025', 0), met_denominador.get('v_2025', 0))
-        r_m3 = calcular_ratio_pct(met_numerador.get('v_mes_m3', 0), met_denominador.get('v_mes_m3', 0))
-        r_m2 = calcular_ratio_pct(met_numerador.get('v_mes_m2', 0), met_denominador.get('v_mes_m2', 0))
-        r_ant = calcular_ratio_pct(met_numerador.get('v_mes_ant', 0), met_denominador.get('v_mes_ant', 0))
-        r_atu = calcular_ratio_pct(met_numerador.get('v_mes_atu', 0), met_denominador.get('v_mes_atu', 0))
-        yoy_delta = r_2025 - r_2024
-        mom_delta = r_atu - r_ant
-
-        return {
-            'tipo': 'item',
-            'indicador': nome_linha,
-            '2024': formatar_pct_sem_sinal(r_2024),
-            '2025': formatar_pct_sem_sinal(r_2025),
-            'MES_M3': formatar_pct_sem_sinal(r_m3),
-            'MES_M2': formatar_pct_sem_sinal(r_m2),
-            'MES_ANT': formatar_pct_sem_sinal(r_ant),
-            'MES_ATU': formatar_pct_sem_sinal(r_atu),
-            'META_MES': '',
-            'YOY': formatar_pct_tabela(yoy_delta),
-            'MOM': formatar_pct_tabela(mom_delta),
-            'ATING_META': '',
-            'YOY_RAW': yoy_delta,
-            'MOM_RAW': mom_delta,
-            'ATING_META_RAW': 0
-        }
-
-    def criar_linha_ratio_por_chaves(nome_linha, metricas_por_indicador, chave_numerador, chave_denominador):
-        met_num = metricas_por_indicador.get(chave_numerador)
-        met_den = metricas_por_indicador.get(chave_denominador)
-        if not met_num or not met_den:
-            return None
-
-        r_2024 = calcular_ratio_pct(met_num.get('v_2024', 0), met_den.get('v_2024', 0))
-        r_2025 = calcular_ratio_pct(met_num.get('v_2025', 0), met_den.get('v_2025', 0))
-        r_m3 = calcular_ratio_pct(met_num.get('v_mes_m3', 0), met_den.get('v_mes_m3', 0))
-        r_m2 = calcular_ratio_pct(met_num.get('v_mes_m2', 0), met_den.get('v_mes_m2', 0))
-        r_ant = calcular_ratio_pct(met_num.get('v_mes_ant', 0), met_den.get('v_mes_ant', 0))
-        r_atu = calcular_ratio_pct(met_num.get('v_mes_atu', 0), met_den.get('v_mes_atu', 0))
-        yoy_delta = r_2025 - r_2024
-        mom_delta = r_atu - r_ant
-
-        return {
-            'tipo': 'item',
-            'indicador': nome_linha,
-            '2024': formatar_pct_sem_sinal(r_2024),
-            '2025': formatar_pct_sem_sinal(r_2025),
-            'MES_M3': formatar_pct_sem_sinal(r_m3),
-            'MES_M2': formatar_pct_sem_sinal(r_m2),
-            'MES_ANT': formatar_pct_sem_sinal(r_ant),
-            'MES_ATU': formatar_pct_sem_sinal(r_atu),
-            'META_MES': '',
-            'YOY': formatar_pct_tabela(yoy_delta),
-            'MOM': formatar_pct_tabela(mom_delta),
-            'ATING_META': '',
-            'YOY_RAW': yoy_delta,
-            'MOM_RAW': mom_delta,
-            'ATING_META_RAW': 0
-        }
-
-    def classe_pct(valor):
-        try:
-            valor_num = float(valor)
-            if valor_num > 0:
-                return "pct-positivo"
-            if valor_num < 0:
-                return "pct-negativo"
-            return "pct-neutro"
-        except Exception:
-            return "pct-neutro"
-
-    def criar_tabela_html_performance_canal(linhas, mes_atual_ref, mes_m1_ref, mes_m2_ref, mes_m3_ref):
-        html = """
-        <style>
-            .tabela-container-performance-canal {
-                width: 100%;
-                max-height: 620px;
-                overflow-y: auto;
-                overflow-x: auto;
-                border: 1px solid #DCC2BE;
-                border-radius: 14px;
-                box-shadow: 0 10px 28px rgba(121, 14, 9, 0.14), 0 2px 8px rgba(61, 7, 4, 0.08);
-                margin: 18px 0;
-                background: linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%);
-                position: relative;
-            }
-
-            .tabela-performance-canal {
-                width: max-content;
-                min-width: 100%;
-                border-collapse: collapse;
-                border-spacing: 0;
-                font-size: 10px;
-                line-height: 1.2;
-            }
-
-            .tabela-performance-canal thead {
-                position: sticky;
-                top: 0;
-                z-index: 100;
-                box-shadow: 0 4px 8px rgba(61, 7, 4, 0.16);
-            }
-
-            .tabela-performance-canal th {
-                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
-                color: white !important;
-                font-weight: 700;
-                padding: 7px 8px !important;
-                text-align: center;
-                border-bottom: 2px solid #5A0A06;
-                border-right: 1px solid rgba(255, 255, 255, 0.14);
-                white-space: nowrap;
-                letter-spacing: 0.35px;
-                text-transform: uppercase;
-                font-size: 9.6px;
-                min-width: 92px;
-            }
-
-            .tabela-performance-canal td {
-                padding: 6px 8px !important;
-                border-bottom: 1px solid #E8E8E8;
-                border-right: 1px solid #EFE5E3;
-                text-align: right;
-                font-variant-numeric: tabular-nums;
-                color: #2F3747;
-                white-space: nowrap;
-                font-size: 10px;
-                transition: background-color 0.2s ease, box-shadow 0.2s ease;
-            }
-
-            .tabela-performance-canal tr td:last-child,
-            .tabela-performance-canal tr th:last-child {
-                border-right: none;
-            }
-
-            .tabela-performance-canal th:first-child {
-                position: sticky;
-                left: 0;
-                z-index: 130;
-                min-width: 180px;
-                background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
-                box-shadow: 2px 0 0 rgba(255, 255, 255, 0.12);
-            }
-
-            .linha-grupo-performance td {
-                text-align: left !important;
-                font-weight: 800 !important;
-                text-transform: uppercase;
-                color: #FFFFFF !important;
-                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-                padding: 9px 12px !important;
-                letter-spacing: 0.4px;
-                position: sticky;
-                left: 0;
-                z-index: 40;
-            }
-
-            .linha-item-performance:nth-child(even) {
-                background-color: #FFFDFC !important;
-            }
-
-            .linha-item-performance:nth-child(odd) {
-                background-color: #FFFFFF !important;
-            }
-
-            .linha-item-performance:hover {
-                background-color: #FFF3F1 !important;
-                box-shadow: inset 0 0 0 1px #FFD8D1 !important;
-            }
-
-            .linha-item-performance td.col-indicador {
-                text-align: left !important;
-                font-weight: 600;
-                color: #3A302F;
-                background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
-                padding-left: 11px !important;
-                min-width: 180px;
-                position: sticky;
-                left: 0;
-                z-index: 35;
-                box-shadow: 2px 0 0 #F2E6E4;
-            }
-
-            .linha-item-performance td.col-meta {
-                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
-                color: #B71C1C !important;
-                font-weight: 600;
-                border-left: 1px solid #F2C8CC !important;
-                border-right: 1px solid #F2C8CC !important;
-            }
-
-            .linha-item-performance td:nth-child(2),
-            .linha-item-performance td:nth-child(3),
-            .linha-item-performance td:nth-child(4),
-            .linha-item-performance td:nth-child(5),
-            .linha-item-performance td:nth-child(9),
-            .linha-item-performance td:nth-child(10) {
-                background-color: #FCF8F8;
-            }
-
-            .linha-item-performance td.pct-positivo {
-                color: #1B5E20 !important;
-                background: linear-gradient(135deg, #E8F5E9 0%, #E6F4E7 100%) !important;
-                font-weight: 700;
-                position: relative;
-                padding-left: 25px !important;
-                border-left: 3px solid #4CAF50 !important;
-            }
-
-            .linha-item-performance td.pct-positivo::before {
-                content: "▲";
-                position: absolute;
-                left: 9px;
-                top: 50%;
-                transform: translateY(-50%);
-                font-size: 10px;
-                font-weight: 900;
-                color: #2E7D32;
-            }
-
-            .linha-item-performance td.pct-negativo {
-                color: #C62828 !important;
-                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
-                font-weight: 700;
-                position: relative;
-                padding-left: 25px !important;
-                border-left: 3px solid #F44336 !important;
-            }
-
-            .linha-item-performance td.pct-negativo::before {
-                content: "▼";
-                position: absolute;
-                left: 9px;
-                top: 50%;
-                transform: translateY(-50%);
-                font-size: 10px;
-                font-weight: 900;
-                color: #C62828;
-            }
-
-            .linha-item-performance td.pct-neutro {
-                color: #666666 !important;
-                background: #F8F9FA !important;
-                font-weight: 600;
-            }
-
-            .linha-separador-performance td {
-                padding: 0 !important;
-                height: 2px;
-                background: linear-gradient(90deg, #FF2800, #790E09);
-                border: none !important;
-            }
-
-            .tabela-container-performance-canal::-webkit-scrollbar {
-                width: 10px;
-                height: 10px;
-            }
-
-            .tabela-container-performance-canal::-webkit-scrollbar-track {
-                background: #F7F3F2;
-                border-radius: 10px;
-            }
-
-            .tabela-container-performance-canal::-webkit-scrollbar-thumb {
-                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
-                border-radius: 10px;
-                border: 2px solid #F7F3F2;
-            }
-
-            .tabela-container-performance-canal::-webkit-scrollbar-thumb:hover {
-                background: linear-gradient(135deg, #8F2C27 0%, #5A0A06 100%);
-            }
-
-            @media (max-width: 768px) {
-                .tabela-performance-canal th,
-                .tabela-performance-canal td {
-                    font-size: 9px !important;
-                    padding: 5px 5px !important;
-                }
-
-                .tabela-performance-canal th:first-child,
-                .linha-item-performance td.col-indicador {
-                    min-width: 145px;
-                }
-            }
-
-            /* Override visual para alinhar com "CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL" */
-            .tabela-container-performance-canal {
-                border: 2px solid #790E09 !important;
-                border-radius: 10px !important;
-                box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15) !important;
-                background: #FFFFFF !important;
-            }
-
-            .tabela-performance-canal {
-                width: 100% !important;
-                font-size: 10.5px !important;
-                line-height: 1.25 !important;
-            }
-
-            .tabela-performance-canal th {
-                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
-                padding: 9px 7px !important;
-                border-right: 1px solid #FFFFFF !important;
-                border-bottom: 3px solid #5A0A06 !important;
-                font-size: 10.5px !important;
-                box-shadow: none !important;
-                min-width: auto !important;
-            }
-
-            .tabela-performance-canal th:first-child {
-                position: static !important;
-                left: auto !important;
-                z-index: auto !important;
-                min-width: auto !important;
-                box-shadow: none !important;
-                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
-            }
-
-            .tabela-performance-canal td {
-                padding: 7px 7px !important;
-                border-bottom: 1px solid #FFFFFF !important;
-                border-right: 1px solid #FFFFFF !important;
-                font-size: 10.5px !important;
-                box-shadow: none !important;
-            }
-
-            .linha-item-performance:nth-child(even) td {
-                background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
-            }
-
-            .linha-item-performance:nth-child(odd) td {
-                background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
-            }
-
-            .linha-item-performance:hover td {
-                background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                box-shadow: inset 0 0 0 1px #F1CBC4 !important;
-            }
-
-            .linha-item-performance td.col-indicador {
-                position: static !important;
-                left: auto !important;
-                z-index: auto !important;
-                min-width: auto !important;
-                box-shadow: none !important;
-                text-align: left !important;
-                font-weight: 600 !important;
-                color: #333333 !important;
-                background: transparent !important;
-                padding-left: 10px !important;
-            }
-
-            .linha-item-performance td.col-mes,
-            .linha-item-performance td.col-total-anual,
-            .linha-item-performance td.col-meta {
-                background: transparent !important;
-                color: #333 !important;
-                font-weight: 400 !important;
-            }
-
-            .linha-item-performance td.col-meta {
-                border-left: 1px solid #FFFFFF !important;
-                border-right: 1px solid #FFFFFF !important;
-            }
-
-            .linha-item-performance td.col-variacao,
-            .linha-item-performance td.col-alcance {
-                background-color: transparent !important;
-            }
-
-            .tabela-container-performance-canal::-webkit-scrollbar {
-                width: 10px;
-                height: 10px;
-            }
-
-            .tabela-container-performance-canal::-webkit-scrollbar-track {
-                background: #F5F5F5;
-                border-radius: 10px;
-            }
-
-            .tabela-container-performance-canal::-webkit-scrollbar-thumb {
-                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
-                border-radius: 10px;
-                border: 2px solid #F5F5F5;
-            }
-
-            /* Compactação final */
-            .tabela-performance-canal {
-                font-size: 9.6px !important;
-                line-height: 1.15 !important;
-                table-layout: fixed !important;
-                width: 100% !important;
-            }
-
-            .tabela-performance-canal th {
-                padding: 5px 6px !important;
-                font-size: 9.3px !important;
-                letter-spacing: 0.25px !important;
-            }
-
-            .tabela-performance-canal td {
-                padding: 4px 6px !important;
-                font-size: 9.6px !important;
-                line-height: 1.1 !important;
-            }
-
-            .linha-grupo-performance td {
-                padding: 6px 9px !important;
-                font-size: 9.6px !important;
-                letter-spacing: 0.25px !important;
-            }
-
-            .linha-item-performance td.col-indicador {
-                padding-left: 8px !important;
-            }
-
-            .linha-item-performance td.pct-positivo,
-            .linha-item-performance td.pct-negativo {
-                padding-left: 20px !important;
-                background: transparent !important;
-                border-left: 1px solid #FFFFFF !important;
-                border-right: 1px solid #FFFFFF !important;
-            }
-
-            .linha-item-performance td.pct-neutro {
-                background: transparent !important;
-            }
-
-            .linha-item-performance td.pct-positivo::before,
-            .linha-item-performance td.pct-negativo::before {
-                left: 6px !important;
-                font-size: 9px !important;
-            }
-
-            .linha-separador-performance td {
-                height: 1px !important;
-            }
-
-            /* Compactação horizontal por coluna */
-            .tabela-performance-canal th:nth-child(1),
-            .tabela-performance-canal td:nth-child(1) {
-                width: 138px !important;
-                min-width: 138px !important;
-                max-width: 138px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(2),
-            .tabela-performance-canal td:nth-child(2),
-            .tabela-performance-canal th:nth-child(3),
-            .tabela-performance-canal td:nth-child(3),
-            .tabela-performance-canal th:nth-child(4),
-            .tabela-performance-canal td:nth-child(4),
-            .tabela-performance-canal th:nth-child(5),
-            .tabela-performance-canal td:nth-child(5) {
-                width: 72px !important;
-                min-width: 72px !important;
-                max-width: 72px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(6),
-            .tabela-performance-canal td:nth-child(6),
-            .tabela-performance-canal th:nth-child(8),
-            .tabela-performance-canal td:nth-child(8),
-            .tabela-performance-canal th:nth-child(11),
-            .tabela-performance-canal td:nth-child(11) {
-                width: 74px !important;
-                min-width: 74px !important;
-                max-width: 74px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(7),
-            .tabela-performance-canal td:nth-child(7) {
-                width: 86px !important;
-                min-width: 86px !important;
-                max-width: 86px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(9),
-            .tabela-performance-canal td:nth-child(9),
-            .tabela-performance-canal th:nth-child(10),
-            .tabela-performance-canal td:nth-child(10) {
-                width: 68px !important;
-                min-width: 68px !important;
-                max-width: 68px !important;
-            }
-        </style>
-
-        <div class="tabela-container-performance-canal">
-            <table class="tabela-performance-canal">
-                <thead>
-                    <tr>
-                        <th>Indicador</th>
-                        <th class="col-mes">""" + str(mes_m3_ref) + """</th>
-                        <th class="col-mes">""" + str(mes_m2_ref) + """</th>
-                        <th class="col-mes">""" + str(mes_m1_ref) + """</th>
-                        <th class="col-mes">""" + str(mes_atual_ref) + """</th>
-                        <th class="col-variacao">MoM</th>
-                        <th class="col-meta">""" + f"Meta {mes_atual_ref}" + """</th>
-                        <th class="col-alcance">Ating Meta</th>
-                        <th class="col-total-anual">2024</th>
-                        <th class="col-total-anual">2025</th>
-                        <th class="col-variacao">YoY</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-
-        for linha in linhas:
-            if linha['tipo'] == 'grupo':
-                html += f'<tr class="linha-grupo-performance"><td colspan="11">{linha["grupo"]}</td></tr>'
-                continue
-
-            if linha['tipo'] == 'separador':
-                html += '<tr class="linha-separador-performance"><td colspan="11"></td></tr>'
-                continue
-
-            html += '<tr class="linha-item-performance">'
-            html += f'<td class="col-indicador">&nbsp;&nbsp;&nbsp;{linha["indicador"]}</td>'
-            html += f'<td class="col-mes">{linha["MES_M3"]}</td>'
-            html += f'<td class="col-mes">{linha["MES_M2"]}</td>'
-            html += f'<td class="col-mes">{linha["MES_ANT"]}</td>'
-            html += f'<td class="col-mes">{linha["MES_ATU"]}</td>'
-            html += f'<td class="col-variacao {classe_pct(linha["MOM_RAW"])}">{linha["MOM"]}</td>'
-            html += f'<td class="col-meta">{linha["META_MES"]}</td>'
-            html += f'<td class="col-alcance {classe_pct(linha["ATING_META_RAW"])}">{linha["ATING_META"]}</td>'
-            html += f'<td class="col-total-anual">{linha["2024"]}</td>'
-            html += f'<td class="col-total-anual">{linha["2025"]}</td>'
-            html += f'<td class="col-variacao {classe_pct(linha["YOY_RAW"])}">{linha["YOY"]}</td>'
-            html += '</tr>'
-
-        html += """
-                </tbody>
-            </table>
-        </div>
-        """
-        return html
-
-    def criar_painel_insights_performance(insights_por_grupo, mes_atual_ref, mes_anterior_ref):
-        partes = [
-            "<style>",
-            ".insights-conversao-canal{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:8px 0 16px 0;}",
-            ".insight-conversao-card{border:1px solid #E3D6D3;border-radius:12px;background:linear-gradient(180deg,#FFFFFF 0%,#FFF9F8 100%);box-shadow:0 4px 14px rgba(121,14,9,.08);overflow:hidden;}",
-            ".insight-conversao-header{background:linear-gradient(135deg,#790E09 0%,#5A0A06 100%);color:#FFF;font-size:11px;font-weight:800;letter-spacing:.3px;padding:8px 10px;text-transform:uppercase;}",
-            ".insight-conversao-table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;}",
-            ".insight-conversao-table th,.insight-conversao-table td{border:1px solid #FFF;padding:6px 6px;text-align:right;white-space:nowrap;}",
-            ".insight-conversao-table th{background:#F7ECEA;color:#3A302F;font-weight:700;}",
-            ".insight-conversao-table td{background:#FFF5F3;color:#2F3747;}",
-            ".insight-conversao-table td:first-child,.insight-conversao-table th:first-child{text-align:left;width:44%;}",
-            ".insight-conversao-table tr:nth-child(even) td{background:#FFF1EF;}",
-            "</style>",
-            "<div class=\"insights-conversao-canal\">",
-        ]
-
-        for grupo in ['FIXA', 'CONTA']:
-            linhas = insights_por_grupo.get(grupo, [])
-            if not linhas:
-                continue
-
-            partes.extend([
-                "<div class=\"insight-conversao-card\">",
-                f"<div class=\"insight-conversao-header\">{grupo}</div>",
-                "<table class=\"insight-conversao-table\">",
-                "<thead><tr>",
-                "<th>Indicador</th>",
-                f"<th>{mes_anterior_ref}</th>",
-                f"<th>{mes_atual_ref}</th>",
-                "<th>2024</th>",
-                "<th>2025</th>",
-                "</tr></thead>",
-                "<tbody>",
-            ])
-
-            for linha in linhas:
-                partes.extend([
-                    "<tr>",
-                    f"<td>{linha.get('indicador', '')}</td>",
-                    f"<td>{linha.get('MES_ANT', '0,0%')}</td>",
-                    f"<td>{linha.get('MES_ATU', '0,0%')}</td>",
-                    f"<td>{linha.get('2024', '0,0%')}</td>",
-                    f"<td>{linha.get('2025', '0,0%')}</td>",
-                    "</tr>",
-                ])
-
-            partes.extend([
-                "</tbody>",
-                "</table>",
-                "</div>",
-            ])
-
-        partes.append("</div>")
-        return "".join(partes)
-
-    df_perf_base = preparar_base_performance(df)
-    df_lig_raw = load_ligacoes_para_performance()
-    df_lig_perf = preparar_base_performance(df_lig_raw)
-
-    if not df_lig_perf.empty:
-        base_ligacoes_origem = df_perf_base[
-            (df_perf_base['INDICADOR_NORM'] == 'LIGACOES') &
-            (df_perf_base['CANAL_NORM'] == 'TELEVENDAS RECEPTIVO') &
-            (df_perf_base['PLATAFORMA_NORM'].isin(['FIXA', 'CONTA']))
-        ].copy()
-
-        # Consolidado por plataforma+mês para uso direto no cálculo da tabela (evita dependência de merge por regional).
-        if not base_ligacoes_origem.empty:
-            agg_lig_pm = (
-                base_ligacoes_origem.groupby(['PLATAFORMA_NORM', 'dat_tratada'], as_index=False, observed=True)[['TEND_QTD', 'DESAFIO_QTD']]
-                .sum()
-            )
-            ligacoes_tend_override = {
-                (str(row['PLATAFORMA_NORM']).strip().upper(), str(row['dat_tratada']).strip().lower()): float(row['TEND_QTD'] or 0)
-                for _, row in agg_lig_pm.iterrows()
-            }
-            ligacoes_meta_override = {
-                (str(row['PLATAFORMA_NORM']).strip().upper(), str(row['dat_tratada']).strip().lower()): float(row['DESAFIO_QTD'] or 0)
-                for _, row in agg_lig_pm.iterrows()
-            }
-
-        df_meta_lig = base_ligacoes_origem.groupby(
-            ['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
-            as_index=False,
-            observed=True
-        )['DESAFIO_QTD'].sum()
-
-        df_tend_lig = base_ligacoes_origem.groupby(
-            ['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
-            as_index=False,
-            observed=True
-        )['TEND_QTD'].sum()
-
-        if not df_meta_lig.empty or not df_tend_lig.empty:
-            # Preservar fallback de tendência da base de ligações (não deixar 0 da base principal sobrescrever)
-            df_lig_perf_work = df_lig_perf.copy()
-            df_lig_perf_work['TEND_QTD_FALLBACK'] = pd.to_numeric(
-                df_lig_perf_work.get('TEND_QTD', df_lig_perf_work['QTDE']),
-                errors='coerce'
-            ).fillna(df_lig_perf_work['QTDE'])
-
-            df_lig_perf = (
-                df_lig_perf_work.drop(columns=['DESAFIO_QTD', 'TEND_QTD'], errors='ignore')
-                .merge(
-                    df_meta_lig,
-                    on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
-                    how='left'
-                )
-                .merge(
-                    df_tend_lig.rename(columns={'TEND_QTD': 'TEND_QTD_BASE'}),
-                    on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
-                    how='left'
-                )
-            )
-            df_lig_perf['DESAFIO_QTD'] = pd.to_numeric(df_lig_perf['DESAFIO_QTD'], errors='coerce').fillna(0)
-            df_lig_perf['TEND_QTD_BASE'] = pd.to_numeric(df_lig_perf['TEND_QTD_BASE'], errors='coerce').fillna(0)
-            df_lig_perf['TEND_QTD'] = np.where(
-                df_lig_perf['TEND_QTD_BASE'] > 0,
-                df_lig_perf['TEND_QTD_BASE'],
-                df_lig_perf['TEND_QTD_FALLBACK']
-            )
-            df_lig_perf.drop(columns=['TEND_QTD_BASE', 'TEND_QTD_FALLBACK'], errors='ignore', inplace=True)
-        else:
-            df_lig_perf['DESAFIO_QTD'] = 0
-            df_lig_perf['TEND_QTD'] = df_lig_perf['QTDE']
-
-        mask_remove_lig = (
-            (df_perf_base['INDICADOR_NORM'] == 'LIGACOES') &
-            (df_perf_base['CANAL_NORM'] == 'TELEVENDAS RECEPTIVO')
-        )
-        df_perf_base = pd.concat([df_perf_base[~mask_remove_lig], df_lig_perf], ignore_index=True)
-
-    if df_perf_base.empty:
-        st.warning("Não há dados suficientes para montar a análise de performance por canal.")
-    else:
-        canais_perf = sorted(
-            df_perf_base['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist()
-        )
-        meses_perf = sorted(
-            [
-                mes for mes in df_perf_base['dat_tratada'].dropna().astype(str).str.strip().tolist()
-                if re.match(r'^[a-z]{3}/\d{2}$', mes)
-            ],
-            key=mes_ano_para_data
-        )
-        meses_perf = list(dict.fromkeys(meses_perf))
-
-        if not meses_perf:
-            st.warning("Não há meses válidos para exibir a análise de performance por canal.")
-        else:
-            col_perf_f1, col_perf_f2 = st.columns(2)
-
-            opcoes_canal = ["Todos"] + canais_perf
-            canal_padrao = "Todos"
-            idx_canal_padrao = opcoes_canal.index(canal_padrao) if canal_padrao in opcoes_canal else 0
-
-            with col_perf_f1:
-                canal_perf_sel = st.selectbox(
-                    "Canal:",
-                    options=opcoes_canal,
-                    index=idx_canal_padrao,
-                    key="filtro_canal_performance_ativados"
-                )
-
-            mes_padrao = get_mes_atual_formatado() if get_mes_atual_formatado() in meses_perf else meses_perf[-1]
-            idx_mes_padrao = meses_perf.index(mes_padrao) if (mes_padrao in meses_perf) else 0
-
-            with col_perf_f2:
-                mes_perf_sel = st.selectbox(
-                    "Mês de referência:",
-                    options=meses_perf,
-                    index=idx_mes_padrao,
-                    key="filtro_mes_performance_ativados"
-                )
-
-            canal_norm_sel = normalizar_texto_chave(canal_perf_sel)
-            df_perf_filtrado = df_perf_base.copy()
-            if canal_perf_sel != "Todos":
-                df_perf_filtrado = df_perf_filtrado[df_perf_filtrado['CANAL_NORM'] == canal_norm_sel]
-
-            meses_perf_filtrado = sorted(
-                [
-                    mes for mes in df_perf_filtrado['dat_tratada'].dropna().astype(str).str.strip().tolist()
-                    if re.match(r'^[a-z]{3}/\d{2}$', mes)
-                ],
-                key=mes_ano_para_data
-            )
-            meses_perf_filtrado = list(dict.fromkeys(meses_perf_filtrado))
-            mes_tendencia_ref = (meses_perf_filtrado[-1] if meses_perf_filtrado else meses_perf[-1]).strip().lower()
-
-            mes_anterior_perf = get_mes_anterior(mes_perf_sel)
-            mes_m2_perf = get_mes_anterior(mes_anterior_perf)
-            mes_m3_perf = get_mes_anterior(mes_m2_perf)
-            mes_yoy_perf = get_mes_mesmo_ano_anterior(mes_perf_sel)
-
-            mostrar_pedidos = (canal_perf_sel == "Todos") or (canal_norm_sel == "E COMMERCE")
-            mostrar_ligacoes = (canal_perf_sel == "Todos") or (canal_norm_sel == "TELEVENDAS RECEPTIVO")
-
-            config_indicadores = {
-                'FIXA': [
-                    ('LIGAÇÕES', 'FIXA', {'LIGACOES'}, 'indicador'),
-                    ('PEDIDOS', 'FIXA', {'PEDIDOS'}, 'indicador'),
-                    ('VENDA BRUTA', 'FIXA', {'VENDA BRUTA', 'VENDAS BRUTAS'}, 'zero'),
-                    ('INSTALADOS', 'FIXA', {'INSTALADOS', 'INSTALACAO', 'INSTALACOES', 'INSTAL'}, 'indicador')
-                ],
-                'CONTA': [
-                    ('LIGAÇÕES', 'CONTA', {'LIGACOES'}, 'indicador'),
-                    ('PEDIDOS', 'CONTA', {'PEDIDOS'}, 'indicador'),
-                    ('GROSS BRUTO', 'CONTA', {'GROSS BRUTO'}, 'zero'),
-                    ('GROSS LIQUIDO', 'CONTA', {'GROSS LIQUIDO'}, 'indicador')
-                ]
-            }
-
-            linhas_tabela_perf = []
-            for grupo, itens in config_indicadores.items():
-                linhas_tabela_perf.append({'tipo': 'grupo', 'grupo': grupo})
-
-                metricas_base_grupo = {}
-                metricas_exibir_grupo = {}
-                plataforma_base_grupo = {}
-
-                for nome_indicador, plataforma_ref, aliases_ref, meta_modo_ref in itens:
-                    if nome_indicador == 'PEDIDOS' and not mostrar_pedidos:
-                        continue
-                    if nome_indicador == 'LIGAÇÕES' and not mostrar_ligacoes:
-                        continue
-
-                    metricas_item = calcular_metricas_linha(
-                        df_perf_filtrado,
-                        aliases_ref,
-                        plataforma_ref,
-                        mes_perf_sel,
-                        mes_anterior_perf,
-                        mes_m2_perf,
-                        mes_m3_perf,
-                        meta_modo_ref,
-                        mes_tendencia_ref
-                    )
-
-                    metricas_base_grupo[nome_indicador] = metricas_item
-                    plataforma_base_grupo[nome_indicador] = plataforma_ref
-
-                # Projeção de meta usando apenas informações já calculadas no próprio bloco:
-                # meta_proj = (realizado_indicador_mes_anterior / realizado_base_mes_anterior) * meta_base_mes_atual
-                # Base FIXA: INSTALADOS | Base CONTA: GROSS LIQUIDO
-                for nome_indicador, metricas_item in metricas_base_grupo.items():
-                    plataforma_ref = plataforma_base_grupo.get(nome_indicador, grupo)
-                    metricas_exibir = metricas_item.copy()
-                    if nome_indicador in {'VENDA BRUTA', 'GROSS BRUTO'}:
-                        nome_base = 'INSTALADOS' if plataforma_ref == 'FIXA' else 'GROSS LIQUIDO'
-                        base_ref = metricas_base_grupo.get(nome_base)
-                        if base_ref:
-                            base_mes_ant = float(base_ref.get('v_mes_ant', 0) or 0)
-                            base_meta_mes = float(base_ref.get('v_meta_mes', 0) or 0)
-                            ind_mes_ant = float(metricas_item.get('v_mes_ant', 0) or 0)
-                            if base_mes_ant > 0 and base_meta_mes > 0:
-                                meta_proj = (ind_mes_ant / base_mes_ant) * base_meta_mes
-                                metricas_exibir['v_meta_mes'] = meta_proj
-                                mes_atu = float(metricas_item.get('v_mes_atu', 0) or 0)
-                                metricas_exibir['v_ating_meta'] = (((mes_atu / meta_proj) - 1) * 100) if meta_proj > 0 else 0
-                            else:
-                                metricas_exibir['v_meta_mes'] = 0
-                                metricas_exibir['v_ating_meta'] = 0
-
-                    metricas_exibir_grupo[nome_indicador] = metricas_exibir
-
-                # Ordem de storytelling solicitada com linhas de conversão dentro da tabela
-                layout_grupo = {
-                    'FIXA': [
-                        ('base', 'LIGAÇÕES'),
-                        ('base', 'PEDIDOS'),
-                        ('base', 'VENDA BRUTA'),
-                        ('ratio', 'LIGAÇÕES VS V. BRUTA', 'VENDA BRUTA', 'LIGAÇÕES', mostrar_ligacoes),
-                        ('ratio', 'PEDIDOS VS V. BRUTA', 'VENDA BRUTA', 'PEDIDOS', mostrar_pedidos),
-                        ('base', 'INSTALADOS'),
-                        ('ratio', 'V. BRUTA VS INSTALADOS', 'INSTALADOS', 'VENDA BRUTA', True),
-                    ],
-                    'CONTA': [
-                        ('base', 'LIGAÇÕES'),
-                        ('base', 'PEDIDOS'),
-                        ('base', 'GROSS BRUTO'),
-                        ('ratio', 'LIGAÇÕES VS V. BRUTA', 'GROSS BRUTO', 'LIGAÇÕES', mostrar_ligacoes),
-                        ('ratio', 'PEDIDOS VS V. BRUTA', 'GROSS BRUTO', 'PEDIDOS', mostrar_pedidos),
-                        ('base', 'GROSS LIQUIDO'),
-                        ('ratio', 'G. LIQUIDO VS G. BRUTO', 'GROSS LIQUIDO', 'GROSS BRUTO', True),
-                    ],
-                }
-
-                for regra in layout_grupo.get(grupo, []):
-                    if not regra:
-                        continue
-
-                    if regra[0] == 'base':
-                        nome_indicador = regra[1]
-                        metricas_exibir = metricas_exibir_grupo.get(nome_indicador)
-                        if not metricas_exibir:
-                            continue
-
-                        linhas_tabela_perf.append(
-                            {
-                                'tipo': 'item',
-                                'indicador': nome_indicador,
-                                '2024': formatar_numero_brasileiro(metricas_exibir['v_2024'], 0),
-                                '2025': formatar_numero_brasileiro(metricas_exibir['v_2025'], 0),
-                                'MES_M3': formatar_numero_brasileiro(metricas_exibir['v_mes_m3'], 0),
-                                'MES_M2': formatar_numero_brasileiro(metricas_exibir['v_mes_m2'], 0),
-                                'MES_ANT': formatar_numero_brasileiro(metricas_exibir['v_mes_ant'], 0),
-                                'MES_ATU': formatar_numero_brasileiro(metricas_exibir['v_mes_atu'], 0),
-                                'META_MES': formatar_numero_brasileiro(metricas_exibir['v_meta_mes'], 0),
-                                'YOY': formatar_pct_tabela(metricas_exibir['v_yoy']),
-                                'MOM': formatar_pct_tabela(metricas_exibir['v_mom']),
-                                'ATING_META': formatar_pct_tabela(metricas_exibir['v_ating_meta']),
-                                'YOY_RAW': metricas_exibir['v_yoy'],
-                                'MOM_RAW': metricas_exibir['v_mom'],
-                                'ATING_META_RAW': metricas_exibir['v_ating_meta']
-                            }
-                        )
-                        continue
-
-                    if regra[0] == 'ratio':
-                        _, rotulo_linha, chave_num, chave_den, condicao_exibir = regra
-                        if not condicao_exibir:
-                            continue
-                        linha_ratio = criar_linha_ratio_por_chaves(
-                            rotulo_linha,
-                            metricas_exibir_grupo,
-                            chave_num,
-                            chave_den
-                        )
-                        if linha_ratio:
-                            linhas_tabela_perf.append(linha_ratio)
-
-                if grupo == 'FIXA':
-                    linhas_tabela_perf.append({'tipo': 'separador'})
-
-            st.caption(
-                f"Mês atual da análise: {mes_perf_sel} | Mês anterior: {mes_anterior_perf} | YoY referência: {mes_yoy_perf}"
-            )
-            st.markdown(
-                criar_tabela_html_performance_canal(
-                    linhas_tabela_perf,
-                    mes_perf_sel,
-                    mes_anterior_perf,
-                    mes_m2_perf,
-                    mes_m3_perf
-                ),
-                unsafe_allow_html=True
-            )
-
 # =========================
 # ABA 2: DESATIVADOS - VERSÃO COMPLETA E CORRIGIDA
 # =========================
@@ -4410,7 +4613,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -4721,9 +4924,8 @@ with tab2:
                             <div class="kpi-title-dinamico">{canal}</div>
                             <div style="text-align: center; padding: 6px 0;">
                                 <div class="kpi-value-dinamico">{total_atual_fmt}</div>
-                                <div class="kpi-meta-line" style="margin: 7px 0;">
-                                    {build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}<br>
-                                    <span style="font-weight: 600;">Silentes:</span> {silentes_fmt}
+                                <div class="kpi-meta-line" style="margin: 7px 0; white-space: nowrap;">
+                                    {build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)} | <span style="font-weight: 600;">Silentes:</span> {silentes_fmt}
                                 </div>
                                 <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
                                     <div class="kpi-variacao-item {classe_mom}" style="font-size: 10px !important;">
@@ -5040,8 +5242,8 @@ with tab2:
             plot_bgcolor='white',
             paper_bgcolor='#FCFCFD',
             font=dict(family='Segoe UI', size=14, color='#2F3747'),
-            margin=dict(l=24, r=24, t=92, b=98),
-            height=560,
+            margin=dict(l=18, r=18, t=66, b=60),
+            height=530,
             xaxis=dict(
                 title='',
                 title_font=dict(size=14, color='#2F3747'),
@@ -5441,15 +5643,18 @@ with tab2:
                 /* Unified table visual override */
                 .tabela-desativados th {
                     padding: 9px 7px !important;
-                    font-size: 10.5px !important;
+                    font-size: 11px !important;
                     box-shadow: none !important;
+                    font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                 }
 
                 .tabela-desativados td {
                     padding: 7px 7px !important;
-                    font-size: 10.5px !important;
+                    font-size: 11px !important;
                     line-height: 1.25 !important;
                     box-shadow: none !important;
+                    font-weight: 400 !important;
+                    font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                 }
 
                 .tabela-desativados td:not(:first-child) {
@@ -5479,6 +5684,12 @@ with tab2:
                     font-size: 10px;
                     font-weight: 900;
                     color: #2E7D32;
+                }
+
+                .tabela-desativados tr td:first-child,
+                .linha-total-desativados td,
+                .tabela-desativados td[class*="percentual-"] {
+                    font-weight: 400 !important;
                 }
 
                 .tabela-desativados td.percentual-negativo-desativados {
@@ -5866,18 +6077,18 @@ with tab3:
         else:
             meta_html_fixa = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
         
-        # Layout: coluna esquerda com cards empilhados, coluna direita com donut
-        col_cards, col_donut = st.columns([0.5, 1.5])
+        # Layout: coluna esquerda com cards (mais larga) + coluna direita com donut
+        col_cards, col_donut = st.columns([0.62, 1.38])
         
         with col_cards:
             card_conta_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 430px; min-height: 108px !important; padding: 12px 12px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS CONTA</div>'
                 f'<div style="text-align: center; padding: 6px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_conta_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
-                f'<div class="kpi-meta-line" style="margin: 7px 0;">'
-                f'{build_kpi_meta_line(anterior_conta_fmt, meta_conta_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=True)}'
+                f'<div class="kpi-meta-line" style="margin: 7px 0; white-space: nowrap;">'
+                f'{build_kpi_meta_line(anterior_conta_fmt, meta_conta_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=False)}'
                 f'</div>'
                 f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
                 f'<div class="kpi-variacao-item {classe_mom_conta}" style="font-size: 10px !important;">'
@@ -5891,13 +6102,13 @@ with tab3:
             st.markdown(card_conta_html, unsafe_allow_html=True)
 
             card_fixa_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 430px; min-height: 108px !important; padding: 12px 12px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS FIXA</div>'
                 f'<div style="text-align: center; padding: 6px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_fixa_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
-                f'<div class="kpi-meta-line" style="margin: 7px 0;">'
-                f'{build_kpi_meta_line(anterior_fixa_fmt, meta_fixa_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=True)}'
+                f'<div class="kpi-meta-line" style="margin: 7px 0; white-space: nowrap;">'
+                f'{build_kpi_meta_line(anterior_fixa_fmt, meta_fixa_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=False)}'
                 f'</div>'
                 f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
                 f'<div class="kpi-variacao-item {classe_mom_fixa}" style="font-size: 10px !important;">'
@@ -6603,15 +6814,18 @@ with tab3:
                     /* Unified table visual override */
                     .tabela-pedidos th {
                         padding: 9px 7px !important;
-                        font-size: 10.5px !important;
+                        font-size: 11px !important;
                         box-shadow: none !important;
+                        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                     }
 
                     .tabela-pedidos td {
                         padding: 7px 7px !important;
-                        font-size: 10.5px !important;
+                        font-size: 11px !important;
                         line-height: 1.25 !important;
                         box-shadow: none !important;
+                        font-weight: 400 !important;
+                        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                     }
 
                     .tabela-pedidos td:not(:first-child) {
@@ -6627,6 +6841,12 @@ with tab3:
                     .linha-regional-pedidos td.performance-excelente-pedidos,
                     .linha-regional-pedidos td.performance-critica-pedidos {
                         animation: none !important;
+                    }
+
+                    .tabela-pedidos tr td:first-child,
+                    .linha-total-pedidos td,
+                    .tabela-pedidos td[class*="percentual-"] {
+                        font-weight: 400 !important;
                     }
                 </style>
                 
@@ -7031,7 +7251,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -7575,8 +7795,8 @@ with tab4:
                     <div style="text-align: center; padding: 15px 0;">
                         <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{fixa_atual_fmt}</div>{tendencia_icon_fixa}</div>
                         {real_hint_fixa}
-                        <div class="kpi-meta-line" style="margin: 10px 0;">
-                            {build_kpi_meta_line(fixa_anterior_fmt, meta_fixa_fmt, mes_anterior, mes_selecionado, break_line=True)}
+                        <div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">
+                            {build_kpi_meta_line(fixa_anterior_fmt, meta_fixa_fmt, mes_anterior, mes_selecionado, break_line=False)}
                         </div>
                         <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
                             <div class="kpi-variacao-item {classe_fixa}" style="font-size: 10px !important;">
@@ -7598,8 +7818,8 @@ with tab4:
                     <div style="text-align: center; padding: 15px 0;">
                         <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{conta_atual_fmt}</div>{tendencia_icon_conta}</div>
                         {real_hint_conta}
-                        <div class="kpi-meta-line" style="margin: 10px 0;">
-                            {build_kpi_meta_line(conta_anterior_fmt, meta_conta_fmt, mes_anterior, mes_selecionado, break_line=True)}
+                        <div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">
+                            {build_kpi_meta_line(conta_anterior_fmt, meta_conta_fmt, mes_anterior, mes_selecionado, break_line=False)}
                         </div>
                         <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
                             <div class="kpi-variacao-item {classe_conta}" style="font-size: 10px !important;">
@@ -8498,15 +8718,18 @@ with tab4:
                         /* Unified table visual override */
                         .tabela-ligacoes th {
                             padding: 9px 7px !important;
-                            font-size: 10.5px !important;
+                            font-size: 11px !important;
                             box-shadow: none !important;
+                            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                         }
 
                         .tabela-ligacoes td {
                             padding: 7px 7px !important;
-                            font-size: 10.5px !important;
+                            font-size: 11px !important;
                             line-height: 1.25 !important;
                             box-shadow: none !important;
+                            font-weight: 400 !important;
+                            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                         }
 
                         .tabela-ligacoes td:not(:first-child) {
@@ -8517,6 +8740,14 @@ with tab4:
                         .linha-regional-ligacoes:hover {
                             background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
                             box-shadow: inset 0 0 0 1px #F1CBC4 !important;
+                        }
+
+                        .tabela-ligacoes tr td:first-child,
+                        .linha-total-ligacoes td,
+                        .tabela-ligacoes td.valor-positivo,
+                        .tabela-ligacoes td.valor-negativo,
+                        .tabela-ligacoes td.valor-destaque {
+                            font-weight: 400 !important;
                         }
                     </style>
                     
@@ -8803,3 +9034,1362 @@ with tab4:
                     st.write(f"**Regional selecionada:** {regional_selecionada}")
                     st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                     st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
+
+# =========================
+# ABA 5: ANALÍTICO
+# =========================
+with tab5:
+    # =========================
+    # NOVA TABELA DINÂMICA: ANÁLISE DE PERFORMANCE POR CANAL
+    # =========================
+    st.markdown(
+        '<div class="section-title"><span class="section-icon">📊</span> ANÁLISE DE PERFORMANCE POR CANAL</div>',
+        unsafe_allow_html=True
+    )
+
+    def normalizar_texto_chave(valor):
+        if pd.isna(valor):
+            return ""
+        texto = unicodedata.normalize("NFKD", str(valor))
+        texto = texto.encode("ASCII", "ignore").decode("ASCII")
+        texto = texto.strip().upper()
+        texto = re.sub(r"[^A-Z0-9]+", " ", texto)
+        texto = re.sub(r"\s+", " ", texto).strip()
+        return texto
+
+    def normalizar_plataforma_chave(valor):
+        texto = normalizar_texto_chave(valor)
+        if 'FIXA' in texto:
+            return 'FIXA'
+        if 'CONTA' in texto:
+            return 'CONTA'
+        return texto
+
+    def mapear_indicador_canonico(valor):
+        texto = normalizar_texto_chave(valor)
+        if not texto:
+            return ""
+        if 'LIGAC' in texto:
+            return 'LIGACOES'
+        if 'PEDID' in texto:
+            return 'PEDIDOS'
+        if 'GROSS' in texto and 'LIQ' in texto:
+            return 'INSTALACAO'
+        if 'GROSS' in texto and 'LIQ' in texto:
+            return 'GROSS LIQUIDO'
+        if 'GROSS' in texto and 'BRUT' in texto:
+            return 'GROSS BRUTO'
+        if 'Vend' in texto and 'Brut' in texto:
+            return 'VENDA BRUTA'
+        return texto
+
+    def get_mes_mesmo_ano_anterior(mes_ref):
+        try:
+            data_ref = mes_ano_para_data(mes_ref)
+            meses_rev = {
+                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+            }
+            mes_txt = meses_rev.get(data_ref.month, 'jan')
+            ano_txt = str(data_ref.year - 1)[-2:]
+            return f"{mes_txt}/{ano_txt}"
+        except Exception:
+            return mes_ref
+
+    @st.cache_data(ttl=3600)
+    def load_ligacoes_para_performance():
+        colunas_saida = [
+            'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
+            'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
+        ]
+        try:
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+            if not Path(ligacoes_path).exists():
+                return pd.DataFrame(columns=colunas_saida)
+
+            df_lig = pd.read_excel(ligacoes_path)
+            colunas_min = ['PERIODO', 'CABEADO', 'QTD', 'DSC_REGIONAL_CMV']
+            if any(col not in df_lig.columns for col in colunas_min):
+                return pd.DataFrame(columns=colunas_saida)
+
+            df_lig['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig['PERIODO'], errors='coerce')
+            df_lig = df_lig[df_lig['DAT_MOVIMENTO2'].notna()].copy()
+            if df_lig.empty:
+                return pd.DataFrame(columns=colunas_saida)
+
+            meses_pt = {
+                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+            }
+
+            df_lig['dat_tratada'] = df_lig['DAT_MOVIMENTO2'].apply(
+                lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
+            )
+            df_lig['REGIONAL'] = (
+                df_lig['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
+            )
+            df_lig['QTDE'] = pd.to_numeric(df_lig['QTD'], errors='coerce').fillna(0)
+            df_lig['DESAFIO_QTD'] = 0
+            df_lig['TEND_QTD'] = df_lig['QTDE']
+            df_lig['CANAL_PLAN'] = 'Televendas Receptivo'
+            df_lig['DSC_INDICADOR'] = 'LIGACOES'
+
+            # Replicar a mesma regra dos KPIs da aba Ligações:
+            # FIXA = CABEADO == SIM | CONTA = TIPO_CHAMADA == DEMAIS
+            if 'TELEFONE' in df_lig.columns:
+                telefone_str = df_lig['TELEFONE'].astype(str)
+                is_click_to_call = telefone_str.str.contains('0960|8449', regex=True, na=False)
+                df_lig['TIPO_CHAMADA'] = np.where(is_click_to_call, 'Click to Call', 'DEMAIS')
+            else:
+                df_lig['TIPO_CHAMADA'] = 'DEMAIS'
+
+            cabeado_norm = df_lig['CABEADO'].astype(str).str.strip().str.upper()
+            mask_fixa = cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
+            mask_conta = df_lig['TIPO_CHAMADA'].eq('DEMAIS')
+
+            df_lig_fixa = df_lig[mask_fixa].copy()
+            df_lig_fixa['COD_PLATAFORMA'] = 'FIXA'
+
+            df_lig_conta = df_lig[mask_conta].copy()
+            df_lig_conta['COD_PLATAFORMA'] = 'CONTA'
+
+            df_lig_saida = pd.concat([df_lig_fixa, df_lig_conta], ignore_index=True)
+            return df_lig_saida[colunas_saida]
+        except Exception:
+            return pd.DataFrame(columns=colunas_saida)
+
+    def preparar_base_performance(df_base):
+        colunas_saida = [
+            'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+            'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF',
+            'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
+        ]
+        if df_base is None or df_base.empty:
+            return pd.DataFrame(columns=colunas_saida)
+
+        colunas_minimas = {'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada', 'QTDE'}
+        if not colunas_minimas.issubset(set(df_base.columns)):
+            return pd.DataFrame(columns=colunas_saida)
+
+        df_work = df_base.copy()
+        df_work['REGIONAL'] = df_work['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
+        df_work['CANAL_PLAN'] = df_work['CANAL_PLAN'].astype(str).str.strip()
+        df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
+        df_work['DSC_INDICADOR'] = df_work['DSC_INDICADOR'].astype(str).str.strip()
+        df_work['dat_tratada'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
+        df_work = df_work[df_work['dat_tratada'].str.match(r'^[a-z]{3}/\d{2}$', na=False)].copy()
+
+        if 'DESAFIO_QTD' not in df_work.columns:
+            df_work['DESAFIO_QTD'] = 0
+        if 'TEND_QTD' not in df_work.columns:
+            df_work['TEND_QTD'] = df_work['QTDE']
+
+        df_work['QTDE'] = normalizar_numerico_serie(df_work['QTDE']).fillna(0)
+        df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work['DESAFIO_QTD']).fillna(0)
+        df_work['TEND_QTD'] = normalizar_numerico_serie(df_work['TEND_QTD']).fillna(0)
+
+        df_work['CANAL_NORM'] = df_work['CANAL_PLAN'].apply(normalizar_texto_chave)
+        df_work['PLATAFORMA_NORM'] = df_work['COD_PLATAFORMA'].apply(normalizar_plataforma_chave)
+        df_work['INDICADOR_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave)
+        df_work['INDICADOR_CANONICO'] = df_work['INDICADOR_NORM'].apply(mapear_indicador_canonico)
+        df_work['ANO_REF'] = df_work['dat_tratada'].str.split('/').str[1].fillna("")
+
+        if df_work.empty:
+            return pd.DataFrame(columns=colunas_saida)
+
+        return (
+            df_work.groupby(
+                [
+                    'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+                    'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF'
+                ],
+                as_index=False,
+                observed=True
+            )[['QTDE', 'DESAFIO_QTD', 'TEND_QTD']].sum()
+        )
+
+    # Overrides robustos para LIGAÇÕES (plataforma/mês), preenchidos após leitura da base principal.
+    ligacoes_tend_override = {}
+    ligacoes_meta_override = {}
+
+    def calcular_metricas_linha(
+        df_base,
+        aliases,
+        plataforma,
+        mes_atual_ref,
+        mes_m1_ref,
+        mes_m2_ref,
+        mes_m3_ref,
+        meta_modo='indicador',
+        mes_tendencia_ref=None
+    ):
+        if df_base is None or df_base.empty:
+            return {
+                'v_2024': 0,
+                'v_2025': 0,
+                'v_mes_m3': 0,
+                'v_mes_m2': 0,
+                'v_mes_ant': 0,
+                'v_mes_atu': 0,
+                'v_meta_mes': 0,
+                'v_yoy': 0,
+                'v_mom': 0,
+                'v_ating_meta': 0
+            }
+
+        aliases_norm = {
+            normalizar_texto_chave(alias)
+            for alias in aliases
+            if str(alias).strip()
+        }
+        aliases_canon = {
+            mapear_indicador_canonico(alias)
+            for alias in aliases_norm
+            if alias
+        }
+        aliases_canon = {alias for alias in aliases_canon if alias}
+
+        indicador_serie = df_base['INDICADOR_CANONICO'].fillna('')
+        match_indicador = indicador_serie.isin(aliases_canon)
+
+        filtro = df_base['PLATAFORMA_NORM'].eq(plataforma) & match_indicador
+        base_linha = df_base[filtro].copy()
+
+        valor_2024 = base_linha.loc[base_linha['ANO_REF'] == '24', 'QTDE'].sum()
+        valor_2025 = base_linha.loc[base_linha['ANO_REF'] == '25', 'QTDE'].sum()
+
+        valor_mes_m3 = base_linha.loc[base_linha['dat_tratada'] == mes_m3_ref, 'QTDE'].sum()
+        valor_mes_m2 = base_linha.loc[base_linha['dat_tratada'] == mes_m2_ref, 'QTDE'].sum()
+        valor_mes_anterior = base_linha.loc[base_linha['dat_tratada'] == mes_m1_ref, 'QTDE'].sum()
+        valor_real_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'QTDE'].sum()
+        valor_tend_mes_atual = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'TEND_QTD'].sum()
+        valor_meta_indicador = base_linha.loc[base_linha['dat_tratada'] == mes_atual_ref, 'DESAFIO_QTD'].sum()
+
+        # Para LIGAÇÕES, priorizar tendência/meta vindas da base principal por plataforma+mês.
+        if 'LIGACOES' in aliases_canon:
+            chave_lig = (str(plataforma).strip().upper(), str(mes_atual_ref).strip().lower())
+            tend_override = float(ligacoes_tend_override.get(chave_lig, 0) or 0)
+            meta_override = float(ligacoes_meta_override.get(chave_lig, 0) or 0)
+            if tend_override > 0:
+                valor_tend_mes_atual = tend_override
+            if meta_override > 0:
+                valor_meta_indicador = meta_override
+
+        if meta_modo == 'zero':
+            valor_meta_mes = 0
+        elif meta_modo == 'plataforma':
+            valor_meta_mes = df_base.loc[
+                df_base['PLATAFORMA_NORM'].eq(plataforma) & df_base['dat_tratada'].eq(mes_atual_ref),
+                'DESAFIO_QTD'
+            ].sum()
+        else:
+            # Padrão: meta por indicador + plataforma + canal + mês (mesma lógica dos filtros da linha)
+            valor_meta_mes = valor_meta_indicador
+
+        mes_atual_norm = str(mes_atual_ref).strip().lower()
+        mes_tendencia_norm = str(mes_tendencia_ref or "").strip().lower()
+        mes_corrente_calendario = get_mes_atual_formatado().strip().lower()
+        meses_tend_linha = sorted(
+            base_linha.loc[
+                pd.to_numeric(base_linha['TEND_QTD'], errors='coerce').fillna(0) > 0,
+                'dat_tratada'
+            ].dropna().astype(str).str.strip().tolist(),
+            key=mes_ano_para_data
+        )
+        mes_tendencia_linha_norm = (
+            meses_tend_linha[-1].strip().lower()
+            if meses_tend_linha else ""
+        )
+        usar_tendencia_mes = (
+            (
+                mes_atual_norm == mes_corrente_calendario
+                or (mes_tendencia_norm and mes_atual_norm == mes_tendencia_norm)
+                or (mes_tendencia_linha_norm and mes_atual_norm == mes_tendencia_linha_norm)
+            )
+            and (valor_tend_mes_atual > 0)
+        )
+        valor_mes_atual = valor_tend_mes_atual if usar_tendencia_mes else valor_real_mes_atual
+
+        yoy_pct = ((valor_2025 - valor_2024) / valor_2024 * 100) if valor_2024 > 0 else 0
+        mom_pct = ((valor_mes_atual - valor_mes_anterior) / valor_mes_anterior * 100) if valor_mes_anterior > 0 else 0
+        ating_meta_pct = (((valor_mes_atual / valor_meta_mes) - 1) * 100) if valor_meta_mes > 0 else 0
+
+        return {
+            'v_2024': valor_2024,
+            'v_2025': valor_2025,
+            'v_mes_m3': valor_mes_m3,
+            'v_mes_m2': valor_mes_m2,
+            'v_mes_ant': valor_mes_anterior,
+            'v_mes_atu': valor_mes_atual,
+            'v_meta_mes': valor_meta_mes,
+            'v_yoy': yoy_pct,
+            'v_mom': mom_pct,
+            'v_ating_meta': ating_meta_pct
+        }
+
+    def formatar_pct_tabela(valor):
+        try:
+            return f"{float(valor):+.1f}%".replace('.', ',')
+        except Exception:
+            return "0,0%"
+
+    def formatar_pct_sem_sinal(valor):
+        try:
+            return f"{float(valor):.1f}%".replace('.', ',')
+        except Exception:
+            return "0,0%"
+
+    def calcular_ratio_pct(numerador, denominador):
+        try:
+            num = float(numerador or 0)
+            den = float(denominador or 0)
+            if den <= 0:
+                return 0.0
+            return (num / den) * 100.0
+        except Exception:
+            return 0.0
+
+    def criar_linha_ratio_performance(nome_linha, met_numerador, met_denominador):
+        r_2024 = calcular_ratio_pct(met_numerador.get('v_2024', 0), met_denominador.get('v_2024', 0))
+        r_2025 = calcular_ratio_pct(met_numerador.get('v_2025', 0), met_denominador.get('v_2025', 0))
+        r_m3 = calcular_ratio_pct(met_numerador.get('v_mes_m3', 0), met_denominador.get('v_mes_m3', 0))
+        r_m2 = calcular_ratio_pct(met_numerador.get('v_mes_m2', 0), met_denominador.get('v_mes_m2', 0))
+        r_ant = calcular_ratio_pct(met_numerador.get('v_mes_ant', 0), met_denominador.get('v_mes_ant', 0))
+        r_atu = calcular_ratio_pct(met_numerador.get('v_mes_atu', 0), met_denominador.get('v_mes_atu', 0))
+        yoy_delta = r_2025 - r_2024
+        mom_delta = r_atu - r_ant
+
+        return {
+            'tipo': 'item',
+            'indicador': nome_linha,
+            '2024': formatar_pct_sem_sinal(r_2024),
+            '2025': formatar_pct_sem_sinal(r_2025),
+            'MES_M3': formatar_pct_sem_sinal(r_m3),
+            'MES_M2': formatar_pct_sem_sinal(r_m2),
+            'MES_ANT': formatar_pct_sem_sinal(r_ant),
+            'MES_ATU': formatar_pct_sem_sinal(r_atu),
+            'META_MES': '',
+            'YOY': formatar_pct_tabela(yoy_delta),
+            'MOM': formatar_pct_tabela(mom_delta),
+            'ATING_META': '',
+            'YOY_RAW': yoy_delta,
+            'MOM_RAW': mom_delta,
+            'ATING_META_RAW': 0
+        }
+
+    def criar_linha_ratio_por_chaves(nome_linha, metricas_por_indicador, chave_numerador, chave_denominador):
+        met_num = metricas_por_indicador.get(chave_numerador)
+        met_den = metricas_por_indicador.get(chave_denominador)
+        if not met_num or not met_den:
+            return None
+
+        r_2024 = calcular_ratio_pct(met_num.get('v_2024', 0), met_den.get('v_2024', 0))
+        r_2025 = calcular_ratio_pct(met_num.get('v_2025', 0), met_den.get('v_2025', 0))
+        r_m3 = calcular_ratio_pct(met_num.get('v_mes_m3', 0), met_den.get('v_mes_m3', 0))
+        r_m2 = calcular_ratio_pct(met_num.get('v_mes_m2', 0), met_den.get('v_mes_m2', 0))
+        r_ant = calcular_ratio_pct(met_num.get('v_mes_ant', 0), met_den.get('v_mes_ant', 0))
+        r_atu = calcular_ratio_pct(met_num.get('v_mes_atu', 0), met_den.get('v_mes_atu', 0))
+        yoy_delta = r_2025 - r_2024
+        mom_delta = r_atu - r_ant
+
+        return {
+            'tipo': 'item',
+            'indicador': nome_linha,
+            '2024': formatar_pct_sem_sinal(r_2024),
+            '2025': formatar_pct_sem_sinal(r_2025),
+            'MES_M3': formatar_pct_sem_sinal(r_m3),
+            'MES_M2': formatar_pct_sem_sinal(r_m2),
+            'MES_ANT': formatar_pct_sem_sinal(r_ant),
+            'MES_ATU': formatar_pct_sem_sinal(r_atu),
+            'META_MES': '',
+            'YOY': formatar_pct_tabela(yoy_delta),
+            'MOM': formatar_pct_tabela(mom_delta),
+            'ATING_META': '',
+            'YOY_RAW': yoy_delta,
+            'MOM_RAW': mom_delta,
+            'ATING_META_RAW': 0
+        }
+
+    def classe_pct(valor):
+        try:
+            valor_num = float(valor)
+            if valor_num > 0:
+                return "pct-positivo"
+            if valor_num < 0:
+                return "pct-negativo"
+            return "pct-neutro"
+        except Exception:
+            return "pct-neutro"
+
+    def criar_tabela_html_performance_canal(linhas, mes_atual_ref, mes_m1_ref, mes_m2_ref, mes_m3_ref):
+        html = """
+        <style>
+            .tabela-container-performance-canal {
+                width: 100%;
+                max-height: 620px;
+                overflow-y: auto;
+                overflow-x: auto;
+                border: 1px solid #DCC2BE;
+                border-radius: 14px;
+                box-shadow: 0 10px 28px rgba(121, 14, 9, 0.14), 0 2px 8px rgba(61, 7, 4, 0.08);
+                margin: 18px 0;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%);
+                position: relative;
+            }
+
+            .tabela-performance-canal {
+                width: max-content;
+                min-width: 100%;
+                border-collapse: collapse;
+                border-spacing: 0;
+                font-size: 10px;
+                line-height: 1.2;
+            }
+
+            .tabela-performance-canal thead {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                box-shadow: 0 4px 8px rgba(61, 7, 4, 0.16);
+            }
+
+            .tabela-performance-canal th {
+                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+                color: white !important;
+                font-weight: 700;
+                padding: 7px 8px !important;
+                text-align: center;
+                border-bottom: 2px solid #5A0A06;
+                border-right: 1px solid rgba(255, 255, 255, 0.14);
+                white-space: nowrap;
+                letter-spacing: 0.35px;
+                text-transform: uppercase;
+                font-size: 9.6px;
+                min-width: 92px;
+            }
+
+            .tabela-performance-canal td {
+                padding: 6px 8px !important;
+                border-bottom: 1px solid #E8E8E8;
+                border-right: 1px solid #EFE5E3;
+                text-align: right;
+                font-variant-numeric: tabular-nums;
+                color: #2F3747;
+                white-space: nowrap;
+                font-size: 10px;
+                transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            .tabela-performance-canal tr td:last-child,
+            .tabela-performance-canal tr th:last-child {
+                border-right: none;
+            }
+
+            .tabela-performance-canal th:first-child {
+                position: sticky;
+                left: 0;
+                z-index: 130;
+                min-width: 180px;
+                background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
+                box-shadow: 2px 0 0 rgba(255, 255, 255, 0.12);
+            }
+
+            .linha-grupo-performance td {
+                text-align: left !important;
+                font-weight: 800 !important;
+                text-transform: uppercase;
+                color: #FFFFFF !important;
+                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+                padding: 9px 12px !important;
+                letter-spacing: 0.4px;
+                position: sticky;
+                left: 0;
+                z-index: 40;
+            }
+
+            .linha-item-performance:nth-child(even) {
+                background-color: #FFFDFC !important;
+            }
+
+            .linha-item-performance:nth-child(odd) {
+                background-color: #FFFFFF !important;
+            }
+
+            .linha-item-performance:hover {
+                background-color: #FFF3F1 !important;
+                box-shadow: inset 0 0 0 1px #FFD8D1 !important;
+            }
+
+            .linha-item-performance td.col-indicador {
+                text-align: left !important;
+                font-weight: 600;
+                color: #3A302F;
+                background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
+                padding-left: 11px !important;
+                min-width: 180px;
+                position: sticky;
+                left: 0;
+                z-index: 35;
+                box-shadow: 2px 0 0 #F2E6E4;
+            }
+
+            .linha-item-performance td.col-meta {
+                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                color: #B71C1C !important;
+                font-weight: 600;
+                border-left: 1px solid #F2C8CC !important;
+                border-right: 1px solid #F2C8CC !important;
+            }
+
+            .linha-item-performance td:nth-child(2),
+            .linha-item-performance td:nth-child(3),
+            .linha-item-performance td:nth-child(4),
+            .linha-item-performance td:nth-child(5),
+            .linha-item-performance td:nth-child(9),
+            .linha-item-performance td:nth-child(10) {
+                background-color: #FCF8F8;
+            }
+
+            .linha-item-performance td.pct-positivo {
+                color: #1B5E20 !important;
+                background: linear-gradient(135deg, #E8F5E9 0%, #E6F4E7 100%) !important;
+                font-weight: 700;
+                position: relative;
+                padding-left: 25px !important;
+                border-left: 3px solid #4CAF50 !important;
+            }
+
+            .linha-item-performance td.pct-positivo::before {
+                content: "▲";
+                position: absolute;
+                left: 9px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 10px;
+                font-weight: 900;
+                color: #2E7D32;
+            }
+
+            .linha-item-performance td.pct-negativo {
+                color: #C62828 !important;
+                background: linear-gradient(135deg, #FFEBEE 0%, #FFE5E8 100%) !important;
+                font-weight: 700;
+                position: relative;
+                padding-left: 25px !important;
+                border-left: 3px solid #F44336 !important;
+            }
+
+            .linha-item-performance td.pct-negativo::before {
+                content: "▼";
+                position: absolute;
+                left: 9px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 10px;
+                font-weight: 900;
+                color: #C62828;
+            }
+
+            .linha-item-performance td.pct-neutro {
+                color: #666666 !important;
+                background: #F8F9FA !important;
+                font-weight: 600;
+            }
+
+            .linha-separador-performance td {
+                padding: 0 !important;
+                height: 2px;
+                background: linear-gradient(90deg, #FF2800, #790E09);
+                border: none !important;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-track {
+                background: #F7F3F2;
+                border-radius: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+                border-radius: 10px;
+                border: 2px solid #F7F3F2;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(135deg, #8F2C27 0%, #5A0A06 100%);
+            }
+
+            @media (max-width: 768px) {
+                .tabela-performance-canal th,
+                .tabela-performance-canal td {
+                    font-size: 9px !important;
+                    padding: 5px 5px !important;
+                }
+
+                .tabela-performance-canal th:first-child,
+                .linha-item-performance td.col-indicador {
+                    min-width: 145px;
+                }
+            }
+
+            /* Override visual para alinhar com "CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL" */
+            .tabela-container-performance-canal {
+                border: 2px solid #790E09 !important;
+                border-radius: 10px !important;
+                box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15) !important;
+                background: #FFFFFF !important;
+            }
+
+            .tabela-performance-canal {
+                width: 100% !important;
+                font-size: 10.5px !important;
+                line-height: 1.25 !important;
+            }
+
+            .tabela-performance-canal th {
+                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+                padding: 9px 7px !important;
+                border-right: 1px solid #FFFFFF !important;
+                border-bottom: 3px solid #5A0A06 !important;
+                font-size: 10.5px !important;
+                box-shadow: none !important;
+                min-width: auto !important;
+            }
+
+            .tabela-performance-canal th:first-child {
+                position: static !important;
+                left: auto !important;
+                z-index: auto !important;
+                min-width: auto !important;
+                box-shadow: none !important;
+                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+            }
+
+            .tabela-performance-canal td {
+                padding: 7px 7px !important;
+                border-bottom: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
+                font-size: 10.5px !important;
+                box-shadow: none !important;
+            }
+
+            .linha-item-performance:nth-child(even) td {
+                background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+            }
+
+            .linha-item-performance:nth-child(odd) td {
+                background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+            }
+
+            .linha-item-performance:hover td {
+                background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                box-shadow: inset 0 0 0 1px #F1CBC4 !important;
+            }
+
+            .linha-item-performance td.col-indicador {
+                position: static !important;
+                left: auto !important;
+                z-index: auto !important;
+                min-width: auto !important;
+                box-shadow: none !important;
+                text-align: left !important;
+                font-weight: 600 !important;
+                color: #333333 !important;
+                background: transparent !important;
+                padding-left: 10px !important;
+            }
+
+            .linha-item-performance td.col-mes,
+            .linha-item-performance td.col-total-anual,
+            .linha-item-performance td.col-meta {
+                background: transparent !important;
+                color: #333 !important;
+                font-weight: 400 !important;
+            }
+
+            .linha-item-performance td.col-meta {
+                border-left: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
+            }
+
+            .linha-item-performance td.col-variacao,
+            .linha-item-performance td.col-alcance {
+                background-color: transparent !important;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-track {
+                background: #F5F5F5;
+                border-radius: 10px;
+            }
+
+            .tabela-container-performance-canal::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+                border-radius: 10px;
+                border: 2px solid #F5F5F5;
+            }
+
+            /* Compactação final */
+            .tabela-performance-canal {
+                font-size: 11px !important;
+                line-height: 1.25 !important;
+                table-layout: auto !important;
+                width: max-content !important;
+                min-width: 100% !important;
+                font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            }
+
+            .tabela-performance-canal th {
+                padding: 8px 7px !important;
+                font-size: 11px !important;
+                letter-spacing: 0.25px !important;
+            }
+
+            .tabela-performance-canal td {
+                padding: 7px 7px !important;
+                font-size: 11px !important;
+                line-height: 1.25 !important;
+                font-weight: 400 !important;
+            }
+
+            .linha-grupo-performance td {
+                padding: 7px 9px !important;
+                font-size: 11px !important;
+                letter-spacing: 0.25px !important;
+            }
+
+            .linha-item-performance td.col-indicador {
+                padding-left: 8px !important;
+                font-weight: 400 !important;
+            }
+
+            .linha-item-performance td.pct-positivo,
+            .linha-item-performance td.pct-negativo {
+                padding-left: 20px !important;
+                background: transparent !important;
+                border-left: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
+                font-weight: 400 !important;
+            }
+
+            .linha-item-performance td.pct-neutro {
+                background: transparent !important;
+            }
+
+            .linha-item-performance td.pct-positivo::before,
+            .linha-item-performance td.pct-negativo::before {
+                left: 6px !important;
+                font-size: 9px !important;
+            }
+
+            .linha-separador-performance td {
+                height: 1px !important;
+            }
+
+            /* Compactação horizontal por coluna */
+            .tabela-performance-canal th:nth-child(1),
+            .tabela-performance-canal td:nth-child(1) {
+                width: 160px !important;
+                min-width: 160px !important;
+                max-width: 160px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(2),
+            .tabela-performance-canal td:nth-child(2),
+            .tabela-performance-canal th:nth-child(3),
+            .tabela-performance-canal td:nth-child(3),
+            .tabela-performance-canal th:nth-child(4),
+            .tabela-performance-canal td:nth-child(4),
+            .tabela-performance-canal th:nth-child(5),
+            .tabela-performance-canal td:nth-child(5) {
+                width: 90px !important;
+                min-width: 90px !important;
+                max-width: 90px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(6),
+            .tabela-performance-canal td:nth-child(6),
+            .tabela-performance-canal th:nth-child(8),
+            .tabela-performance-canal td:nth-child(8),
+            .tabela-performance-canal th:nth-child(11),
+            .tabela-performance-canal td:nth-child(11) {
+                width: 92px !important;
+                min-width: 92px !important;
+                max-width: 92px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(7),
+            .tabela-performance-canal td:nth-child(7) {
+                width: 104px !important;
+                min-width: 104px !important;
+                max-width: 104px !important;
+            }
+
+            .tabela-performance-canal th:nth-child(9),
+            .tabela-performance-canal td:nth-child(9),
+            .tabela-performance-canal th:nth-child(10),
+            .tabela-performance-canal td:nth-child(10) {
+                width: 88px !important;
+                min-width: 88px !important;
+                max-width: 88px !important;
+            }
+        </style>
+
+        <div class="tabela-container-performance-canal">
+            <table class="tabela-performance-canal">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th class="col-mes">""" + str(mes_m3_ref) + """</th>
+                        <th class="col-mes">""" + str(mes_m2_ref) + """</th>
+                        <th class="col-mes">""" + str(mes_m1_ref) + """</th>
+                        <th class="col-mes">""" + str(mes_atual_ref) + """</th>
+                        <th class="col-variacao">MoM</th>
+                        <th class="col-meta">""" + f"Meta {mes_atual_ref}" + """</th>
+                        <th class="col-alcance">Ating Meta</th>
+                        <th class="col-total-anual">2024</th>
+                        <th class="col-total-anual">2025</th>
+                        <th class="col-variacao">YoY</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        for linha in linhas:
+            if linha['tipo'] == 'grupo':
+                html += f'<tr class="linha-grupo-performance"><td colspan="11">{linha["grupo"]}</td></tr>'
+                continue
+
+            if linha['tipo'] == 'separador':
+                html += '<tr class="linha-separador-performance"><td colspan="11"></td></tr>'
+                continue
+
+            html += '<tr class="linha-item-performance">'
+            html += f'<td class="col-indicador">&nbsp;&nbsp;&nbsp;{linha["indicador"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_M3"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_M2"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_ANT"]}</td>'
+            html += f'<td class="col-mes">{linha["MES_ATU"]}</td>'
+            html += f'<td class="col-variacao {classe_pct(linha["MOM_RAW"])}">{linha["MOM"]}</td>'
+            html += f'<td class="col-meta">{linha["META_MES"]}</td>'
+            html += f'<td class="col-alcance {classe_pct(linha["ATING_META_RAW"])}">{linha["ATING_META"]}</td>'
+            html += f'<td class="col-total-anual">{linha["2024"]}</td>'
+            html += f'<td class="col-total-anual">{linha["2025"]}</td>'
+            html += f'<td class="col-variacao {classe_pct(linha["YOY_RAW"])}">{linha["YOY"]}</td>'
+            html += '</tr>'
+
+        html += """
+                </tbody>
+            </table>
+        </div>
+        """
+        return html
+
+    def criar_painel_insights_performance(insights_por_grupo, mes_atual_ref, mes_anterior_ref):
+        partes = [
+            "<style>",
+            ".insights-conversao-canal{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:8px 0 16px 0;}",
+            ".insight-conversao-card{border:1px solid #E3D6D3;border-radius:12px;background:linear-gradient(180deg,#FFFFFF 0%,#FFF9F8 100%);box-shadow:0 4px 14px rgba(121,14,9,.08);overflow:hidden;}",
+            ".insight-conversao-header{background:linear-gradient(135deg,#790E09 0%,#5A0A06 100%);color:#FFF;font-size:11px;font-weight:800;letter-spacing:.3px;padding:8px 10px;text-transform:uppercase;}",
+            ".insight-conversao-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;font-family:'Manrope','Segoe UI',sans-serif;}",
+            ".insight-conversao-table th,.insight-conversao-table td{border:1px solid #FFF;padding:7px 7px;text-align:right;white-space:nowrap;}",
+            ".insight-conversao-table th{background:#F7ECEA;color:#3A302F;font-weight:700;}",
+            ".insight-conversao-table td{background:#FFF5F3;color:#2F3747;}",
+            ".insight-conversao-table td:first-child,.insight-conversao-table th:first-child{text-align:left;width:44%;}",
+            ".insight-conversao-table tr:nth-child(even) td{background:#FFF1EF;}",
+            "</style>",
+            "<div class=\"insights-conversao-canal\">",
+        ]
+
+        for grupo in ['FIXA', 'CONTA']:
+            linhas = insights_por_grupo.get(grupo, [])
+            if not linhas:
+                continue
+
+            partes.extend([
+                "<div class=\"insight-conversao-card\">",
+                f"<div class=\"insight-conversao-header\">{grupo}</div>",
+                "<table class=\"insight-conversao-table\">",
+                "<thead><tr>",
+                "<th>Indicador</th>",
+                f"<th>{mes_anterior_ref}</th>",
+                f"<th>{mes_atual_ref}</th>",
+                "<th>2024</th>",
+                "<th>2025</th>",
+                "</tr></thead>",
+                "<tbody>",
+            ])
+
+            for linha in linhas:
+                partes.extend([
+                    "<tr>",
+                    f"<td>{linha.get('indicador', '')}</td>",
+                    f"<td>{linha.get('MES_ANT', '0,0%')}</td>",
+                    f"<td>{linha.get('MES_ATU', '0,0%')}</td>",
+                    f"<td>{linha.get('2024', '0,0%')}</td>",
+                    f"<td>{linha.get('2025', '0,0%')}</td>",
+                    "</tr>",
+                ])
+
+            partes.extend([
+                "</tbody>",
+                "</table>",
+                "</div>",
+            ])
+
+        partes.append("</div>")
+        return "".join(partes)
+
+    df_perf_base = preparar_base_performance(df)
+    df_lig_raw = load_ligacoes_para_performance()
+    df_lig_perf = preparar_base_performance(df_lig_raw)
+
+    if not df_lig_perf.empty:
+        base_ligacoes_origem = df_perf_base[
+            (df_perf_base['INDICADOR_NORM'] == 'LIGACOES') &
+            (df_perf_base['CANAL_NORM'] == 'TELEVENDAS RECEPTIVO') &
+            (df_perf_base['PLATAFORMA_NORM'].isin(['FIXA', 'CONTA']))
+        ].copy()
+
+        # Consolidado por plataforma+mês para uso direto no cálculo da tabela (evita dependência de merge por regional).
+        if not base_ligacoes_origem.empty:
+            agg_lig_pm = (
+                base_ligacoes_origem.groupby(['PLATAFORMA_NORM', 'dat_tratada'], as_index=False, observed=True)[['TEND_QTD', 'DESAFIO_QTD']]
+                .sum()
+            )
+            ligacoes_tend_override = {
+                (str(row['PLATAFORMA_NORM']).strip().upper(), str(row['dat_tratada']).strip().lower()): float(row['TEND_QTD'] or 0)
+                for _, row in agg_lig_pm.iterrows()
+            }
+            ligacoes_meta_override = {
+                (str(row['PLATAFORMA_NORM']).strip().upper(), str(row['dat_tratada']).strip().lower()): float(row['DESAFIO_QTD'] or 0)
+                for _, row in agg_lig_pm.iterrows()
+            }
+
+        df_meta_lig = base_ligacoes_origem.groupby(
+            ['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+            as_index=False,
+            observed=True
+        )['DESAFIO_QTD'].sum()
+
+        df_tend_lig = base_ligacoes_origem.groupby(
+            ['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+            as_index=False,
+            observed=True
+        )['TEND_QTD'].sum()
+
+        if not df_meta_lig.empty or not df_tend_lig.empty:
+            # Preservar fallback de tendência da base de ligações (não deixar 0 da base principal sobrescrever)
+            df_lig_perf_work = df_lig_perf.copy()
+            df_lig_perf_work['TEND_QTD_FALLBACK'] = pd.to_numeric(
+                df_lig_perf_work.get('TEND_QTD', df_lig_perf_work['QTDE']),
+                errors='coerce'
+            ).fillna(df_lig_perf_work['QTDE'])
+
+            df_lig_perf = (
+                df_lig_perf_work.drop(columns=['DESAFIO_QTD', 'TEND_QTD'], errors='ignore')
+                .merge(
+                    df_meta_lig,
+                    on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+                    how='left'
+                )
+                .merge(
+                    df_tend_lig.rename(columns={'TEND_QTD': 'TEND_QTD_BASE'}),
+                    on=['REGIONAL', 'PLATAFORMA_NORM', 'dat_tratada'],
+                    how='left'
+                )
+            )
+            df_lig_perf['DESAFIO_QTD'] = pd.to_numeric(df_lig_perf['DESAFIO_QTD'], errors='coerce').fillna(0)
+            df_lig_perf['TEND_QTD_BASE'] = pd.to_numeric(df_lig_perf['TEND_QTD_BASE'], errors='coerce').fillna(0)
+            df_lig_perf['TEND_QTD'] = np.where(
+                df_lig_perf['TEND_QTD_BASE'] > 0,
+                df_lig_perf['TEND_QTD_BASE'],
+                df_lig_perf['TEND_QTD_FALLBACK']
+            )
+            df_lig_perf.drop(columns=['TEND_QTD_BASE', 'TEND_QTD_FALLBACK'], errors='ignore', inplace=True)
+        else:
+            df_lig_perf['DESAFIO_QTD'] = 0
+            df_lig_perf['TEND_QTD'] = df_lig_perf['QTDE']
+
+        mask_remove_lig = (
+            (df_perf_base['INDICADOR_NORM'] == 'LIGACOES') &
+            (df_perf_base['CANAL_NORM'] == 'TELEVENDAS RECEPTIVO')
+        )
+        df_perf_base = pd.concat([df_perf_base[~mask_remove_lig], df_lig_perf], ignore_index=True)
+
+    if df_perf_base.empty:
+        st.warning("Não há dados suficientes para montar a análise de performance por canal.")
+    else:
+        canais_perf = sorted(
+            df_perf_base['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist()
+        )
+        meses_perf = sorted(
+            [
+                mes for mes in df_perf_base['dat_tratada'].dropna().astype(str).str.strip().tolist()
+                if re.match(r'^[a-z]{3}/\d{2}$', mes)
+            ],
+            key=mes_ano_para_data
+        )
+        meses_perf = list(dict.fromkeys(meses_perf))
+
+        if not meses_perf:
+            st.warning("Não há meses válidos para exibir a análise de performance por canal.")
+        else:
+            col_perf_f1, col_perf_f2 = st.columns(2)
+
+            opcoes_canal = ["Todos"] + canais_perf
+            canal_padrao = "Todos"
+            idx_canal_padrao = opcoes_canal.index(canal_padrao) if canal_padrao in opcoes_canal else 0
+
+            with col_perf_f1:
+                canal_perf_sel = st.selectbox(
+                    "Canal:",
+                    options=opcoes_canal,
+                    index=idx_canal_padrao,
+                    key="filtro_canal_performance_ativados"
+                )
+
+            mes_padrao = get_mes_atual_formatado() if get_mes_atual_formatado() in meses_perf else meses_perf[-1]
+            idx_mes_padrao = meses_perf.index(mes_padrao) if (mes_padrao in meses_perf) else 0
+
+            with col_perf_f2:
+                mes_perf_sel = st.selectbox(
+                    "Mês de referência:",
+                    options=meses_perf,
+                    index=idx_mes_padrao,
+                    key="filtro_mes_performance_ativados"
+                )
+
+            canal_norm_sel = normalizar_texto_chave(canal_perf_sel)
+            df_perf_filtrado = df_perf_base.copy()
+            if canal_perf_sel != "Todos":
+                df_perf_filtrado = df_perf_filtrado[df_perf_filtrado['CANAL_NORM'] == canal_norm_sel]
+
+            meses_perf_filtrado = sorted(
+                [
+                    mes for mes in df_perf_filtrado['dat_tratada'].dropna().astype(str).str.strip().tolist()
+                    if re.match(r'^[a-z]{3}/\d{2}$', mes)
+                ],
+                key=mes_ano_para_data
+            )
+            meses_perf_filtrado = list(dict.fromkeys(meses_perf_filtrado))
+            mes_tendencia_ref = (meses_perf_filtrado[-1] if meses_perf_filtrado else meses_perf[-1]).strip().lower()
+
+            mes_anterior_perf = get_mes_anterior(mes_perf_sel)
+            mes_m2_perf = get_mes_anterior(mes_anterior_perf)
+            mes_m3_perf = get_mes_anterior(mes_m2_perf)
+            mes_yoy_perf = get_mes_mesmo_ano_anterior(mes_perf_sel)
+
+            mostrar_pedidos = (canal_perf_sel == "Todos") or (canal_norm_sel == "E COMMERCE")
+            mostrar_ligacoes = (canal_perf_sel == "Todos") or (canal_norm_sel == "TELEVENDAS RECEPTIVO")
+
+            config_indicadores = {
+                'FIXA': [
+                    ('LIGAÇÕES', 'FIXA', {'LIGACOES'}, 'indicador'),
+                    ('PEDIDOS', 'FIXA', {'PEDIDOS'}, 'indicador'),
+                    ('VENDA BRUTA', 'FIXA', {'VENDA BRUTA', 'VENDAS BRUTAS'}, 'zero'),
+                    ('INSTALADOS', 'FIXA', {'INSTALADOS', 'INSTALACAO', 'INSTALACOES', 'INSTAL'}, 'indicador')
+                ],
+                'CONTA': [
+                    ('LIGAÇÕES', 'CONTA', {'LIGACOES'}, 'indicador'),
+                    ('PEDIDOS', 'CONTA', {'PEDIDOS'}, 'indicador'),
+                    ('GROSS BRUTO', 'CONTA', {'GROSS BRUTO'}, 'zero'),
+                    ('GROSS LIQUIDO', 'CONTA', {'GROSS LIQUIDO'}, 'indicador')
+                ]
+            }
+
+            linhas_tabela_perf = []
+            for grupo, itens in config_indicadores.items():
+                linhas_tabela_perf.append({'tipo': 'grupo', 'grupo': grupo})
+
+                metricas_base_grupo = {}
+                metricas_exibir_grupo = {}
+                plataforma_base_grupo = {}
+
+                for nome_indicador, plataforma_ref, aliases_ref, meta_modo_ref in itens:
+                    if nome_indicador == 'PEDIDOS' and not mostrar_pedidos:
+                        continue
+                    if nome_indicador == 'LIGAÇÕES' and not mostrar_ligacoes:
+                        continue
+
+                    metricas_item = calcular_metricas_linha(
+                        df_perf_filtrado,
+                        aliases_ref,
+                        plataforma_ref,
+                        mes_perf_sel,
+                        mes_anterior_perf,
+                        mes_m2_perf,
+                        mes_m3_perf,
+                        meta_modo_ref,
+                        mes_tendencia_ref
+                    )
+
+                    metricas_base_grupo[nome_indicador] = metricas_item
+                    plataforma_base_grupo[nome_indicador] = plataforma_ref
+
+                # Projeção de meta usando apenas informações já calculadas no próprio bloco:
+                # meta_proj = (realizado_indicador_mes_anterior / realizado_base_mes_anterior) * meta_base_mes_atual
+                # Base FIXA: INSTALADOS | Base CONTA: GROSS LIQUIDO
+                for nome_indicador, metricas_item in metricas_base_grupo.items():
+                    plataforma_ref = plataforma_base_grupo.get(nome_indicador, grupo)
+                    metricas_exibir = metricas_item.copy()
+                    if nome_indicador in {'VENDA BRUTA', 'GROSS BRUTO'}:
+                        nome_base = 'INSTALADOS' if plataforma_ref == 'FIXA' else 'GROSS LIQUIDO'
+                        base_ref = metricas_base_grupo.get(nome_base)
+                        if base_ref:
+                            base_mes_ant = float(base_ref.get('v_mes_ant', 0) or 0)
+                            base_meta_mes = float(base_ref.get('v_meta_mes', 0) or 0)
+                            ind_mes_ant = float(metricas_item.get('v_mes_ant', 0) or 0)
+                            if base_mes_ant > 0 and base_meta_mes > 0:
+                                meta_proj = (ind_mes_ant / base_mes_ant) * base_meta_mes
+                                metricas_exibir['v_meta_mes'] = meta_proj
+                                mes_atu = float(metricas_item.get('v_mes_atu', 0) or 0)
+                                metricas_exibir['v_ating_meta'] = (((mes_atu / meta_proj) - 1) * 100) if meta_proj > 0 else 0
+                            else:
+                                metricas_exibir['v_meta_mes'] = 0
+                                metricas_exibir['v_ating_meta'] = 0
+
+                    metricas_exibir_grupo[nome_indicador] = metricas_exibir
+
+                # Ordem de storytelling solicitada com linhas de conversão dentro da tabela
+                layout_grupo = {
+                    'FIXA': [
+                        ('base', 'LIGAÇÕES'),
+                        ('base', 'PEDIDOS'),
+                        ('base', 'VENDA BRUTA'),
+                        ('ratio', 'LIGAÇÕES VS V. BRUTA', 'VENDA BRUTA', 'LIGAÇÕES', mostrar_ligacoes),
+                        ('ratio', 'PEDIDOS VS V. BRUTA', 'VENDA BRUTA', 'PEDIDOS', mostrar_pedidos),
+                        ('base', 'INSTALADOS'),
+                        ('ratio', 'V. BRUTA VS INSTALADOS', 'INSTALADOS', 'VENDA BRUTA', True),
+                    ],
+                    'CONTA': [
+                        ('base', 'LIGAÇÕES'),
+                        ('base', 'PEDIDOS'),
+                        ('base', 'GROSS BRUTO'),
+                        ('ratio', 'LIGAÇÕES VS V. BRUTA', 'GROSS BRUTO', 'LIGAÇÕES', mostrar_ligacoes),
+                        ('ratio', 'PEDIDOS VS V. BRUTA', 'GROSS BRUTO', 'PEDIDOS', mostrar_pedidos),
+                        ('base', 'GROSS LIQUIDO'),
+                        ('ratio', 'G. LIQUIDO VS G. BRUTO', 'GROSS LIQUIDO', 'GROSS BRUTO', True),
+                    ],
+                }
+
+                for regra in layout_grupo.get(grupo, []):
+                    if not regra:
+                        continue
+
+                    if regra[0] == 'base':
+                        nome_indicador = regra[1]
+                        metricas_exibir = metricas_exibir_grupo.get(nome_indicador)
+                        if not metricas_exibir:
+                            continue
+
+                        linhas_tabela_perf.append(
+                            {
+                                'tipo': 'item',
+                                'indicador': nome_indicador,
+                                '2024': formatar_numero_brasileiro(metricas_exibir['v_2024'], 0),
+                                '2025': formatar_numero_brasileiro(metricas_exibir['v_2025'], 0),
+                                'MES_M3': formatar_numero_brasileiro(metricas_exibir['v_mes_m3'], 0),
+                                'MES_M2': formatar_numero_brasileiro(metricas_exibir['v_mes_m2'], 0),
+                                'MES_ANT': formatar_numero_brasileiro(metricas_exibir['v_mes_ant'], 0),
+                                'MES_ATU': formatar_numero_brasileiro(metricas_exibir['v_mes_atu'], 0),
+                                'META_MES': formatar_numero_brasileiro(metricas_exibir['v_meta_mes'], 0),
+                                'YOY': formatar_pct_tabela(metricas_exibir['v_yoy']),
+                                'MOM': formatar_pct_tabela(metricas_exibir['v_mom']),
+                                'ATING_META': formatar_pct_tabela(metricas_exibir['v_ating_meta']),
+                                'YOY_RAW': metricas_exibir['v_yoy'],
+                                'MOM_RAW': metricas_exibir['v_mom'],
+                                'ATING_META_RAW': metricas_exibir['v_ating_meta']
+                            }
+                        )
+                        continue
+
+                    if regra[0] == 'ratio':
+                        _, rotulo_linha, chave_num, chave_den, condicao_exibir = regra
+                        if not condicao_exibir:
+                            continue
+                        linha_ratio = criar_linha_ratio_por_chaves(
+                            rotulo_linha,
+                            metricas_exibir_grupo,
+                            chave_num,
+                            chave_den
+                        )
+                        if linha_ratio:
+                            linhas_tabela_perf.append(linha_ratio)
+
+                if grupo == 'FIXA':
+                    linhas_tabela_perf.append({'tipo': 'separador'})
+
+            st.caption(
+                f"Mês atual da análise: {mes_perf_sel} | Mês anterior: {mes_anterior_perf} | YoY referência: {mes_yoy_perf}"
+            )
+            st.markdown(
+                criar_tabela_html_performance_canal(
+                    linhas_tabela_perf,
+                    mes_perf_sel,
+                    mes_anterior_perf,
+                    mes_m2_perf,
+                    mes_m3_perf
+                ),
+                unsafe_allow_html=True
+            )
+
+
+    st.markdown(
+        '<div class="section-title"><span class="section-icon">📊</span> ANALÍTICO - PLANEJAMENTO DIÁRIO PARA META</div>',
+        unsafe_allow_html=True
+    )
+
+    base_analitica = df.copy()
+    for coluna in ['dat_tratada', 'DSC_INDICADOR', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']:
+        if coluna in base_analitica.columns:
+            base_analitica[coluna] = base_analitica[coluna].astype(str).str.strip()
+
+    meses_analitico = sorted(
+        base_analitica['dat_tratada'].dropna().unique().tolist(),
+        key=mes_ano_para_data
+    )
+    regionais_analitico = ["Todas"] + sorted(base_analitica['REGIONAL'].dropna().unique().tolist())
+
+    if not meses_analitico:
+        st.warning("Não há meses disponíveis para montar a tabela analítica.")
+    else:
+        mes_corrente_ref = get_mes_atual_formatado()
+        idx_mes_analitico = meses_analitico.index(mes_corrente_ref) if mes_corrente_ref in meses_analitico else len(meses_analitico) - 1
+
+        col_f_a1, col_f_a2 = st.columns([1.2, 1.2])
+        with col_f_a1:
+            mes_analitico = st.selectbox(
+                "Mês de referência",
+                options=meses_analitico,
+                index=idx_mes_analitico,
+                key="analitico_mes_ref"
+            )
+        with col_f_a2:
+            regional_analitico = st.selectbox(
+                "Regional",
+                options=regionais_analitico,
+                index=0,
+                key="analitico_regional_ref"
+            )
+
+        resumo_corte_exibido = False
+
+        def render_resumo_corte_analitico(data_corte_txt: str, dias: dict[int, int]) -> None:
+            dias_txt = (
+                f"SEG {int(dias.get(0, 0))} | TER {int(dias.get(1, 0))} | "
+                f"QUA {int(dias.get(2, 0))} | QUI {int(dias.get(3, 0))} | "
+                f"SEX {int(dias.get(4, 0))} | SAB {int(dias.get(5, 0))} | DOM {int(dias.get(6, 0))}"
+            )
+            st.markdown(
+                (
+                    '<div class="analitico-corte-info">'
+                    '<span class="analitico-corte-label">Dados reais até:</span> '
+                    f'<span class="analitico-corte-date">{escape(str(data_corte_txt))}</span>'
+                    '<span class="analitico-corte-sep">|</span>'
+                    '<span class="analitico-corte-label">Dias restantes no mês:</span> '
+                    f'<span class="analitico-corte-days">{escape(dias_txt)}</span>'
+                    '</div>'
+                ),
+                unsafe_allow_html=True
+            )
+
+        # -------------------------
+        # TABELA 1: CONTA
+        # -------------------------
+        st.markdown(
+            '<div class="subsection-title" style="margin-top:18px;">📋 CONTA - NECESSIDADE DIÁRIA</div>',
+            unsafe_allow_html=True
+        )
+        tabela_conta, ctx_conta = construir_tabela_analitica_produto(
+            df_base=base_analitica,
+            mes_ref=mes_analitico,
+            indicador_real_ref='GROSS LIQUIDO',
+            indicador_meta_ref='GROSS LIQUIDO',
+            regional_ref=regional_analitico,
+            produto_ref='CONTA'
+        )
+
+        if tabela_conta.empty:
+            st.warning("Sem dados para a tabela analítica de CONTA (indicador GROSS LIQUIDO) com os filtros selecionados.")
+        else:
+            dias = ctx_conta.get('dias_restantes', {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0})
+            data_corte = ctx_conta.get('data_corte')
+            data_corte_txt = pd.Timestamp(data_corte).strftime('%d/%m/%Y') if data_corte else "N/D"
+            render_resumo_corte_analitico(data_corte_txt, dias)
+            resumo_corte_exibido = True
+            tabela_conta_fmt = formatar_tabela_analitica(
+                tabela_conta,
+                mes_ref=mes_analitico,
+                mes_anterior_ref=ctx_conta.get('mes_anterior', get_mes_anterior(mes_analitico)),
+                incluir_total=True
+            )
+            tabela_conta_num = montar_tabela_analitica_exibicao_numerica(
+                tabela_conta,
+                mes_ref=mes_analitico,
+                mes_anterior_ref=ctx_conta.get('mes_anterior', get_mes_anterior(mes_analitico)),
+                incluir_total=True
+            )
+            st.markdown(
+                criar_tabela_html_analitica(
+                    df_formatado=tabela_conta_fmt,
+                    df_numerico=tabela_conta_num,
+                    table_id="tabela-analitico-conta"
+                ),
+                unsafe_allow_html=True
+            )
+
+        # -------------------------
+        # TABELA 2: FIXA
+        # -------------------------
+        st.markdown(
+            '<div class="subsection-title" style="margin-top:24px;">📋 FIXA - NECESSIDADE DIÁRIA</div>',
+            unsafe_allow_html=True
+        )
+        tabela_fixa, ctx_fixa = construir_tabela_analitica_produto(
+            df_base=base_analitica,
+            mes_ref=mes_analitico,
+            indicador_real_ref='Instalação',
+            indicador_meta_ref='GROSS LIQUIDO',
+            regional_ref=regional_analitico,
+            produto_ref='FIXA'
+        )
+
+        if tabela_fixa.empty:
+            st.warning("Sem dados para a tabela analítica de FIXA (realizado = Instalação | meta = GROSS LIQUIDO) com os filtros selecionados.")
+        else:
+            dias = ctx_fixa.get('dias_restantes', {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0})
+            data_corte = ctx_fixa.get('data_corte')
+            data_corte_txt = pd.Timestamp(data_corte).strftime('%d/%m/%Y') if data_corte else "N/D"
+            if not resumo_corte_exibido:
+                render_resumo_corte_analitico(data_corte_txt, dias)
+                resumo_corte_exibido = True
+            tabela_fixa_fmt = formatar_tabela_analitica(
+                tabela_fixa,
+                mes_ref=mes_analitico,
+                mes_anterior_ref=ctx_fixa.get('mes_anterior', get_mes_anterior(mes_analitico)),
+                incluir_total=True
+            )
+            tabela_fixa_num = montar_tabela_analitica_exibicao_numerica(
+                tabela_fixa,
+                mes_ref=mes_analitico,
+                mes_anterior_ref=ctx_fixa.get('mes_anterior', get_mes_anterior(mes_analitico)),
+                incluir_total=True
+            )
+            st.markdown(
+                criar_tabela_html_analitica(
+                    df_formatado=tabela_fixa_fmt,
+                    df_numerico=tabela_fixa_num,
+                    table_id="tabela-analitico-fixa"
+                ),
+                unsafe_allow_html=True
+            )
