@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -2974,6 +2974,460 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
                         classes.append("status-gap")
                     elif valor_raw < 0:
                         classes.append("status-superavit")
+                    else:
+                        classes.append("status-neutro")
+                except Exception:
+                    classes.append("status-neutro")
+
+            classe_celula = " ".join(classes)
+            html += f'<td class="{classe_celula}">{valor_fmt}</td>'
+
+        html += "</tr>"
+
+    html += "</tbody></table></div>"
+    return html
+
+def construir_tabela_resultado_canais(
+    df_base: pd.DataFrame,
+    mes_ref: str,
+    produto_ref: str
+) -> pd.DataFrame:
+    """Monta tabela de resultado por canal (3 meses, MoM, Meta e Var Meta)."""
+    colunas_saida = ['CANAL_PLAN', 'MES_M2', 'MES_M1', 'MES_ATUAL_TEND', 'MOM', 'META', 'VAR_META']
+    canais_ordem = [
+        'Televendas Ativo',
+        'Televendas Receptivo',
+        'S2S+DAC',
+        'E-Commerce',
+        'Inside Sales',
+        'Hospitality PME'
+    ]
+
+    def _norm_texto(valor) -> str:
+        if pd.isna(valor):
+            return ""
+        texto = unicodedata.normalize("NFKD", str(valor))
+        texto = texto.encode("ASCII", "ignore").decode("ASCII")
+        texto = texto.strip().upper()
+        texto = re.sub(r"[^A-Z0-9]+", " ", texto)
+        return re.sub(r"\s+", " ", texto).strip()
+
+    mes_ref_norm = str(mes_ref).strip().lower()
+    mes_m1 = get_mes_anterior(mes_ref_norm)
+    mes_m2 = get_mes_anterior(mes_m1)
+    produto_norm = str(produto_ref).strip().upper()
+
+    indicador_real_norm = 'GROSS LIQUIDO' if produto_norm == 'CONTA' else 'INSTALACAO'
+    indicador_meta_norm = 'GROSS LIQUIDO'
+
+    if df_base is None or df_base.empty:
+        return pd.DataFrame(
+            [
+                {
+                    'CANAL_PLAN': canal,
+                    'MES_M2': 0.0,
+                    'MES_M1': 0.0,
+                    'MES_ATUAL_TEND': 0.0,
+                    'MOM': 0.0,
+                    'META': 0.0,
+                    'VAR_META': 0.0
+                }
+                for canal in canais_ordem
+            ],
+            columns=colunas_saida
+        )
+
+    df_work = df_base.copy()
+    for coluna in ['CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada']:
+        if coluna in df_work.columns:
+            df_work[coluna] = df_work[coluna].astype(str).str.strip()
+
+    if 'TEND_QTD' not in df_work.columns:
+        df_work['TEND_QTD'] = df_work.get('QTDE', 0)
+    if 'DESAFIO_QTD' not in df_work.columns:
+        df_work['DESAFIO_QTD'] = 0
+
+    df_work['QTDE'] = normalizar_numerico_serie(df_work.get('QTDE', 0)).fillna(0.0)
+    df_work['TEND_QTD'] = normalizar_numerico_serie(df_work.get('TEND_QTD', 0)).fillna(0.0)
+    df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work.get('DESAFIO_QTD', 0)).fillna(0.0)
+    df_work['MES_NORM'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
+    df_work['PLATAFORMA_NORM'] = df_work['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
+    df_work['INDICADOR_NORM'] = df_work['DSC_INDICADOR'].apply(_norm_texto)
+
+    canais_map = {_norm_texto(canal): canal for canal in canais_ordem}
+    df_work['CANAL_CANONICO'] = df_work['CANAL_PLAN'].apply(lambda x: canais_map.get(_norm_texto(x), ""))
+    df_work = df_work[
+        (df_work['CANAL_CANONICO'] != "") &
+        (df_work['PLATAFORMA_NORM'] == produto_norm)
+    ].copy()
+
+    def _agg_por_canal(coluna_valor: str, mes_alvo: str, indicador_alvo_norm: str) -> dict[str, float]:
+        df_f = df_work[
+            (df_work['MES_NORM'] == str(mes_alvo).strip().lower()) &
+            (df_work['INDICADOR_NORM'] == indicador_alvo_norm)
+        ]
+        if df_f.empty:
+            return {}
+        return (
+            df_f.groupby('CANAL_CANONICO', observed=True)[coluna_valor]
+            .sum()
+            .astype(float)
+            .to_dict()
+        )
+
+    agg_m2 = _agg_por_canal('QTDE', mes_m2, indicador_real_norm)
+    agg_m1 = _agg_por_canal('QTDE', mes_m1, indicador_real_norm)
+    agg_m0_tend = _agg_por_canal('TEND_QTD', mes_ref_norm, indicador_real_norm)
+    agg_meta = _agg_por_canal('DESAFIO_QTD', mes_ref_norm, indicador_meta_norm)
+
+    rows: list[dict[str, float | str]] = []
+    for canal in canais_ordem:
+        val_m2 = float(agg_m2.get(canal, 0.0))
+        val_m1 = float(agg_m1.get(canal, 0.0))
+        val_m0_tend = float(agg_m0_tend.get(canal, 0.0))
+        val_meta = float(agg_meta.get(canal, 0.0))
+        mom = (((val_m0_tend / val_m1) - 1.0) * 100.0) if val_m1 > 0 else 0.0
+        var_meta = (((val_m0_tend / val_meta) - 1.0) * 100.0) if val_meta > 0 else 0.0
+
+        rows.append({
+            'CANAL_PLAN': canal,
+            'MES_M2': val_m2,
+            'MES_M1': val_m1,
+            'MES_ATUAL_TEND': val_m0_tend,
+            'MOM': mom,
+            'META': val_meta,
+            'VAR_META': var_meta
+        })
+
+    return pd.DataFrame(rows, columns=colunas_saida)
+
+def _colunas_tabela_resultado_canais(
+    mes_ref: str,
+    mes_m1: str,
+    mes_m2: str,
+    produto_ref: str | None = None
+) -> list[str]:
+    produto_label = str(produto_ref or "").strip().upper()
+    if produto_label not in {"CONTA", "FIXA"}:
+        produto_label = "CANAL_PLAN"
+    return [
+        produto_label,
+        str(mes_m2).strip().upper(),
+        str(mes_m1).strip().upper(),
+        str(mes_ref).strip().upper(),
+        'MoM',
+        'Meta',
+        'Var Meta'
+    ]
+
+def montar_tabela_resultado_canais_exibicao_numerica(
+    df_tabela: pd.DataFrame,
+    mes_ref: str,
+    mes_m1: str,
+    mes_m2: str,
+    produto_ref: str | None = None,
+    incluir_total: bool = True
+) -> pd.DataFrame:
+    colunas_saida = _colunas_tabela_resultado_canais(mes_ref, mes_m1, mes_m2, produto_ref)
+    if df_tabela is None or df_tabela.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_num = pd.DataFrame({
+        colunas_saida[0]: df_tabela['CANAL_PLAN'].astype(str),
+        colunas_saida[1]: normalizar_numerico_serie(df_tabela['MES_M2']).fillna(0.0),
+        colunas_saida[2]: normalizar_numerico_serie(df_tabela['MES_M1']).fillna(0.0),
+        colunas_saida[3]: normalizar_numerico_serie(df_tabela['MES_ATUAL_TEND']).fillna(0.0),
+        colunas_saida[4]: normalizar_numerico_serie(df_tabela['MOM']).fillna(0.0),
+        colunas_saida[5]: normalizar_numerico_serie(df_tabela['META']).fillna(0.0),
+        colunas_saida[6]: normalizar_numerico_serie(df_tabela['VAR_META']).fillna(0.0)
+    })
+
+    if incluir_total and not df_num.empty:
+        total_m2 = float(pd.to_numeric(df_num[colunas_saida[1]], errors='coerce').fillna(0.0).sum())
+        total_m1 = float(pd.to_numeric(df_num[colunas_saida[2]], errors='coerce').fillna(0.0).sum())
+        total_m0 = float(pd.to_numeric(df_num[colunas_saida[3]], errors='coerce').fillna(0.0).sum())
+        total_meta = float(pd.to_numeric(df_num[colunas_saida[5]], errors='coerce').fillna(0.0).sum())
+        mom_total = (((total_m0 / total_m1) - 1.0) * 100.0) if total_m1 > 0 else 0.0
+        var_meta_total = (((total_m0 / total_meta) - 1.0) * 100.0) if total_meta > 0 else 0.0
+
+        linha_total = {
+            colunas_saida[0]: 'NACIONAIS',
+            colunas_saida[1]: total_m2,
+            colunas_saida[2]: total_m1,
+            colunas_saida[3]: total_m0,
+            colunas_saida[4]: mom_total,
+            colunas_saida[5]: total_meta,
+            colunas_saida[6]: var_meta_total
+        }
+        df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
+
+    return df_num
+
+def formatar_tabela_resultado_canais(
+    df_tabela: pd.DataFrame,
+    mes_ref: str,
+    mes_m1: str,
+    mes_m2: str,
+    produto_ref: str | None = None,
+    incluir_total: bool = True
+) -> pd.DataFrame:
+    df_num = montar_tabela_resultado_canais_exibicao_numerica(
+        df_tabela=df_tabela,
+        mes_ref=mes_ref,
+        mes_m1=mes_m1,
+        mes_m2=mes_m2,
+        produto_ref=produto_ref,
+        incluir_total=incluir_total
+    )
+    if df_num.empty:
+        return df_num
+
+    colunas = list(df_num.columns)
+    col_mom = colunas[4]
+    col_var_meta = colunas[6]
+    df_fmt = df_num.copy()
+
+    def _fmt_pct(valor: float) -> str:
+        try:
+            return f"{float(valor):+.1f}%".replace('.', ',')
+        except Exception:
+            return "0,0%"
+
+    for col in colunas:
+        if col == colunas[0]:
+            continue
+        if col in {col_mom, col_var_meta}:
+            df_fmt[col] = pd.to_numeric(df_fmt[col], errors='coerce').fillna(0.0).apply(_fmt_pct)
+        else:
+            df_fmt[col] = pd.to_numeric(df_fmt[col], errors='coerce').fillna(0.0).apply(
+                lambda x: formatar_numero_brasileiro(x, 0)
+            )
+
+    return df_fmt
+
+def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: pd.DataFrame, table_id: str) -> str:
+    """Cria tabela HTML no padrão visual do dashboard para resultado por canal."""
+    if df_formatado is None or df_formatado.empty:
+        return ""
+
+    colunas = list(df_formatado.columns)
+    col_canal = colunas[0] if colunas else 'CANAL_PLAN'
+    col_meta = colunas[5] if len(colunas) > 5 else 'Meta'
+    col_mom = colunas[4] if len(colunas) > 4 else 'MoM'
+    col_var = colunas[6] if len(colunas) > 6 else 'Var Meta'
+
+    html = f"""
+    <style>
+        #{table_id}.tabela-container-resultado-canais {{
+            width: 100%;
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: auto;
+            border: 2px solid #790E09;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(121, 14, 9, 0.14);
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+            margin: 10px 0 18px 0;
+            background: #FFFFFF;
+        }}
+        #{table_id} .tabela-resultado-canais {{
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            font-size: 12px;
+            line-height: 1.3;
+            min-width: 760px;
+            table-layout: fixed;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        #{table_id} .tabela-resultado-canais thead {{
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }}
+        #{table_id} .tabela-resultado-canais th {{
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 700;
+            padding: 8px 7px;
+            text-align: center;
+            border-bottom: 3px solid #5A0A06;
+            border-right: 1px solid #FFFFFF;
+            white-space: nowrap;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-size: 12px;
+        }}
+        #{table_id} .tabela-resultado-canais th:first-child {{
+            width: 140px;
+            min-width: 140px;
+            max-width: 140px;
+            text-align: left;
+            padding-left: 9px;
+        }}
+        #{table_id} .tabela-resultado-canais th:not(:first-child),
+        #{table_id} .tabela-resultado-canais td:not(.col-canal) {{
+            width: 103px;
+            min-width: 103px;
+            max-width: 103px;
+        }}
+        #{table_id} .tabela-resultado-canais th.col-var {{
+            background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+        }}
+        #{table_id} .tabela-resultado-canais th.col-meta {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+        }}
+        #{table_id} .tabela-resultado-canais td {{
+            padding: 6px 7px;
+            text-align: right;
+            border-bottom: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            color: #1F2937;
+            font-size: 12px;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-canal {{
+            text-align: left;
+            color: #2F3747;
+            background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            min-width: 140px;
+            width: 140px;
+            max-width: 140px;
+            padding-left: 9px;
+        }}
+        #{table_id} .linha-canal-resultado.linha-zebra-par td {{
+            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+        }}
+        #{table_id} .linha-canal-resultado.linha-zebra-impar td {{
+            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+        }}
+        #{table_id} .linha-canal-resultado.linha-zebra-par:hover,
+        #{table_id} .linha-canal-resultado.linha-zebra-impar:hover {{
+            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+            box-shadow: inset 0 0 0 1px #F1CBC4;
+        }}
+        #{table_id} .linha-canal-resultado.linha-zebra-par:hover td,
+        #{table_id} .linha-canal-resultado.linha-zebra-impar:hover td {{
+            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-meta {{
+            color: #8C1D18;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var {{
+            position: relative;
+            padding-left: 18px !important;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-positivo {{
+            color: #1B5E20 !important;
+            background: rgba(27, 94, 32, 0.06) !important;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-positivo::before {{
+            content: "▲";
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #2E7D32;
+            font-size: 11px;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-negativo {{
+            color: #B71C1C !important;
+            background: rgba(183, 28, 28, 0.06) !important;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-negativo::before {{
+            content: "▼";
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #C62828;
+            font-size: 11px;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-neutro {{
+            color: #475569 !important;
+            background: transparent !important;
+        }}
+        #{table_id} .linha-total-resultado {{
+            position: sticky;
+            top: 39px;
+            z-index: 95;
+            border-bottom: 2px solid #790E09;
+        }}
+        #{table_id} .linha-total-resultado td {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 400;
+            border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+            padding-left: 8px !important;
+            font-size: 12px;
+        }}
+        #{table_id} .linha-total-resultado td.col-canal {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            z-index: 80;
+        }}
+        #{table_id} .linha-total-resultado td.col-meta,
+        #{table_id} .linha-total-resultado td.col-var.status-positivo,
+        #{table_id} .linha-total-resultado td.col-var.status-negativo,
+        #{table_id} .linha-total-resultado td.col-var.status-neutro {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+        }}
+        #{table_id} .linha-total-resultado td.col-var::before {{
+            content: "" !important;
+        }}
+        #{table_id} .linha-total-resultado td.col-var.status-positivo::before,
+        #{table_id} .linha-total-resultado td.col-var.status-negativo::before,
+        #{table_id} .linha-total-resultado td.col-var.status-neutro::before {{
+            content: "" !important;
+        }}
+    </style>
+    <div id="{table_id}" class="tabela-container-resultado-canais">
+    <table class="tabela-resultado-canais">
+    <thead><tr>
+    """
+
+    for col in colunas:
+        classe = ""
+        if col == col_meta:
+            classe = "col-meta"
+        elif col in {col_mom, col_var}:
+            classe = "col-var"
+        html += f'<th class="{classe}">{escape(str(col))}</th>'
+    html += "</tr></thead><tbody>"
+
+    idx_linha_canal = 0
+    for idx, row in df_formatado.iterrows():
+        canal_ref = str(df_numerico.iloc[idx, 0]) if idx < len(df_numerico) else str(row.iloc[0])
+        canal_ref_norm = canal_ref.strip().upper()
+        is_total = canal_ref_norm.startswith("TOTAL") or canal_ref_norm.startswith("NACIONAIS")
+        if is_total:
+            classe_linha = "linha-total-resultado"
+        else:
+            classe_zebra = "linha-zebra-par" if (idx_linha_canal % 2 == 0) else "linha-zebra-impar"
+            classe_linha = f"linha-canal-resultado {classe_zebra}"
+            idx_linha_canal += 1
+        html += f'<tr class="{classe_linha}">'
+
+        for col_idx, col in enumerate(colunas):
+            valor_fmt = escape(str(row[col]))
+            classes = []
+
+            if col == col_canal:
+                classes.append("col-canal")
+            elif col == col_meta:
+                classes.append("col-meta")
+            elif col in {col_mom, col_var}:
+                classes.append("col-var")
+                try:
+                    valor_raw = float(df_numerico.iloc[idx, col_idx])
+                    if valor_raw > 0:
+                        classes.append("status-positivo")
+                    elif valor_raw < 0:
+                        classes.append("status-negativo")
                     else:
                         classes.append("status-neutro")
                 except Exception:
@@ -10266,6 +10720,62 @@ with tab5:
         mes_corrente_ref = get_mes_atual_formatado()
         idx_mes_analitico = meses_analitico.index(mes_corrente_ref) if mes_corrente_ref in meses_analitico else len(meses_analitico) - 1
 
+        st.markdown(
+            '<div class="subsection-title" style="margin-top:18px;">📋 RESULTADO DOS CANAIS</div>',
+            unsafe_allow_html=True
+        )
+        col_res_a1, col_res_a2 = st.columns([1.1, 1.1])
+        with col_res_a1:
+            produto_resultado = st.selectbox(
+                "Produto",
+                options=['CONTA', 'FIXA'],
+                index=0,
+                key="analitico_resultado_produto_ref"
+            )
+        with col_res_a2:
+            mes_resultado = st.selectbox(
+                "Mês de referência",
+                options=meses_analitico,
+                index=idx_mes_analitico,
+                key="analitico_resultado_mes_ref"
+            )
+
+        mes_resultado_m1 = get_mes_anterior(mes_resultado)
+        mes_resultado_m2 = get_mes_anterior(mes_resultado_m1)
+        tabela_resultado_canais = construir_tabela_resultado_canais(
+            df_base=base_analitica,
+            mes_ref=mes_resultado,
+            produto_ref=produto_resultado
+        )
+        tabela_resultado_canais_fmt = formatar_tabela_resultado_canais(
+            df_tabela=tabela_resultado_canais,
+            mes_ref=mes_resultado,
+            mes_m1=mes_resultado_m1,
+            mes_m2=mes_resultado_m2,
+            produto_ref=produto_resultado,
+            incluir_total=True
+        )
+        tabela_resultado_canais_num = montar_tabela_resultado_canais_exibicao_numerica(
+            df_tabela=tabela_resultado_canais,
+            mes_ref=mes_resultado,
+            mes_m1=mes_resultado_m1,
+            mes_m2=mes_resultado_m2,
+            produto_ref=produto_resultado,
+            incluir_total=True
+        )
+        st.markdown(
+            criar_tabela_html_resultado_canais(
+                df_formatado=tabela_resultado_canais_fmt,
+                df_numerico=tabela_resultado_canais_num,
+                table_id="tabela-analitico-resultado-canais"
+            ),
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            '<div class="subsection-title" style="margin-top:22px;">📌 PLANEJAMENTO DIÁRIO PARA META</div>',
+            unsafe_allow_html=True
+        )
         col_f_a1, col_f_a2 = st.columns([1.2, 1.2])
         with col_f_a1:
             mes_analitico = st.selectbox(
@@ -10393,4 +10903,3 @@ with tab5:
                 ),
                 unsafe_allow_html=True
             )
-
