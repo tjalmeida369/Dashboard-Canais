@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -1724,7 +1724,7 @@ def normalizar_rotulo_produto(valor) -> str:
         return f"PRODUTO {base}"
     return base
 
-@st.cache_data
+@st.cache_data(ttl=900)
 def create_bar_chart_data(df_mes_selecionado):
     """Cria dados para gráfico de barras horizontais"""
     df_plot = df_mes_selecionado.copy()
@@ -3465,7 +3465,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = "base_final_trt_new3.xlsx"
+file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
 df = load_data(file_path)
 
 # Validar dados
@@ -5067,7 +5067,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
             df_desativados = pd.read_excel(file_path)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
@@ -7705,7 +7705,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             
             # Carregar dados
             df_ligacoes = pd.read_excel(ligacoes_path)
@@ -9550,6 +9550,20 @@ with tab5:
         except Exception:
             return mes_ref
 
+    @st.cache_data(ttl=1800)
+    def preparar_base_analitica(df_in: pd.DataFrame) -> pd.DataFrame:
+        """Normaliza campos de uso recorrente para acelerar filtros/consultas no analítico."""
+        if df_in is None or df_in.empty:
+            return pd.DataFrame()
+        df_work = df_in.copy()
+        for coluna in ['dat_tratada', 'DSC_INDICADOR', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']:
+            if coluna in df_work.columns:
+                df_work[coluna] = df_work[coluna].astype(str).str.strip()
+        if 'COD_PLATAFORMA' in df_work.columns:
+            df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+        df_work['DSC_IND_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave) if 'DSC_INDICADOR' in df_work.columns else ""
+        return df_work
+
     @st.cache_data(ttl=3600)
     def load_ligacoes_para_performance():
         colunas_saida = [
@@ -9557,7 +9571,7 @@ with tab5:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
+            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -10703,10 +10717,320 @@ with tab5:
         unsafe_allow_html=True
     )
 
-    base_analitica = df.copy()
-    for coluna in ['dat_tratada', 'DSC_INDICADOR', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']:
-        if coluna in base_analitica.columns:
-            base_analitica[coluna] = base_analitica[coluna].astype(str).str.strip()
+    base_analitica = preparar_base_analitica(df)
+
+    # ------------------------------------------------------------
+    # NOVO VISUAL: PERFORMANCE REGIONAL CONSOLIDADA (PEDIDOS/LIGAÇÕES/V.B/ATIVADOS)
+    # ------------------------------------------------------------
+    st.markdown(
+        '<div class="subsection-title" style="margin-top:12px;">📌 PERFORMANCE REGIONAL - RESUMO MULTI INDICADORES</div>',
+        unsafe_allow_html=True
+    )
+
+    df_reg_base = base_analitica.copy()
+    if df_reg_base.empty:
+        st.warning("Não há dados disponíveis para montar a visão regional.")
+    else:
+        @st.cache_data(ttl=1800)
+        def load_ligacoes_resumo():
+            """Carrega ligações reais (televendas_ligacoes2.xlsx) já tratadas para REGIONAL/mes/plataforma."""
+            try:
+                path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+                if not Path(path).exists():
+                    return pd.DataFrame()
+                df_lig = pd.read_excel(path)
+                if df_lig.empty:
+                    return pd.DataFrame()
+                df_lig['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig['PERIODO'], errors='coerce')
+                df_lig = df_lig[df_lig['DAT_MOVIMENTO2'].notna()].copy()
+                meses_pt = {1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+                            7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'}
+                df_lig['dat_tratada'] = df_lig['DAT_MOVIMENTO2'].apply(
+                    lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
+                )
+                df_lig['REGIONAL'] = df_lig['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
+
+                def classificar_tipo_chamada(telefone):
+                    if pd.isna(telefone):
+                        return "DEMAIS"
+                    telefone_str = str(telefone)
+                    if '0960' in telefone_str or '8449' in telefone_str:
+                        return "Click to Call"
+                    return "DEMAIS"
+
+                df_lig['TIPO_CHAMADA'] = df_lig['TELEFONE'].apply(classificar_tipo_chamada) if 'TELEFONE' in df_lig.columns else 'DEMAIS'
+
+                def mapear_cabeado(valor):
+                    valor_str = str(valor).upper().strip()
+                    if valor_str in ['SIM', 'S', 'TRUE', '1', 'FIXA']:
+                        return 'FIXA'
+                    if valor_str in ['NÃO', 'NAO', 'N', 'FALSE', '0', 'CONTA']:
+                        return 'CONTA'
+                    return 'OUTROS'
+
+                df_lig['COD_PLATAFORMA'] = df_lig['CABEADO'].apply(mapear_cabeado)
+                df_lig['CANAL_PLAN'] = 'Televendas Receptivo'
+                df_lig['QTDE'] = pd.to_numeric(df_lig.get('QTD', 0), errors='coerce').fillna(0)
+                return df_lig[['REGIONAL', 'dat_tratada', 'COD_PLATAFORMA', 'CANAL_PLAN', 'QTDE', 'CABEADO', 'TIPO_CHAMADA']]
+            except Exception:
+                return pd.DataFrame()
+
+        df_lig_resumo = load_ligacoes_resumo()
+        # Normalizações auxiliares
+        df_reg_base['COD_PLATAFORMA'] = df_reg_base['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+        df_reg_base['DSC_IND_NORM'] = df_reg_base['DSC_INDICADOR'].apply(normalizar_texto_chave)
+
+        # Filtros
+        meses_disp_reg = sorted(
+            df_reg_base['dat_tratada'].dropna().unique().tolist(),
+            key=mes_ano_para_data
+        )
+        canal_disp_reg = ["Todos"] + sorted(df_reg_base['CANAL_PLAN'].dropna().unique().tolist())
+        produto_disp_reg = ['CONTA', 'FIXA']
+
+        # Seleções
+        mes_reg_default = get_mes_atual_formatado() if get_mes_atual_formatado() in meses_disp_reg else (meses_disp_reg[-1] if meses_disp_reg else "")
+        col_f_reg1, col_f_reg2, col_f_reg3 = st.columns([1, 1, 1.1])
+        with col_f_reg1:
+            mes_reg_sel = st.selectbox("Mês", options=meses_disp_reg, index=meses_disp_reg.index(mes_reg_default) if mes_reg_default in meses_disp_reg else 0, key="reg_viz_mes")
+        with col_f_reg2:
+            canal_reg_sel = st.selectbox("Canal", options=canal_disp_reg, index=0, key="reg_viz_canal")
+        with col_f_reg3:
+            produto_reg_sel = st.selectbox("Produto", options=produto_disp_reg, index=0, key="reg_viz_produto")
+
+        # Aplicar filtros
+        df_reg = df_reg_base[df_reg_base['dat_tratada'] == mes_reg_sel].copy()
+        if canal_reg_sel != "Todos":
+            df_reg = df_reg[df_reg['CANAL_PLAN'] == canal_reg_sel]
+        df_reg = df_reg[df_reg['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_reg_sel)]
+
+        # Filtro para ligações reais (fonte externa)
+        df_lig_filt = pd.DataFrame()
+        if not df_lig_resumo.empty:
+            df_lig_filt = df_lig_resumo[df_lig_resumo['dat_tratada'] == mes_reg_sel].copy()
+            if canal_reg_sel != "Todos":
+                df_lig_filt = df_lig_filt[df_lig_filt['CANAL_PLAN'] == canal_reg_sel]
+            df_lig_filt = df_lig_filt[df_lig_filt['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_reg_sel)]
+
+        if df_reg.empty:
+            st.warning("Sem dados para os filtros selecionados.")
+        else:
+            # Aliases de indicadores (normalizados)
+            aliases_ped = {'PEDIDOS'}
+            aliases_lig = {'LIGACOES'}
+            aliases_vb = {'VENDA BRUTA', 'VENDAS BRUTAS', 'GROSS BRUTO'}
+            aliases_ativ = {'GROSS LIQUIDO'} if produto_reg_sel == 'CONTA' else {'INSTALACAO', 'INSTALADOS', 'INSTAL'}
+            alias_meta_ativ = {'GROSS LIQUIDO'}  # meta sempre baseada em GROSS LIQUIDO
+
+            def soma_indicador(df_in: pd.DataFrame, aliases: set[str], meta: bool = False) -> float:
+                if df_in.empty:
+                    return 0.0
+                col = 'DESAFIO_QTD' if meta else 'QTDE'
+                aliases_norm = {normalizar_texto_chave(a) for a in aliases}
+                return float(
+                    pd.to_numeric(
+                        df_in.loc[df_in['DSC_IND_NORM'].isin(aliases_norm), col],
+                        errors='coerce'
+                    ).fillna(0).sum()
+                )
+
+            regionais_reg = sorted(df_reg['REGIONAL'].dropna().unique().tolist())
+            linhas_saida = []
+
+            for reg in regionais_reg:
+                df_r = df_reg[df_reg['REGIONAL'] == reg]
+                ped = soma_indicador(df_r, aliases_ped, meta=False)
+                # Ligações: usar fonte externa (televendas) priorizada e regra por produto
+                lig_real = 0.0
+                if not df_lig_filt.empty:
+                    df_r_lig = df_lig_filt[df_lig_filt['REGIONAL'] == reg]
+                    if produto_reg_sel == 'FIXA':
+                        lig_real = float(df_r_lig[df_r_lig['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
+                    else:  # CONTA
+                        lig_real = float(df_r_lig[df_r_lig['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
+                else:
+                    lig_real = soma_indicador(df_r, aliases_lig, meta=False)
+
+                # Tendência para mês atual (usa base principal TEND_QTD)
+                mes_corrente_norm = get_mes_atual_formatado().strip().lower()
+                lig = lig_real
+                if str(mes_reg_sel).strip().lower() == mes_corrente_norm:
+                    df_tend = base_analitica.copy()
+                    df_tend['COD_PLATAFORMA'] = df_tend['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+                    df_tend['DSC_IND_NORM'] = df_tend['DSC_INDICADOR'].apply(normalizar_texto_chave)
+                    df_tend_filt = df_tend[
+                        (df_tend['dat_tratada'] == mes_reg_sel) &
+                        (df_tend['DSC_IND_NORM'] == normalizar_texto_chave('LIGACOES')) &
+                        (df_tend['CANAL_PLAN'] == 'Televendas Receptivo') &
+                        (df_tend['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_reg_sel)) &
+                        (df_tend['REGIONAL'] == reg)
+                    ]
+                    tend_val = float(pd.to_numeric(df_tend_filt.get('TEND_QTD', 0), errors='coerce').fillna(0).sum())
+                    if tend_val > 0:
+                        lig = tend_val
+
+                meta_ped = soma_indicador(df_r, aliases_ped, meta=True)
+                meta_lig = soma_indicador(df_r, aliases_lig, meta=True)
+                vb = soma_indicador(df_r, aliases_vb, meta=False)
+                ativ_real = soma_indicador(df_r, aliases_ativ, meta=False)
+                ativ = ativ_real
+                # Tendência para mês atual (usa base principal TEND_QTD)
+                if str(mes_reg_sel).strip().lower() == mes_corrente_norm:
+                    df_tend = base_analitica.copy()
+                    df_tend['COD_PLATAFORMA'] = df_tend['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+                    df_tend['DSC_IND_NORM'] = df_tend['DSC_INDICADOR'].apply(normalizar_texto_chave)
+                    aliases_ativ_norm = {normalizar_texto_chave(a) for a in aliases_ativ}
+                    df_tend_filt = df_tend[
+                        (df_tend['dat_tratada'] == mes_reg_sel) &
+                        (df_tend['DSC_IND_NORM'].isin(aliases_ativ_norm)) &
+                        (df_tend['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_reg_sel)) &
+                        (df_tend['REGIONAL'] == reg)
+                    ]
+                    if canal_reg_sel != "Todos":
+                        df_tend_filt = df_tend_filt[df_tend_filt['CANAL_PLAN'] == canal_reg_sel]
+                    tend_val = float(pd.to_numeric(df_tend_filt.get('TEND_QTD', 0), errors='coerce').fillna(0).sum())
+                    if tend_val > 0:
+                        ativ = tend_val
+                meta_ativ = soma_indicador(df_r, alias_meta_ativ, meta=True)
+
+                # Regra de demanda por canal:
+                # - E-Commerce: só pedidos contam como demanda
+                # - Televendas Receptivo: só ligações contam como demanda
+                # - Demais / Todos: soma pedidos + ligações
+                canal_norm = str(canal_reg_sel).strip().upper()
+                if canal_norm == 'E-COMMERCE' or canal_norm == 'E COMMERCE':
+                    demanda = ped
+                    meta_demanda = meta_ped
+                elif canal_norm == 'TELEVENDAS RECEPTIVO':
+                    demanda = lig
+                    meta_demanda = meta_lig
+                else:
+                    demanda = ped + lig
+                    meta_demanda = meta_ped + meta_lig
+                conv_vb = (vb / demanda) * 100 if demanda > 0 else np.nan
+                conv_ativ = (ativ / vb) * 100 if vb > 0 else np.nan
+
+                linhas_saida.append({
+                    'REGIONAL': reg,
+                    'DEMANDA': demanda,
+                    'META_DEMANDA': meta_demanda,
+                    'VENDA_BRUTA': vb,
+                    'CONV_VB': conv_vb,
+                    'ATIVADOS': ativ,
+                    'META_ATIV': meta_ativ,
+                    'CONV_ATIV': conv_ativ
+                })
+
+            if not linhas_saida:
+                st.warning("Nenhuma regional elegível para os filtros selecionados.")
+            else:
+                df_saida = pd.DataFrame(linhas_saida)
+                # Ordenar regionais por VENDA_BRUTA desc
+                df_saida = df_saida.sort_values('VENDA_BRUTA', ascending=False, ignore_index=True)
+
+                # Linha total
+                total_row = {
+                    'REGIONAL': 'TOTAL',
+                    'DEMANDA': df_saida['DEMANDA'].sum(),
+                    'META_DEMANDA': df_saida['META_DEMANDA'].sum(),
+                    'VENDA_BRUTA': df_saida['VENDA_BRUTA'].sum(),
+                    'CONV_VB': (df_saida['VENDA_BRUTA'].sum() / df_saida['DEMANDA'].sum()) * 100 if df_saida['DEMANDA'].sum() > 0 else np.nan,
+                    'ATIVADOS': df_saida['ATIVADOS'].sum(),
+                    'META_ATIV': df_saida['META_ATIV'].sum(),
+                    'CONV_ATIV': (df_saida['ATIVADOS'].sum() / df_saida['VENDA_BRUTA'].sum()) * 100 if df_saida['VENDA_BRUTA'].sum() > 0 else np.nan
+                }
+                df_saida = pd.concat([pd.DataFrame([total_row]), df_saida], ignore_index=True)
+
+                # Formatação
+                def fmt_num(v):
+                    return formatar_numero_brasileiro(v, 0)
+
+                def fmt_pct(v):
+                    return formatar_pct_sem_sinal(v) if pd.notna(v) else "0,0%"
+
+                df_fmt = df_saida.copy()
+                for col in ['DEMANDA', 'META_DEMANDA', 'VENDA_BRUTA', 'ATIVADOS', 'META_ATIV']:
+                    df_fmt[col] = df_fmt[col].apply(fmt_num)
+                for col in ['CONV_VB', 'CONV_ATIV']:
+                    df_fmt[col] = df_fmt[col].apply(fmt_pct)
+
+                # HTML estilizado seguindo paleta das demais tabelas
+                tabela_id = "tabela-analitico-regional"
+                css_reg = f"""
+                <style>
+                .{tabela_id}-container {{
+                    width: 100%;
+                    overflow-x: auto;
+                    border: 2px solid #790E09;
+                    border-radius: 12px;
+                    box-shadow: 0 6px 18px rgba(121,14,9,0.16);
+                    margin: 12px 0 6px 0;
+                    background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+                }}
+                table.{tabela_id} {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    min-width: 940px;
+                    font-size: 12px;
+                }}
+                .{tabela_id} thead th {{
+                    position: sticky;
+                    top: 0;
+                    background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+                    color: #fff;
+                    padding: 9px 8px;
+                    text-align: center;
+                    font-weight: 800;
+                    letter-spacing: 0.4px;
+                }}
+                .{tabela_id} tbody td {{
+                    padding: 8px 8px;
+                    text-align: center;
+                    border-bottom: 1px solid #F0E4E2;
+                    font-weight: 600;
+                    color: #2F3747;
+                }}
+                .{tabela_id} tbody tr:nth-child(odd) td {{ background: #FFF9F8; }}
+                .{tabela_id} tbody tr:nth-child(even) td {{ background: #FDF3F2; }}
+                .{tabela_id} tbody tr:first-child td {{
+                    background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%);
+                    color: #fff;
+                    font-weight: 800;
+                    border-bottom: 2px solid #A23B36;
+                }}
+                .{tabela_id} tbody td.col-regional {{ text-align: left; padding-left: 14px; }}
+                </style>
+                """
+                header_cols = [
+                    "REGIONAL", "DEMANDA", "META DEMANDA",
+                    "VENDA BRUTA", "CONVERSÃO V.B", "ATIVADOS", "META ATIVADOS", "CONVERSÃO ATIV"
+                ]
+                html_rows = ""
+                for _, row in df_fmt.iterrows():
+                    html_rows += "<tr>"
+                    html_rows += f'<td class="col-regional">{escape(str(row["REGIONAL"]))}</td>'
+                    html_rows += "".join(
+                        f"<td>{row[col_key]}</td>" for col_key in [
+                            "DEMANDA", "META_DEMANDA",
+                            "VENDA_BRUTA", "CONV_VB", "ATIVADOS", "META_ATIV", "CONV_ATIV"
+                        ]
+                    )
+                    html_rows += "</tr>"
+
+                html_table = f"""
+                {css_reg}
+                <div class="{tabela_id}-container">
+                  <table class="{tabela_id}">
+                    <thead>
+                      <tr>{" ".join([f"<th>{col}</th>" for col in header_cols])}</tr>
+                    </thead>
+                    <tbody>
+                      {html_rows}
+                    </tbody>
+                  </table>
+                </div>
+                """
+                st.markdown(html_table, unsafe_allow_html=True)
 
     meses_analitico = sorted(
         base_analitica['dat_tratada'].dropna().unique().tolist(),
@@ -10763,14 +11087,46 @@ with tab5:
             produto_ref=produto_resultado,
             incluir_total=True
         )
-        st.markdown(
-            criar_tabela_html_resultado_canais(
-                df_formatado=tabela_resultado_canais_fmt,
-                df_numerico=tabela_resultado_canais_num,
-                table_id="tabela-analitico-resultado-canais"
-            ),
-            unsafe_allow_html=True
-        )
+        # Observações persistentes por canal (lado a lado com a tabela)
+        @st.cache_data
+        def load_obs_resultado() -> str:
+            obs_path = Path("obs_resultado_canais.txt")
+            if obs_path.exists():
+                try:
+                    return obs_path.read_text(encoding="utf-8")
+                except Exception:
+                    return ""
+            return ""
+
+        def save_obs_resultado(texto: str):
+            obs_path = Path("obs_resultado_canais.txt")
+            obs_path.write_text(texto, encoding="utf-8")
+            load_obs_resultado.clear()  # reset cache
+
+        col_tbl_res, col_obs_res = st.columns([3, 1], gap="medium")
+        with col_tbl_res:
+            st.markdown(
+                criar_tabela_html_resultado_canais(
+                    df_formatado=tabela_resultado_canais_fmt,
+                    df_numerico=tabela_resultado_canais_num,
+                    table_id="tabela-analitico-resultado-canais"
+                ),
+                unsafe_allow_html=True
+            )
+        with col_obs_res:
+            obs_default = st.session_state.get("obs_resultado_canais", load_obs_resultado())
+            with st.form("form_obs_resultado_canais"):
+                obs_txt = st.text_area(
+                    "Observações por canal",
+                    value=obs_default,
+                    height=220,
+                    help="Anote pontos qualitativos sobre o resultado dos canais."
+                )
+                submitted = st.form_submit_button("Aplicar observações")
+                if submitted:
+                    st.session_state["obs_resultado_canais"] = obs_txt
+                    save_obs_resultado(obs_txt)
+                    st.success("Observações aplicadas e salvas.")
 
         st.markdown(
             '<div class="subsection-title" style="margin-top:22px;">📌 PLANEJAMENTO DIÁRIO PARA META</div>',
