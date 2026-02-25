@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -4256,8 +4256,6 @@ with tab1:
         for regional in regionais:
             df_regional = df_tabela[df_tabela['REGIONAL'] == regional]
 
-            # Total 2024 (para cálculo, não exibido)
-            total_2024 = df_regional[df_regional['ano'] == '24']['QTDE'].sum()
             # Total 2025
             total_2025 = df_regional[df_regional['ano'] == '25']['QTDE'].sum()
 
@@ -4284,11 +4282,8 @@ with tab1:
             meta_mes_atual = df_regional[df_regional['mes_ano'] == mes_atual]['DESAFIO_QTD'].sum()
             alcance_meta = (((valor_base_meta / meta_mes_atual) - 1) * 100) if meta_mes_atual > 0 else 0
 
-            var_2025_2024 = ((total_2025 - total_2024) / total_2024 * 100) if total_2024 > 0 else 0
-
             row_data = {
                 'Regional': regional,
-                'Total 2024': total_2024,
                 **{f'{meses_ordem[i]}/25': valores_mensais_2025[i] for i in range(12)},
                 'Total 2025': total_2025,
                 **{meses_2026[i]: valores_mensais_2026[i] for i in range(len(meses_2026))},
@@ -4296,8 +4291,7 @@ with tab1:
                 f'Real {mes_atual}': mes_atual_valor,
                 f'Meta {mes_atual}': meta_mes_atual,
                 'TEND vs META': alcance_meta,
-                'MOM': variacao_mom,
-                '25VS24': var_2025_2024
+                'MOM': variacao_mom
             }
 
             pivot_data.append(row_data)
@@ -4328,7 +4322,6 @@ with tab1:
     df_total = df_tabela.copy()
     
     # Calcular totais gerais
-    total_2024_geral = df_total[df_total['ano'] == '24']['QTDE'].sum()
     total_2025_geral = df_total[df_total['ano'] == '25']['QTDE'].sum()
     
     # Calcular valores mensais gerais para 2025
@@ -4350,9 +4343,6 @@ with tab1:
     # Calcular meta geral do mês atual
     meta_mes_atual_geral = df_total[df_total['mes_ano'] == mes_atual_tabela]['DESAFIO_QTD'].sum()
     
-    # Calcular variações gerais
-    variacao_2024_2025_geral = ((total_2025_geral - total_2024_geral) / total_2024_geral * 100) if total_2024_geral > 0 else 0
-    
     # Calcular variação MoM geral
     mes_anterior_geral = get_mes_anterior(mes_atual_tabela)
     mes_atual_valor_geral = df_total[df_total['mes_ano'] == mes_atual_tabela]['QTDE'].sum()
@@ -4367,7 +4357,6 @@ with tab1:
     # Adicionar linha de TOTAL no início
     linha_total = {
         'Regional': 'TOTAL',
-        'Total 2024': total_2024_geral,
         'Total 2025': total_2025_geral,
         **{f'{meses_ordem[i]}/25': valores_mensais_2025_geral[i] for i in range(12)},
         **{meses_2026_tabela[i]: valores_mensais_2026_geral[i] for i in range(len(meses_2026_tabela))},
@@ -4375,7 +4364,6 @@ with tab1:
         f'Real {mes_atual_tabela}': real_mes_atual_geral,
         f'Meta {mes_atual_tabela}': meta_mes_atual_geral,
         'TEND vs META': alcance_meta_geral,
-        '25VS24': variacao_2024_2025_geral,
         'MOM': variacao_mom_geral
     }
     
@@ -4386,12 +4374,12 @@ with tab1:
         df_final = pd.DataFrame([linha_total])
     
     # Ordenar colunas
-    colunas_base = ['Regional', 'Total 2024']
+    colunas_base = ['Regional']
     colunas_meses_2025 = [f'{meses_ordem[i]}/25' for i in range(12)]
     colunas_meses_2026 = meses_2026_tabela
     colunas_finais = [f'Tend {mes_atual_tabela}', f'Real {mes_atual_tabela}', f'Meta {mes_atual_tabela}', 'MOM', 'TEND vs META']
 
-    colunas_ordenadas = colunas_base + colunas_meses_2025 + ['Total 2025', '25VS24'] + colunas_meses_2026 + colunas_finais
+    colunas_ordenadas = colunas_base + colunas_meses_2025 + ['Total 2025'] + colunas_meses_2026 + colunas_finais
     
     # Manter apenas colunas presentes no DataFrame
     colunas_ordenadas = [col for col in colunas_ordenadas if col in df_final.columns]
@@ -4413,7 +4401,7 @@ with tab1:
     
     df_exibicao = df_final.copy()
     for col in df_exibicao.columns:
-        if col not in ['Regional', '25VS24', 'MOM', 'TEND vs META']:
+        if col not in ['Regional', 'MOM', 'TEND vs META']:
             df_exibicao[col] = df_exibicao[col].apply(formatar_numero)
         else:
             df_exibicao[col] = df_exibicao[col].apply(formatar_percentual)
@@ -4774,7 +4762,7 @@ with tab1:
             classe = ""
             if col == 'Regional':
                 classe = ""
-            elif col in ['Total 2024', 'Total 2025']:
+            elif col == 'Total 2025':
                 classe = "col-total-anual"
             elif '/25' in col or '/26' in col:
                 classe = "col-mes"
@@ -4784,7 +4772,7 @@ with tab1:
                 classe = "col-meta"
             elif 'Alcance' in col or col == 'TEND vs META':
                 classe = "col-alcance"
-            elif 'Var' in col or col in ['25VS24', 'MOM']:
+            elif 'Var' in col or col == 'MOM':
                 classe = "col-variacao"
             
             html += f'<th class="{classe}">{col}</th>'
@@ -4803,7 +4791,7 @@ with tab1:
                 if is_total:
                     if col == 'Regional':
                         classe_celula = ""
-                    elif col in ['Total 2024', 'Total 2025']:
+                    elif col == 'Total 2025':
                         classe_celula = "col-total-anual"
                     elif '/25' in col or '/26' in col:
                         classe_celula = "col-mes"
@@ -4813,12 +4801,12 @@ with tab1:
                         classe_celula = "col-meta"
                     elif 'Alcance' in col or col == 'TEND vs META':
                         classe_celula = "col-alcance"
-                    elif 'Var' in col or col in ['25VS24', 'MOM']:
+                    elif 'Var' in col or col == 'MOM':
                         classe_celula = "col-variacao"
                 else:
                     if col == 'Regional':
                         classe_celula = ""
-                    elif col in ['Total 2024', 'Total 2025']:
+                    elif col == 'Total 2025':
                         classe_celula = "col-total-anual"
                     elif '/25' in col or '/26' in col:
                         classe_celula = "col-mes"
@@ -4826,7 +4814,7 @@ with tab1:
                         classe_celula = "col-real-mes"
                     elif 'Meta' in col and col != 'TEND vs META':
                         classe_celula = "col-meta"
-                    elif 'Alcance' in col or 'Var' in col or col in ['25VS24', 'MOM', 'TEND vs META']:
+                    elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'TEND vs META']:
                         try:
                             valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                             num_valor = float(valor_limpo)
@@ -4869,90 +4857,12 @@ with tab1:
     if not df_exibicao.empty:
         st.markdown(criar_tabela_html(df_exibicao), unsafe_allow_html=True)
         
-        # Botões de exportação
-        col_exp1, col_exp2, col_exp3 = st.columns([1, 1, 2])
-        
-        with col_exp1:
-            def exportar_excel_tabela(df_numerico):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_numerico.to_excel(writer, index=False, sheet_name='Tabela_Dinamica')
-                    
-                    workbook = writer.book
-                    worksheet = writer.sheets['Tabela_Dinamica']
-                    
-                    header_format = workbook.add_format({
-                        'bold': True,
-                        'bg_color': '#FF2800',
-                        'font_color': 'white',
-                        'align': 'center',
-                        'border': 1,
-                        'font_size': 10
-                    })
-                    
-                    number_format = workbook.add_format({
-                        'num_format': '#,##0',
-                        'align': 'center'
-                    })
-                    
-                    percent_format = workbook.add_format({
-                        'num_format': '0.0%',
-                        'align': 'center'
-                    })
-                    
-                    for col_num, col_name in enumerate(df_numerico.columns):
-                        worksheet.write(0, col_num, col_name, header_format)
-                        
-                        if col_name in ['25VS24', 'MOM', 'TEND vs META']:
-                            cell_format = percent_format
-                        else:
-                            cell_format = number_format
-                        
-                        for row_num in range(1, len(df_numerico) + 1):
-                            value = df_numerico.iloc[row_num-1, col_num]
-                            if pd.isna(value):
-                                worksheet.write(row_num, col_num, '')
-                            elif col_name == 'Regional':
-                                worksheet.write(row_num, col_num, value)
-                            else:
-                                worksheet.write(row_num, col_num, value, cell_format)
-                    
-                    for i, col in enumerate(df_numerico.columns):
-                        column_width = max(df_numerico[col].astype(str).map(len).max(), len(col)) + 2
-                        worksheet.set_column(i, i, min(column_width, 20))
-                
-                return output.getvalue()
-        
-            excel_data = exportar_excel_tabela(df_final)
-            st.download_button(
-                label="📥 Exportar Excel",
-                data=excel_data,
-                file_name="tabela_dinamica.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                width='stretch'
-            )
-        
-        with col_exp2:
-            @st.cache_data
-            def convert_to_csv(df):
-                return df.to_csv(index=False, sep=';', decimal=',').encode('utf-8')
-        
-            csv_data = convert_to_csv(df_final)
-            st.download_button(
-                label="📄 Exportar CSV",
-                data=csv_data,
-                file_name="tabela_dinamica.csv",
-                mime="text/csv",
-                width='stretch'
-            )
-        
-        with col_exp3:
-            st.caption(f"""
-            **Resumo:** {len(pivot_data)} Regionais | 
-            **Total 2025:** {formatar_numero(total_2025_geral)} | 
-            **Crescimento vs 2024:** {formatar_percentual(variacao_2024_2025_geral)} | 
-            **TEND vs META ({mes_atual_tabela}):** {formatar_percentual(alcance_meta_geral)}
-            """)
+        st.caption(f"""
+        **Resumo:** {len(pivot_data)} Regionais | 
+        **Total 2025:** {formatar_numero(total_2025_geral)} | 
+        **MOM:** {formatar_percentual(variacao_mom_geral)} | 
+        **TEND vs META ({mes_atual_tabela}):** {formatar_percentual(alcance_meta_geral)}
+        """)
         
         # Análise detalhada
         with st.expander("🔍 Ver dados para análise detalhada", expanded=False):
@@ -4960,17 +4870,19 @@ with tab1:
             df_analise = df_analise[colunas_ordenadas]
             
             st.write("**Principais Insights:**")
+            df_crescimento = pd.DataFrame(pivot_data_ordenada)
             
             col_insight1, col_insight2, col_insight3, col_insight4 = st.columns(4)
             
             with col_insight1:
-                df_crescimento = pd.DataFrame(pivot_data_ordenada)
                 if not df_crescimento.empty and len(df_crescimento) > 0:
-                    maior_cresc_idx = df_crescimento['25VS24'].idxmax()
-                    maior_cresc = df_crescimento.loc[maior_cresc_idx]
-                    st.metric("Maior Crescimento", 
-                             maior_cresc['Regional'], 
-                             f"{maior_cresc['25VS24']:+.1f}%")
+                    melhor_alcance_idx = df_crescimento['TEND vs META'].idxmax()
+                    melhor_alcance = df_crescimento.loc[melhor_alcance_idx]
+                    st.metric(
+                        "Maior TEND vs META",
+                        melhor_alcance['Regional'],
+                        f"{melhor_alcance['TEND vs META']:+.1f}%"
+                    )
             
             with col_insight2:
                 if not df_crescimento.empty and len(df_crescimento) > 0:
@@ -4989,10 +4901,8 @@ with tab1:
             
             with col_insight4:
                 if not df_crescimento.empty and len(df_crescimento) > 0:
-                    media_cresc = df_crescimento['25VS24'].mean()
-                    st.metric("Crescimento Médio", 
-                             f"{media_cresc:+.1f}%", 
-                             None)
+                    media_mom = df_crescimento['MOM'].mean()
+                    st.metric("MOM Médio", f"{media_mom:+.1f}%", None)
             
             # Gráfico comparativo
             st.write("**Comparativo entre Regionais (Top 10 por Volume 2025):**")
@@ -6220,40 +6130,6 @@ with tab2:
         # Exibir tabela
         st.markdown(criar_tabela_html_desativados(df_exibicao), unsafe_allow_html=True)
         
-        # Botões de exportação
-        col_exp1, col_exp2 = st.columns(2)
-        
-        with col_exp1:
-            @st.cache_data
-            def exportar_excel_tabela(df_numerico):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_numerico.to_excel(writer, index=False, sheet_name='Tabela_Desativados')
-                return output.getvalue()
-            
-            excel_data = exportar_excel_tabela(df_final)
-            st.download_button(
-                label="📥 Exportar Excel",
-                data=excel_data,
-                file_name="tabela_desativados.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-        
-        with col_exp2:
-            @st.cache_data
-            def exportar_csv_tabela(df_numerico):
-                return df_numerico.to_csv(index=False, sep=';', decimal=',').encode('utf-8')
-            
-            csv_data = exportar_csv_tabela(df_final)
-            st.download_button(
-                label="📄 Exportar CSV",
-                data=csv_data,
-                file_name="tabela_desativados.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-
 # =========================
 # ABA 3: PEDIDOS
 # =========================
@@ -6263,7 +6139,7 @@ with tab3:
             <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📋</span>
             PEDIDOS E-Commerce
             <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE PEDIDOS E CONVERSÃO - E-Commerce
+                ANÁLISE DE PEDIDOS PME
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -6672,7 +6548,8 @@ with tab3:
         # =========================
         # TABELA DINÂMICA POR REGIONAL
         # =========================
-        st.markdown('<div class="section-title"><span class="section-icon">📋</span> PEDIDOS POR REGIONAL - E-Commerce</div>', unsafe_allow_html=True)
+        container_evolucao_pedidos = st.container()
+        st.markdown('<div class="section-title"><span class="section-icon">📋</span> PEDIDOS POR REGIONAL</div>', unsafe_allow_html=True)
         
         # Adicionar filtros específicos para a tabela
         col_filtro_t1_pedidos, col_filtro_t2_pedidos = st.columns(2)
@@ -6730,7 +6607,6 @@ with tab3:
             pivot = []
             for regional in sorted(df_tabela_pedidos['REGIONAL'].unique()):
                 dfr = df_tabela_pedidos[df_tabela_pedidos['REGIONAL'] == regional]
-                total_2024 = dfr[dfr['ano'] == '24']['QTDE'].sum()
                 total_2025 = dfr[dfr['ano'] == '25']['QTDE'].sum()
                 vals_2025 = [dfr[dfr['mes_ano'] == mes]['QTDE'].sum() for mes in meses_2025]
                 vals_2026 = [dfr[dfr['mes_ano'] == mes]['QTDE'].sum() for mes in meses_2026]
@@ -6743,11 +6619,9 @@ with tab3:
                 valor_base_meta = tend_foco if usar_tendencia else real_foco
                 alcance = (((valor_base_meta / meta_foco) - 1) * 100) if meta_foco > 0 else 0
                 var_mom = ((valor_base_meta - real_ant) / real_ant * 100) if real_ant > 0 else 0
-                var_2425 = ((total_2025 - total_2024) / total_2024 * 100) if total_2024 > 0 else 0
 
                 linha = {
                     'Regional': regional,
-                    'Total 2024': total_2024,
                     **{meses_2025[i]: vals_2025[i] for i in range(12)},
                     'Total 2025': total_2025,
                 }
@@ -6757,7 +6631,6 @@ with tab3:
                     f'Tend {mes_foco}': tend_foco,
                     f'Meta {mes_foco}': meta_foco,
                     'TEND vs META': alcance,
-                    '25VS24': var_2425,
                     'MOM': var_mom
                 })
                 pivot.append(linha)
@@ -6776,7 +6649,6 @@ with tab3:
                 df_regional_pedidos = df_tabela_pedidos[df_tabela_pedidos['REGIONAL'] == regional]
                 
                 # Calcular totais por ano (QTDE - realizado)
-                total_2024_pedidos = df_regional_pedidos[df_regional_pedidos['ano'] == '24']['QTDE'].sum()
                 total_2025_pedidos = df_regional_pedidos[df_regional_pedidos['ano'] == '25']['QTDE'].sum()
                 
                 # Calcular valores mensais para 2025 (QTDE - realizado)
@@ -6791,9 +6663,6 @@ with tab3:
                 # Calcular valor de jan/26 (meta) - DESAFIO_QTD
                 meta_jan_26_pedidos = df_regional_pedidos[df_regional_pedidos['mes_ano'] == 'jan/26']['DESAFIO_QTD'].sum()
                 
-                # Calcular variações
-                variacao_2024_2025_pedidos = ((total_2025_pedidos - total_2024_pedidos) / total_2024_pedidos * 100) if total_2024_pedidos > 0 else 0
-                
                 # Calcular variação MoM (dez/25 vs nov/25)
                 dez_25_pedidos = df_regional_pedidos[df_regional_pedidos['mes_ano'] == 'dez/25']['QTDE'].sum()
                 nov_25_pedidos = df_regional_pedidos[df_regional_pedidos['mes_ano'] == 'nov/25']['QTDE'].sum()
@@ -6804,13 +6673,11 @@ with tab3:
                 
                 pivot_data_pedidos.append({
                     'Regional': regional,
-                    'Total 2024': total_2024_pedidos,
                     **{meses_2025_pedidos[i]: valores_mensais_2025_pedidos[i] for i in range(12)},
                     'Total 2025': total_2025_pedidos,
                     'Real Jan/26': real_jan_26_pedidos,
                     'Meta Jan/26': meta_jan_26_pedidos,
                     'TEND vs META': alcance_meta_pedidos,
-                    '25VS24': variacao_2024_2025_pedidos,
                     'MOM': variacao_mom_pedidos
                 })
             
@@ -6837,7 +6704,6 @@ with tab3:
             df_total_pedidos = df_tabela_pedidos.copy()
             
             # Calcular totais gerais
-            total_2024_geral_pedidos = df_total_pedidos[df_total_pedidos['ano'] == '24']['QTDE'].sum()
             total_2025_geral_pedidos = df_total_pedidos[df_total_pedidos['ano'] == '25']['QTDE'].sum()
             
             # Calcular valores mensais gerais para 2025
@@ -6867,9 +6733,6 @@ with tab3:
             tend_foco_geral_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_foco_tabela_pedidos]['TEND_QTD'].sum() if 'TEND_QTD' in df_total_pedidos.columns else 0
             meta_foco_geral_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_foco_tabela_pedidos]['DESAFIO_QTD'].sum()
             
-            # Calcular variações gerais
-            variacao_2024_2025_geral_pedidos = ((total_2025_geral_pedidos - total_2024_geral_pedidos) / total_2024_geral_pedidos * 100) if total_2024_geral_pedidos > 0 else 0
-            
             # Calcular variação MoM geral com base no mês foco
             mes_anterior_foco_pedidos = get_mes_anterior(mes_foco_tabela_pedidos)
             valor_mes_anterior_foco_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_anterior_foco_pedidos]['QTDE'].sum()
@@ -6883,14 +6746,12 @@ with tab3:
             # Adicionar linha de TOTAL no início
             linha_total_pedidos = {
                 'Regional': 'TOTAL',
-                'Total 2024': total_2024_geral_pedidos,
                 **{meses_2025_pedidos[i]: valores_mensais_2025_geral_pedidos[i] for i in range(12)},
                 'Total 2025': total_2025_geral_pedidos,
                 **{meses_2026_geral_pedidos[i]: valores_mensais_2026_geral_pedidos[i] for i in range(len(meses_2026_geral_pedidos))},
                 f'Tend {mes_foco_tabela_pedidos}': tend_foco_geral_pedidos,
                 f'Meta {mes_foco_tabela_pedidos}': meta_foco_geral_pedidos,
                 'TEND vs META': alcance_meta_geral_pedidos,
-                '25VS24': variacao_2024_2025_geral_pedidos,
                 'MOM': variacao_mom_geral_pedidos
             }
             
@@ -6922,7 +6783,7 @@ with tab3:
                 colunas_mes_2026 = [c for c in colunas_mes_2026 if ordem_mes.get(str(c).split('/')[0], 99) <= mes_foco_num]
             except Exception:
                 pass
-            colunas_ordenadas_pedidos = ['Regional', 'Total 2024'] + colunas_mes_2025 + ['Total 2025', '25VS24'] + colunas_mes_2026 + [f'Tend {mes_foco_tabela_pedidos}', f'Meta {mes_foco_tabela_pedidos}', 'MOM', 'TEND vs META']
+            colunas_ordenadas_pedidos = ['Regional'] + colunas_mes_2025 + ['Total 2025'] + colunas_mes_2026 + [f'Tend {mes_foco_tabela_pedidos}', f'Meta {mes_foco_tabela_pedidos}', 'MOM', 'TEND vs META']
             # Remover duplicidade mantendo ordem
             colunas_ordenadas_pedidos = list(dict.fromkeys(colunas_ordenadas_pedidos))
             colunas_ordenadas_pedidos = [c for c in colunas_ordenadas_pedidos if c in df_final_pedidos.columns]
@@ -6949,8 +6810,10 @@ with tab3:
             
             df_exibicao_pedidos = df_final_pedidos.copy().fillna(0)
             for col in df_exibicao_pedidos.columns:
-                if col in ['Regional', '25VS24', 'MOM', 'TEND vs META']:
+                if col in ['MOM', 'TEND vs META']:
                     df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(formatar_percentual_pedidos)
+                elif col == 'Regional':
+                    df_exibicao_pedidos[col] = df_exibicao_pedidos[col].astype(str)
                 else:
                     df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(lambda v: formatar_numero_pedidos(v if not isinstance(v, pd.Series) else v.iloc[0]))
             
@@ -7314,7 +7177,7 @@ with tab3:
                     classe = ""
                     if col == 'Regional':
                         classe = ""
-                    elif col in ['Total 2024', 'Total 2025']:
+                    elif col == 'Total 2025':
                         classe = "col-total-anual-pedidos"
                     elif col in meses_2025_pedidos:
                         classe = "col-mes-pedidos"
@@ -7324,7 +7187,7 @@ with tab3:
                         classe = "col-meta-pedidos"
                     elif 'Alcance' in col or col == 'TEND vs META':
                         classe = "col-alcance-pedidos"
-                    elif 'Var' in col or col in ['25VS24', 'MOM']:
+                    elif 'Var' in col or col == 'MOM':
                         classe = "col-variacao-pedidos"
                     
                     html += f'<th class="{classe}">{col}</th>'
@@ -7343,7 +7206,7 @@ with tab3:
                         if is_total:
                             if col == 'Regional':
                                 classe_celula = ""
-                            elif col in ['Total 2024', 'Total 2025']:
+                            elif col == 'Total 2025':
                                 classe_celula = "col-total-anual-pedidos"
                             elif col in meses_2025_pedidos:
                                 classe_celula = "col-mes-pedidos"
@@ -7353,12 +7216,12 @@ with tab3:
                                 classe_celula = "col-meta-pedidos"
                             elif 'Alcance' in col or col == 'TEND vs META':
                                 classe_celula = "col-alcance-pedidos"
-                            elif 'Var' in col or col in ['25VS24', 'MOM']:
+                            elif 'Var' in col or col == 'MOM':
                                 classe_celula = "col-variacao-pedidos"
                         else:
                             if col == 'Regional':
                                 classe_celula = ""
-                            elif col in ['Total 2024', 'Total 2025']:
+                            elif col == 'Total 2025':
                                 classe_celula = "col-total-anual-pedidos"
                             elif col in meses_2025_pedidos:
                                 classe_celula = "col-mes-pedidos"
@@ -7366,7 +7229,7 @@ with tab3:
                                 classe_celula = "col-real-jan26-pedidos"
                             elif 'Meta' in col and col != 'TEND vs META':
                                 classe_celula = "col-meta-pedidos"
-                            elif 'Alcance' in col or 'Var' in col or col in ['25VS24', 'MOM', 'TEND vs META']:
+                            elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'TEND vs META']:
                                 try:
                                     valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                                     num_valor = float(valor_limpo)
@@ -7409,280 +7272,193 @@ with tab3:
             html_tabela_pedidos = criar_tabela_html_pedidos(df_exibicao_pedidos)
             components.html(html_tabela_pedidos, height=700, scrolling=True)
             
-            # =========================
-            # BOTÕES DE EXPORTAÇÃO
-            # =========================
-            col_exp1_pedidos, col_exp2_pedidos, col_exp3_pedidos = st.columns([1, 1, 2])
+            st.caption(f"""
+            **Resumo da Tabela:** {len(pivot_data_pedidos)} Regionais | 
+            **Total 2025:** {formatar_numero_pedidos(total_2025_geral_pedidos)} | 
+            **MOM:** {formatar_percentual_pedidos(variacao_mom_geral_pedidos)} | 
+            **TEND vs META:** {formatar_percentual_pedidos(alcance_meta_geral_pedidos)}
+            """)
             
-            with col_exp1_pedidos:
-                def exportar_excel_tabela_pedidos(df_numerico_pedidos):
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_numerico_pedidos.to_excel(writer, index=False, sheet_name='Tabela_Pedidos')
-                        
-                        workbook = writer.book
-                        worksheet = writer.sheets['Tabela_Pedidos']
-                        
-                        header_format = workbook.add_format({
-                            'bold': True,
-                            'bg_color': '#FF2800',
-                            'font_color': 'white',
-                            'align': 'center',
-                            'border': 1,
-                            'font_size': 10
-                        })
-                        
-                        number_format = workbook.add_format({
-                            'num_format': '#,##0',
-                            'align': 'center'
-                        })
-                        
-                        percent_format = workbook.add_format({
-                            'num_format': '0.0%',
-                            'align': 'center'
-                        })
-                        
-                        for col_num, col_name in enumerate(df_numerico_pedidos.columns):
-                            worksheet.write(0, col_num, col_name, header_format)
-                            
-                            if col_name in ['25VS24', 'MOM', 'TEND vs META']:
-                                cell_format = percent_format
-                            else:
-                                cell_format = number_format
-                            
-                            for row_num in range(1, len(df_numerico_pedidos) + 1):
-                                value = df_numerico_pedidos.iloc[row_num-1, col_num]
-                                if pd.isna(value):
-                                    worksheet.write(row_num, col_num, '')
-                                elif col_name == 'Regional':
-                                    worksheet.write(row_num, col_num, value)
-                                else:
-                                    worksheet.write(row_num, col_num, value, cell_format)
-                        
-                        for i, col in enumerate(df_numerico_pedidos.columns):
-                            # Usa índice posicional para evitar ambiguidade quando há colunas com nomes repetidos
-                            col_values = df_numerico_pedidos.iloc[:, i]
-                            max_data_len = col_values.astype(str).str.len().max()
-                            max_data_len = 0 if pd.isna(max_data_len) else int(max_data_len)
-                            header_len = len(str(col))
-                            column_width = max(max_data_len, header_len) + 2
-                            worksheet.set_column(i, i, min(column_width, 20))
+            with container_evolucao_pedidos:
+                # =========================
+                # GRÁFICO DE EVOLUÇÃO MENSAL
+                # =========================
+                st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL DE PEDIDOS</div>', unsafe_allow_html=True)
+                
+                # Filtros para o gráfico de evolução
+                with st.container():
+                    col_filtro_evo1, col_filtro_evo2, col_filtro_evo3 = st.columns(3)
                     
-                    return output.getvalue()
+                    with col_filtro_evo1:
+                        render_filter_label("PRODUTO")
+                        plataforma_evo = st.selectbox(
+                            "Selecione o Produto",
+                            options=["Todas"] + sorted(df_pedidos['COD_PLATAFORMA'].unique()),
+                            key="filtro_plataforma_evo_pedidos",
+                            label_visibility="collapsed"
+                        )
+                    
+                    with col_filtro_evo2:
+                        render_filter_label("REGIONAL")
+                        regional_evo = st.selectbox(
+                            "Selecione a Regional",
+                            options=["Todas"] + sorted(df_pedidos['REGIONAL'].unique()),
+                            key="filtro_regional_evo_pedidos",
+                            label_visibility="collapsed"
+                        )
+                    
+                    with col_filtro_evo3:
+                        render_filter_label("INDICADOR")
+                        indicador_evo = st.selectbox(
+                            "Selecione o Indicador",
+                            options=["Todos"] + sorted(df_pedidos['DSC_INDICADOR'].unique()),
+                            key="filtro_indicador_evo_pedidos",
+                            label_visibility="collapsed"
+                        )
                 
-                # Converter df_final_pedidos para formato numérico para exportação
-                df_numerico_pedidos = df_final_pedidos.copy()
-                excel_data_pedidos = exportar_excel_tabela_pedidos(df_numerico_pedidos)
-                st.download_button(
-                    label="📥 Exportar Excel",
-                    data=excel_data_pedidos,
-                    file_name="tabela_pedidos.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-            
-            with col_exp2_pedidos:
-                @st.cache_data
-                def convert_to_csv_pedidos(df):
-                    return df.to_csv(index=False, sep=';', decimal=',').encode('utf-8')
+                # Aplicar filtros para o gráfico de evolução
+                df_evo = df_pedidos.copy()
                 
-                csv_data_pedidos = convert_to_csv_pedidos(df_numerico_pedidos)
-                st.download_button(
-                    label="📄 Exportar CSV",
-                    data=csv_data_pedidos,
-                    file_name="tabela_pedidos.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-            
-            with col_exp3_pedidos:
-                st.caption(f"""
-                **Resumo da Tabela:** {len(pivot_data_pedidos)} Regionais | 
-                **Total 2024:** {formatar_numero_pedidos(total_2024_geral_pedidos)} | 
-                **Total 2025:** {formatar_numero_pedidos(total_2025_geral_pedidos)} | 
-                **Crescimento:** {formatar_percentual_pedidos(variacao_2024_2025_geral_pedidos)} | 
-                **TEND vs META:** {formatar_percentual_pedidos(alcance_meta_geral_pedidos)}
-                """)
-            
-            # =========================
-            # GRÁFICO DE EVOLUÇÃO MENSAL
-            # =========================
-            st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL DE PEDIDOS</div>', unsafe_allow_html=True)
-            
-            # Filtros para o gráfico de evolução
-            with st.container():
-                col_filtro_evo1, col_filtro_evo2, col_filtro_evo3 = st.columns(3)
+                if plataforma_evo != "Todas":
+                    df_evo = df_evo[df_evo['COD_PLATAFORMA'] == plataforma_evo]
+                if regional_evo != "Todas":
+                    df_evo = df_evo[df_evo['REGIONAL'] == regional_evo]
+                if indicador_evo != "Todos":
+                    df_evo = df_evo[df_evo['DSC_INDICADOR'] == indicador_evo]
                 
-                with col_filtro_evo1:
-                    render_filter_label("PRODUTO")
-                    plataforma_evo = st.selectbox(
-                        "Selecione o Produto",
-                        options=["Todas"] + sorted(df_pedidos['COD_PLATAFORMA'].unique()),
-                        key="filtro_plataforma_evo_pedidos",
-                        label_visibility="collapsed"
-                    )
-                
-                with col_filtro_evo2:
-                    render_filter_label("REGIONAL")
-                    regional_evo = st.selectbox(
-                        "Selecione a Regional",
-                        options=["Todas"] + sorted(df_pedidos['REGIONAL'].unique()),
-                        key="filtro_regional_evo_pedidos",
-                        label_visibility="collapsed"
-                    )
-                
-                with col_filtro_evo3:
-                    render_filter_label("INDICADOR")
-                    indicador_evo = st.selectbox(
-                        "Selecione o Indicador",
-                        options=["Todos"] + sorted(df_pedidos['DSC_INDICADOR'].unique()),
-                        key="filtro_indicador_evo_pedidos",
-                        label_visibility="collapsed"
-                    )
-            
-            # Aplicar filtros para o gráfico de evolução
-            df_evo = df_pedidos.copy()
-            
-            if plataforma_evo != "Todas":
-                df_evo = df_evo[df_evo['COD_PLATAFORMA'] == plataforma_evo]
-            if regional_evo != "Todas":
-                df_evo = df_evo[df_evo['REGIONAL'] == regional_evo]
-            if indicador_evo != "Todos":
-                df_evo = df_evo[df_evo['DSC_INDICADOR'] == indicador_evo]
-            
-            # Criar dados para o gráfico de linhas (similar à aba de Ativados)
-            def create_line_chart_data_pedidos(df_grafico):
-                """Cria dados para gráfico de linhas temporal para pedidos"""
-                # Garantir que temos as colunas de ano e mês
-                if 'DAT_MOVIMENTO2' in df_grafico.columns:
-                    df_grafico['DAT_MOVIMENTO2'] = pd.to_datetime(df_grafico['DAT_MOVIMENTO2'], errors='coerce')
-                    df_grafico['ANO'] = df_grafico['DAT_MOVIMENTO2'].dt.year
-                    df_grafico['DAT_MÊS'] = df_grafico['DAT_MOVIMENTO2'].dt.month
-                else:
-                    # Se não tiver DAT_MOVIMENTO2, usar dat_tratada
-                    meses_pt = {
-                        'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-                        'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+                # Criar dados para o gráfico de linhas (similar à aba de Ativados)
+                def create_line_chart_data_pedidos(df_grafico):
+                    """Cria dados para gráfico de linhas temporal para pedidos"""
+                    # Garantir que temos as colunas de ano e mês
+                    if 'DAT_MOVIMENTO2' in df_grafico.columns:
+                        df_grafico['DAT_MOVIMENTO2'] = pd.to_datetime(df_grafico['DAT_MOVIMENTO2'], errors='coerce')
+                        df_grafico['ANO'] = df_grafico['DAT_MOVIMENTO2'].dt.year
+                        df_grafico['DAT_MÊS'] = df_grafico['DAT_MOVIMENTO2'].dt.month
+                    else:
+                        # Se não tiver DAT_MOVIMENTO2, usar dat_tratada
+                        meses_pt = {
+                            'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+                            'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+                        }
+                        
+                        def extrair_mes_ano(mes_ano_str):
+                            try:
+                                mes_str, ano_str = mes_ano_str.lower().split('/')
+                                mes_num = meses_pt.get(mes_str, 1)
+                                ano_num = int(f"20{ano_str}")
+                                return ano_num, mes_num
+                            except:
+                                return 2024, 1
+                        
+                        df_grafico[['ANO', 'DAT_MÊS']] = df_grafico['dat_tratada'].apply(
+                            lambda x: pd.Series(extrair_mes_ano(x))
+                        )
+                    
+                    meses_abreviados = {
+                        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+                        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
                     }
                     
-                    def extrair_mes_ano(mes_ano_str):
-                        try:
-                            mes_str, ano_str = mes_ano_str.lower().split('/')
-                            mes_num = meses_pt.get(mes_str, 1)
-                            ano_num = int(f"20{ano_str}")
-                            return ano_num, mes_num
-                        except:
-                            return 2024, 1
+                    dados_grafico = []
+                    # Considerar 2024, 2025 e 2026
+                    for ano in [2024, 2025, 2026]:
+                        df_ano = df_grafico[df_grafico['ANO'] == ano]
+                        for mes_num in range(1, 13):
+                            df_mes = df_ano[df_ano['DAT_MÊS'] == mes_num]
+                            
+                            # Para 2024 e 2025 usar QTDE (realizado), para 2026 usar DESAFIO_QTD (meta)
+                            if ano in [2024, 2025]:
+                                valor = df_mes['QTDE'].sum()
+                            else:
+                                valor = df_mes['DESAFIO_QTD'].sum()
+                            
+                            dados_grafico.append({
+                                'Ano': str(ano),
+                                'Mês': meses_abreviados[mes_num],
+                                'Mês_Num': mes_num,
+                                'Valor': valor,
+                                'Tipo': 'Real' if ano in [2024, 2025] else 'Meta'
+                            })
                     
-                    df_grafico[['ANO', 'DAT_MÊS']] = df_grafico['dat_tratada'].apply(
-                        lambda x: pd.Series(extrair_mes_ano(x))
-                    )
+                    df_linhas = pd.DataFrame(dados_grafico)
+                    df_linhas['Mês_Ord'] = df_linhas['Mês_Num']
+                    df_linhas = df_linhas.sort_values(['Ano', 'Mês_Ord'])
+                    df_linhas['Valor_Formatado'] = df_linhas['Valor'].apply(lambda x: f'{x:,.0f}'.replace(',', '.'))
+                    
+                    return df_linhas
                 
-                meses_abreviados = {
-                    1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
-                    7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+                # Criar dados para gráfico
+                df_linhas_pedidos = create_line_chart_data_pedidos(df_evo)
+                
+                # Criar título dinâmico
+                filtros_ativos = []
+                if plataforma_evo != "Todas":
+                    filtros_ativos.append(f"Produto: {plataforma_evo}")
+                if regional_evo != "Todas":
+                    filtros_ativos.append(f"Regional: {regional_evo}")
+                if indicador_evo != "Todos":
+                    filtros_ativos.append(f"Indicador: {indicador_evo}")
+                
+                titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
+                
+                # Criar gráfico
+                cores_personalizadas = {
+                    '2024': '#FF2800',
+                    '2025': '#790E09',
+                    '2026': '#5A6268'
                 }
                 
-                dados_grafico = []
-                # Considerar 2024, 2025 e 2026
-                for ano in [2024, 2025, 2026]:
-                    df_ano = df_grafico[df_grafico['ANO'] == ano]
-                    for mes_num in range(1, 13):
-                        df_mes = df_ano[df_ano['DAT_MÊS'] == mes_num]
-                        
-                        # Para 2024 e 2025 usar QTDE (realizado), para 2026 usar DESAFIO_QTD (meta)
-                        if ano in [2024, 2025]:
-                            valor = df_mes['QTDE'].sum()
-                        else:
-                            valor = df_mes['DESAFIO_QTD'].sum()
-                        
-                        dados_grafico.append({
-                            'Ano': str(ano),
-                            'Mês': meses_abreviados[mes_num],
-                            'Mês_Num': mes_num,
-                            'Valor': valor,
-                            'Tipo': 'Real' if ano in [2024, 2025] else 'Meta'
-                        })
+                fig_linhas_pedidos = px.line(
+                    df_linhas_pedidos,
+                    x='Mês',
+                    y='Valor',
+                    color='Ano',
+                    title=f'<b>EVOLUÇÃO MENSAL DE PEDIDOS</b><br><span style="font-size: 14px; color: #666666;">{titulo_filtros}</span>',
+                    labels={'Valor': 'Volume', 'Mês': ''},
+                    markers=True,
+                    line_shape='spline',
+                    color_discrete_map=cores_personalizadas,
+                    text='Valor_Formatado'
+                )
                 
-                df_linhas = pd.DataFrame(dados_grafico)
-                df_linhas['Mês_Ord'] = df_linhas['Mês_Num']
-                df_linhas = df_linhas.sort_values(['Ano', 'Mês_Ord'])
-                df_linhas['Valor_Formatado'] = df_linhas['Valor'].apply(lambda x: f'{x:,.0f}'.replace(',', '.'))
+                apply_standard_line_layout(fig_linhas_pedidos, 'VOLUME DE PEDIDOS', height=500)
+                apply_standard_line_traces(fig_linhas_pedidos, cores_personalizadas, valor_label='Valor', meta_year='2026')
                 
-                return df_linhas
-            
-            # Criar dados para gráfico
-            df_linhas_pedidos = create_line_chart_data_pedidos(df_evo)
-            
-            # Criar título dinâmico
-            filtros_ativos = []
-            if plataforma_evo != "Todas":
-                filtros_ativos.append(f"Produto: {plataforma_evo}")
-            if regional_evo != "Todas":
-                filtros_ativos.append(f"Regional: {regional_evo}")
-            if indicador_evo != "Todos":
-                filtros_ativos.append(f"Indicador: {indicador_evo}")
-            
-            titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
-            
-            # Criar gráfico
-            cores_personalizadas = {
-                '2024': '#FF2800',
-                '2025': '#790E09',
-                '2026': '#5A6268'
-            }
-            
-            fig_linhas_pedidos = px.line(
-                df_linhas_pedidos,
-                x='Mês',
-                y='Valor',
-                color='Ano',
-                title=f'<b>EVOLUÇÃO MENSAL DE PEDIDOS</b><br><span style="font-size: 14px; color: #666666;">{titulo_filtros}</span>',
-                labels={'Valor': 'Volume', 'Mês': ''},
-                markers=True,
-                line_shape='spline',
-                color_discrete_map=cores_personalizadas,
-                text='Valor_Formatado'
-            )
-            
-            apply_standard_line_layout(fig_linhas_pedidos, 'VOLUME DE PEDIDOS', height=500)
-            apply_standard_line_traces(fig_linhas_pedidos, cores_personalizadas, valor_label='Valor', meta_year='2026')
-            
-            # Container de informações
-            st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #FFFFFF, #F8F9FA); 
-                            padding: 15px 20px; 
-                            border-radius: 12px; 
-                            border: 2px solid #E9ECEF;
-                            margin: 15px 0 5px 0;
-                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                        <div style="font-size: 14px; color: #333333; font-weight: 700;">
-                            <span>📊 Dados Filtrados:</span>
-                            <span style="color: #FF2800; margin-left: 8px;">{len(df_evo):,}</span>
-                        </div>
-                        <div style="font-size: 13px; color: #666666; display: flex; gap: 20px; flex-wrap: wrap;">
-                            <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                <div style="width: 12px; height: 12px; background: #FF2800; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                <span style="font-weight: 600;">2024 (Real)</span>
-                            </span>
-                            <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                <div style="width: 12px; height: 12px; background: #790E09; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                <span style="font-weight: 600;">2025 (Real)</span>
-                            </span>
-                            <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                <div style="width: 12px; height: 12px; background: #5A6268; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                <span style="font-weight: 600;">2026 (Meta)</span>
-                                <span style="color: #5A6268; margin-left: 4px;">— —</span>
-                            </span>
+                # Container de informações
+                st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #FFFFFF, #F8F9FA); 
+                                padding: 15px 20px; 
+                                border-radius: 12px; 
+                                border: 2px solid #E9ECEF;
+                                margin: 15px 0 5px 0;
+                                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div style="font-size: 14px; color: #333333; font-weight: 700;">
+                                <span>📊 Dados Filtrados:</span>
+                                <span style="color: #FF2800; margin-left: 8px;">{len(df_evo):,}</span>
+                            </div>
+                            <div style="font-size: 13px; color: #666666; display: flex; gap: 20px; flex-wrap: wrap;">
+                                <span style="display: inline-flex; align-items: center; gap: 8px;">
+                                    <div style="width: 12px; height: 12px; background: #FF2800; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                                    <span style="font-weight: 600;">2024 (Real)</span>
+                                </span>
+                                <span style="display: inline-flex; align-items: center; gap: 8px;">
+                                    <div style="width: 12px; height: 12px; background: #790E09; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                                    <span style="font-weight: 600;">2025 (Real)</span>
+                                </span>
+                                <span style="display: inline-flex; align-items: center; gap: 8px;">
+                                    <div style="width: 12px; height: 12px; background: #5A6268; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                                    <span style="font-weight: 600;">2026 (Meta)</span>
+                                    <span style="color: #5A6268; margin-left: 4px;">— —</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Exibir gráfico
-            apply_standard_title_style(fig_linhas_pedidos)
-            st.plotly_chart(fig_linhas_pedidos, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
+                """, unsafe_allow_html=True)
+                
+                # Exibir gráfico
+                apply_standard_title_style(fig_linhas_pedidos)
+                st.plotly_chart(fig_linhas_pedidos, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
 
 # =========================
 # ABA 4: LIGAÇÕES - VERSÃO CORRIGIDA
@@ -8220,91 +7996,95 @@ with tab4:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
+            card_total_html = (
+                f'<div class="kpi-card-dinamico animate-fade-in-up">'
+                f'<div class="kpi-title-dinamico">TOTAL LIGAÇÕES</div>'
+                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{total_atual_fmt}</div>{tendencia_icon_total}</div>'
+                f'{real_hint_total}'
+                f'<div class="kpi-meta-line" style="margin: 10px 0;">'
+                f'{build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}'
+                f'</div>'
+                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div class="kpi-variacao-item {classe_total}" style="font-size: 10px !important;">'
+                f'{variacao_total:+.0f}% MoM'
+                f'</div>'
+                f'</div>'
+                f'</div>'
+                f'</div>'
+            )
             st.markdown(
-                f"""
-                <div class="kpi-card-dinamico animate-fade-in-up">
-                    <div class="kpi-title-dinamico">TOTAL LIGAÇÕES</div>
-                    <div style="text-align: center; padding: 15px 0;">
-                        <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{total_atual_fmt}</div>{tendencia_icon_total}</div>
-                        {real_hint_total}
-                        <div class="kpi-meta-line" style="margin: 10px 0;">
-                            {build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}
-                        </div>
-                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-                            <div class="kpi-variacao-item {classe_total}" style="font-size: 10px !important;">
-                                {variacao_total:+.0f}% MoM
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                """,
+                card_total_html,
                 unsafe_allow_html=True
             )
         
         with col2:
+            card_fixa_html = (
+                f'<div class="kpi-card-dinamico animate-fade-in-up">'
+                f'<div class="kpi-title-dinamico">LIGAÇÕES FIXA</div>'
+                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{fixa_atual_fmt}</div>{tendencia_icon_fixa}</div>'
+                f'{real_hint_fixa}'
+                f'<div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">'
+                f'{build_kpi_meta_line(fixa_anterior_fmt, meta_fixa_fmt, mes_anterior, mes_selecionado, break_line=False)}'
+                f'</div>'
+                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div class="kpi-variacao-item {classe_fixa}" style="font-size: 10px !important;">'
+                f'{variacao_fixa:+.0f}% MoM'
+                f'</div>'
+                f'{meta_fixa_html}'
+                f'</div>'
+                f'</div>'
+                f'</div>'
+            )
             st.markdown(
-                f"""
-                <div class="kpi-card-dinamico animate-fade-in-up">
-                    <div class="kpi-title-dinamico">LIGAÇÕES FIXA</div>
-                    <div style="text-align: center; padding: 15px 0;">
-                        <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{fixa_atual_fmt}</div>{tendencia_icon_fixa}</div>
-                        {real_hint_fixa}
-                        <div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">
-                            {build_kpi_meta_line(fixa_anterior_fmt, meta_fixa_fmt, mes_anterior, mes_selecionado, break_line=False)}
-                        </div>
-                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-                            <div class="kpi-variacao-item {classe_fixa}" style="font-size: 10px !important;">
-                                {variacao_fixa:+.0f}% MoM
-                            </div>
-                            {meta_fixa_html}
-                        </div>
-                    </div>
-                </div>
-                """,
+                card_fixa_html,
                 unsafe_allow_html=True
             )
         
         with col3:
+            card_conta_html = (
+                f'<div class="kpi-card-dinamico animate-fade-in-up">'
+                f'<div class="kpi-title-dinamico">LIGAÇÕES CONTA</div>'
+                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{conta_atual_fmt}</div>{tendencia_icon_conta}</div>'
+                f'{real_hint_conta}'
+                f'<div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">'
+                f'{build_kpi_meta_line(conta_anterior_fmt, meta_conta_fmt, mes_anterior, mes_selecionado, break_line=False)}'
+                f'</div>'
+                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div class="kpi-variacao-item {classe_conta}" style="font-size: 10px !important;">'
+                f'{variacao_conta:+.0f}% MoM'
+                f'</div>'
+                f'{meta_conta_html}'
+                f'</div>'
+                f'</div>'
+                f'</div>'
+            )
             st.markdown(
-                f"""
-                <div class="kpi-card-dinamico animate-fade-in-up">
-                    <div class="kpi-title-dinamico">LIGAÇÕES CONTA</div>
-                    <div style="text-align: center; padding: 15px 0;">
-                        <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{conta_atual_fmt}</div>{tendencia_icon_conta}</div>
-                        {real_hint_conta}
-                        <div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">
-                            {build_kpi_meta_line(conta_anterior_fmt, meta_conta_fmt, mes_anterior, mes_selecionado, break_line=False)}
-                        </div>
-                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-                            <div class="kpi-variacao-item {classe_conta}" style="font-size: 10px !important;">
-                                {variacao_conta:+.0f}% MoM
-                            </div>
-                            {meta_conta_html}
-                        </div>
-                    </div>
-                </div>
-                """,
+                card_conta_html,
                 unsafe_allow_html=True
             )
         
         with col4:
+            card_ctc_html = (
+                f'<div class="kpi-card-dinamico animate-fade-in-up">'
+                f'<div class="kpi-title-dinamico">CLICK TO CALL</div>'
+                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div class="kpi-value-dinamico">{clicktocall_atual_fmt}</div>'
+                f'<div class="kpi-meta-line" style="margin: 10px 0;">'
+                f'{build_kpi_meta_line(clicktocall_anterior_fmt, mes_anterior_ref=mes_anterior)}'
+                f'</div>'
+                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div class="kpi-variacao-item {classe_clicktocall}" style="font-size: 10px !important;">'
+                f'{variacao_clicktocall:+.0f}% MoM'
+                f'</div>'
+                f'</div>'
+                f'</div>'
+                f'</div>'
+            )
             st.markdown(
-                f"""
-                <div class="kpi-card-dinamico animate-fade-in-up">
-                    <div class="kpi-title-dinamico">CLICK TO CALL</div>
-                    <div style="text-align: center; padding: 15px 0;">
-                        <div class="kpi-value-dinamico">{clicktocall_atual_fmt}</div>
-                        <div class="kpi-meta-line" style="margin: 10px 0;">
-                            {build_kpi_meta_line(clicktocall_anterior_fmt, mes_anterior_ref=mes_anterior)}
-                        </div>
-                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-                            <div class="kpi-variacao-item {classe_clicktocall}" style="font-size: 10px !important;">
-                                {variacao_clicktocall:+.0f}% MoM
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                """,
+                card_ctc_html,
                 unsafe_allow_html=True
             )
         
@@ -8604,44 +8384,6 @@ with tab4:
                     for _, row in media_por_ano.iterrows():
                         st.write(f"• **{row['Ano']}**: Média mensal de {formatar_numero_brasileiro(row['Valor'], 0)}")
             
-            # =========================
-            # DOWNLOAD DOS DADOS
-            # =========================
-            st.markdown("---")
-            
-            col_down1, col_down2 = st.columns(2)
-            
-            with col_down1:
-                @st.cache_data
-                def exportar_excel_grafico(df_grafico):
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_grafico.to_excel(writer, index=False, sheet_name='Dados_Grafico_Ligacoes')
-                    return output.getvalue()
-                
-                excel_data = exportar_excel_grafico(df_linhas_lig)
-                st.download_button(
-                    label="📥 Exportar Dados do Gráfico (Excel)",
-                    data=excel_data,
-                    file_name=f"dados_grafico_ligacoes_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-            
-            with col_down2:
-                @st.cache_data
-                def exportar_csv_grafico(df_grafico):
-                    return df_grafico.to_csv(index=False, sep=';', decimal=',').encode('utf-8')
-                
-                csv_data = exportar_csv_grafico(df_linhas_lig)
-                st.download_button(
-                    label="📄 Exportar Dados do Gráfico (CSV)",
-                    data=csv_data,
-                    file_name=f"dados_grafico_ligacoes_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-
         else:
             st.warning("""
             ⚠️ **Não foi possível gerar o gráfico de evolução.**
@@ -9217,8 +8959,6 @@ with tab4:
                         
                         if col == 'Regional':
                             classe = "col-regional"
-                        elif col == 'Total 2024':
-                            classe = "col-total-anual"
                         elif col in meses_lista:
                             if '/25' in col:
                                 classe = "col-mes-2025"
@@ -10723,7 +10463,7 @@ with tab5:
     # NOVO VISUAL: PERFORMANCE REGIONAL CONSOLIDADA (PEDIDOS/LIGAÇÕES/V.B/ATIVADOS)
     # ------------------------------------------------------------
     st.markdown(
-        '<div class="subsection-title" style="margin-top:12px;">📌 PERFORMANCE REGIONAL - RESUMO MULTI INDICADORES</div>',
+        '<div class="subsection-title" style="margin-top:12px;">📌 PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES</div>',
         unsafe_allow_html=True
     )
 
@@ -11259,4 +10999,3 @@ with tab5:
                 ),
                 unsafe_allow_html=True
             )
-
