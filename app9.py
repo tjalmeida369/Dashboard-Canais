@@ -108,6 +108,7 @@ def normalizar_numerico_serie(serie):
 # CONFIGURAÇÕES DE ESTILO GLOBAL
 # =========================
 st.set_page_config(page_title="Dashboard - Canais Estratégicos", layout="wide")
+KPI_PILL_VARIANT = "contrast"  # Opcoes: "clean" ou "contrast"
 
 def render_header_logo():
     """Render top-right logo if the local PNG file exists."""
@@ -233,6 +234,9 @@ st.markdown("""
             border-left: 4px solid #FF2800;
             background: linear-gradient(90deg, rgba(255, 40, 0, 0.08) 0%, transparent 100%);
             border-radius: 0 10px 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         
         .card-title {
@@ -253,17 +257,17 @@ st.markdown("""
         .kpi-card-dinamico {
             background: linear-gradient(145deg, #FFFFFF, #F8F9FA);
             border-radius: 16px;
-            padding: 16px;
+            padding: 6px;
             box-shadow: 
                 0 8px 25px rgba(121, 14, 9, 0.12),
                 0 3px 10px rgba(0, 0, 0, 0.06),
                 inset 0 1px 0 rgba(255, 255, 255, 0.9);
-            margin: 10px 0;
+            margin: 4px 0;
             border: 2px solid #F0F0F0;
             position: relative;
             overflow: hidden;
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
-            min-height: 180px;
+            min-height: 70px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -318,7 +322,7 @@ st.markdown("""
         .kpi-block-dinamico {
             background: linear-gradient(135deg, #FFFFFF, #F8F9FA);
             border-radius: 12px;
-            padding: 15px 10px;
+            padding: 7px 5px;
             text-align: center;
             border: 2px solid #E9ECEF;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
@@ -815,6 +819,9 @@ st.markdown("""
 
         .kpi-card-dinamico {
             overflow: hidden;
+            min-height: 70px !important;
+            padding: 6px !important;
+            margin: 4px 0 !important;
         }
 
         .kpi-card-dinamico::before,
@@ -863,7 +870,7 @@ st.markdown("""
         }
 
         .kpi-value-dinamico {
-            font-size: 25px !important;
+            font-size: 20px !important;
             color: var(--ds-text) !important;
             background: none !important;
             -webkit-text-fill-color: var(--ds-text) !important;
@@ -874,19 +881,40 @@ st.markdown("""
         }
 
         .kpi-variacao-item {
-            box-shadow: none;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
             border-radius: 999px;
-            border-width: 1px !important;
+            border: 1px solid #DCE3EC !important;
             min-height: 24px;
-            padding: 4px 10px !important;
+            padding: 4px 11px !important;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
             font-weight: 700 !important;
+            letter-spacing: 0.2px;
+            color: #475569 !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                0 1px 2px rgba(15, 23, 42, 0.08);
+        }
+
+        .kpi-variacao-item::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #94A3B8;
+            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.18);
+            flex: 0 0 auto;
         }
 
         .kpi-meta-line {
             font-size: 12.5px;
             color: #666666;
-            margin: 6px 0;
+            margin: 5px 0;
             line-height: 1.35;
             font-weight: 500;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
@@ -908,7 +936,7 @@ st.markdown("""
         }
 
         .kpi-parcial-note {
-            font-size: 11px;
+            font-size: 12px;
             color: #666666;
             font-weight: 700;
             margin-top: 4px;
@@ -955,15 +983,36 @@ st.markdown("""
         }
 
         .variacao-positiva {
-            color: var(--ds-positive) !important;
-            background: #EAF6EC !important;
-            border-color: #4CAF50 !important;
+            color: #166534 !important;
+            background: linear-gradient(180deg, #F4FBF6 0%, #E8F5ED 100%) !important;
+            border-color: rgba(22, 101, 52, 0.30) !important;
+        }
+
+        .variacao-positiva::before {
+            background: #22C55E;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.20);
         }
 
         .variacao-negativa {
-            color: var(--ds-negative) !important;
-            background: #FDECEC !important;
-            border-color: #F44336 !important;
+            color: #B42318 !important;
+            background: linear-gradient(180deg, #FFF6F5 0%, #FDECEC 100%) !important;
+            border-color: rgba(180, 35, 24, 0.30) !important;
+        }
+
+        .variacao-negativa::before {
+            background: #DC2626;
+            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.20);
+        }
+
+        .variacao-neutra {
+            color: #475569 !important;
+            background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F7 100%) !important;
+            border-color: rgba(71, 85, 105, 0.25) !important;
+        }
+
+        .variacao-neutra::before {
+            background: #94A3B8;
+            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20);
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -1368,7 +1417,7 @@ st.markdown("""
             }
 
             .kpi-card-dinamico {
-                min-height: 145px;
+                min-height: 58px;
             }
 
             .analitico-corte-info {
@@ -1379,21 +1428,161 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Variantes "executivas" para os pills de MoM/Meta nos cards KPI.
+if KPI_PILL_VARIANT == "clean":
+    kpi_pill_style = """
+    <style>
+        .kpi-variacao-item {
+            border-radius: 999px !important;
+            border-width: 1px !important;
+            min-height: 24px !important;
+            padding: 4px 11px !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+            color: #475569 !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 1px 2px rgba(15, 23, 42, 0.07) !important;
+        }
+        .kpi-variacao-item::before {
+            content: "" !important;
+            width: 7px !important;
+            height: 7px !important;
+            border-radius: 999px !important;
+            background: #94A3B8 !important;
+            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20) !important;
+            flex: 0 0 auto !important;
+        }
+        .variacao-positiva {
+            color: #166534 !important;
+            background: linear-gradient(180deg, #F5FCF7 0%, #EDF8F0 100%) !important;
+            border-color: rgba(22, 101, 52, 0.28) !important;
+        }
+        .variacao-positiva::before {
+            background: #16A34A !important;
+            box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.22) !important;
+        }
+        .variacao-negativa {
+            color: #B42318 !important;
+            background: linear-gradient(180deg, #FFF6F6 0%, #FDECEC 100%) !important;
+            border-color: rgba(180, 35, 24, 0.30) !important;
+        }
+        .variacao-negativa::before {
+            background: #DC2626 !important;
+            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.20) !important;
+        }
+        .variacao-neutra {
+            color: #475569 !important;
+            background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F7 100%) !important;
+            border-color: rgba(71, 85, 105, 0.25) !important;
+        }
+        .variacao-neutra::before {
+            background: #94A3B8 !important;
+            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20) !important;
+        }
+    </style>
+    """
+else:
+    kpi_pill_style = """
+    <style>
+        .kpi-variacao-item {
+            border-radius: 999px !important;
+            border-width: 1px !important;
+            min-height: 24px !important;
+            padding: 4px 11px !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+            color: #475569 !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 3px rgba(15, 23, 42, 0.10) !important;
+        }
+        .kpi-variacao-item::before {
+            content: "" !important;
+            width: 7px !important;
+            height: 7px !important;
+            border-radius: 999px !important;
+            background: #94A3B8 !important;
+            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20) !important;
+            flex: 0 0 auto !important;
+        }
+        .variacao-positiva {
+            color: #14532D !important;
+            background: linear-gradient(180deg, #ECF9F0 0%, #DDF3E4 100%) !important;
+            border-color: rgba(22, 101, 52, 0.38) !important;
+        }
+        .variacao-positiva::before {
+            background: #16A34A !important;
+            box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.28) !important;
+        }
+        .variacao-negativa {
+            color: #991B1B !important;
+            background: linear-gradient(180deg, #FEEFEF 0%, #FDDDDD 100%) !important;
+            border-color: rgba(185, 28, 28, 0.42) !important;
+        }
+        .variacao-negativa::before {
+            background: #DC2626 !important;
+            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.30) !important;
+        }
+        .variacao-neutra {
+            color: #334155 !important;
+            background: linear-gradient(180deg, #F1F5F9 0%, #E5EBF2 100%) !important;
+            border-color: rgba(71, 85, 105, 0.30) !important;
+        }
+        .variacao-neutra::before {
+            background: #64748B !important;
+            box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.25) !important;
+        }
+    </style>
+    """
+
+st.markdown(kpi_pill_style, unsafe_allow_html=True)
+
 # =========================
 # FUNÇÕES AUXILIARES
 # =========================
-@st.cache_data
-def load_data(path: str) -> pd.DataFrame:
-    """Carrega dados do Excel com tratamento de erros"""
+@st.cache_data(show_spinner=False)
+def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """
+    Carrega e pré-trata a base principal.
+    O file_mtime é usado apenas para invalidar cache quando o arquivo muda.
+    """
+    _ = file_mtime  # parâmetro sentinela para invalidação de cache
     try:
         df = pd.read_excel(path)
-        return df
     except FileNotFoundError:
         st.error("Arquivo de dados não encontrado!")
         st.stop()
     except Exception as e:
         st.error(f"Erro ao carregar dados: {str(e)}")
         st.stop()
+
+    # Pré-tratamento leve para reduzir retrabalho a cada rerun.
+    colunas_texto = ['REGIONAL', 'CANAL_PLAN', 'dat_tratada', 'DSC_INDICADOR', 'COD_PLATAFORMA']
+    for col in colunas_texto:
+        if col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]):
+                df[col] = df[col].str.strip()
+            else:
+                df[col] = df[col].astype('string').str.strip()
+
+    if 'DAT_MOVIMENTO2' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['DAT_MOVIMENTO2']):
+        df['DAT_MOVIMENTO2'] = pd.to_datetime(df['DAT_MOVIMENTO2'], errors='coerce')
+
+    if 'QTDE' in df.columns:
+        df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0)
+    if 'DESAFIO_QTD' in df.columns:
+        df['DESAFIO_QTD'] = normalizar_numerico_serie(df['DESAFIO_QTD']).fillna(0)
+    else:
+        df['DESAFIO_QTD'] = 0.0
+
+    if 'TEND_QTD' in df.columns:
+        df['TEND_QTD'] = normalizar_numerico_serie(df['TEND_QTD']).fillna(0)
+    else:
+        df['TEND_QTD'] = df.get('QTDE', 0)
+
+    return df
+
+
+@st.cache_data(show_spinner=False)
+def load_excel_cached(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """Leitura de Excel com cache invalidado por data de modificação."""
+    _ = file_mtime
+    return pd.read_excel(path)
 
 def export_excel(df: pd.DataFrame) -> BytesIO:
     """Exporta DataFrame para Excel"""
@@ -1508,7 +1697,11 @@ def build_kpi_meta_line(
         f'<span class="kpi-meta-label" title="{escape(hint_meta)}" '
         f'aria-label="{escape(hint_meta)}">Meta:</span>'
     )
-    separador = "<br>" if break_line else " | "
+    separador = (
+        "<br>"
+        if break_line
+        else '<span style="display:inline-block; margin: 0 8px; color:#94A3B8;">|</span>'
+    )
     return f"{label_anterior} {anterior_valor}{separador}{label_meta} {meta_valor}"
 
 def get_data_realizado_max_formatada(df_base: pd.DataFrame) -> str:
@@ -1533,11 +1726,11 @@ def get_data_realizado_max_formatada(df_base: pd.DataFrame) -> str:
                 return data_max.strftime('%d/%m/%Y')
     return "N/D"
 
-@st.cache_data
 def create_line_chart_data(df_grafico):
     """Cria dados para gráfico de linhas temporal"""
     if 'ANO' not in df_grafico.columns or 'DAT_MÊS' not in df_grafico.columns:
-        df_grafico['DAT_MOVIMENTO2'] = pd.to_datetime(df_grafico['DAT_MOVIMENTO2'], errors='coerce')
+        if not pd.api.types.is_datetime64_any_dtype(df_grafico['DAT_MOVIMENTO2']):
+            df_grafico['DAT_MOVIMENTO2'] = pd.to_datetime(df_grafico['DAT_MOVIMENTO2'], errors='coerce')
         df_grafico['ANO'] = df_grafico['DAT_MOVIMENTO2'].dt.year
         df_grafico['DAT_MÊS'] = df_grafico['DAT_MOVIMENTO2'].dt.month
     
@@ -1639,7 +1832,7 @@ def apply_standard_line_layout(fig, y_axis_title: str, height: int = 520):
             font_color='#2F3747'
         ),
         height=height,
-        showlegend=True
+        showlegend=False
     )
 
 def apply_standard_line_traces(fig, color_map: dict, valor_label: str = 'Valor', meta_year: str = '2026'):
@@ -1649,6 +1842,15 @@ def apply_standard_line_traces(fig, color_map: dict, valor_label: str = 'Valor',
         cor = color_map.get(ano, '#6B7280')
         is_meta = ano == str(meta_year)
         hover_nome = 'Meta' if is_meta else valor_label
+        posicoes_texto = {
+            '2024': 'top left',
+            '2025': 'top center',
+            '2026': 'top right'
+        }
+        texto_trace = [
+            formatar_numero_brasileiro(v, 0) if pd.notna(v) and float(v) != 0 else ''
+            for v in list(trace.y)
+        ]
         trace.update(
             mode='lines+markers+text',
             marker=dict(
@@ -1663,13 +1865,15 @@ def apply_standard_line_traces(fig, color_map: dict, valor_label: str = 'Valor',
                 smoothing=1.2,
                 color=cor
             ),
-            textposition='top center',
-            textfont=dict(size=11, color=cor),
             hovertemplate=(
                 f"<b>%{{x}}/{ano}</b><br>"
                 + f"<b>{hover_nome}:</b> %{{y:,.0f}}<br>"
                 + "<extra></extra>"
-            )
+            ),
+            text=texto_trace,
+            textposition=posicoes_texto.get(ano, 'top center'),
+            textfont=dict(size=10, color=cor),
+            cliponaxis=False
         )
 
 def apply_standard_title_style(fig, size: int = 16):
@@ -1724,7 +1928,6 @@ def normalizar_rotulo_produto(valor) -> str:
         return f"PRODUTO {base}"
     return base
 
-@st.cache_data(ttl=900)
 def create_bar_chart_data(df_mes_selecionado):
     """Cria dados para gráfico de barras horizontais"""
     df_plot = df_mes_selecionado.copy()
@@ -2744,6 +2947,11 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
         return ""
 
     colunas = list(df_formatado.columns)
+    total_colunas = max(len(colunas), 1)
+    largura_col_pct = 100.0 / total_colunas
+    colgroup_html = "<colgroup>" + "".join(
+        [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+    ) + "</colgroup>"
     dias_semana_cols = {'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM'}
     col_var = colunas[4] if len(colunas) > 4 else "META X REAL"
     col_mes_anterior = colunas[1] if len(colunas) > 1 else ""
@@ -2756,7 +2964,7 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             width: 100%;
             max-height: 520px;
             overflow-y: auto;
-            overflow-x: auto;
+            overflow-x: hidden;
             border: 2px solid #790E09;
             border-radius: 10px;
             box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
@@ -2770,7 +2978,7 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             border-spacing: 0;
             font-size: 11px;
             line-height: 1.25;
-            min-width: 1080px;
+            table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
         }}
         #{table_id} .tabela-analitico thead {{
@@ -2786,7 +2994,9 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             text-align: center;
             border-bottom: 3px solid #5A0A06;
             border-right: 1px solid #FFFFFF;
-            white-space: nowrap;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
             text-transform: uppercase;
             letter-spacing: 0.3px;
             font-size: 11px;
@@ -2810,16 +3020,16 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             font-variant-numeric: tabular-nums;
             color: #1F2937;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
+            font-size: 12px;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }}
         #{table_id} .tabela-analitico td.col-canal {{
             text-align: left;
             font-weight: 400;
             color: #2F3747;
             background: linear-gradient(90deg, #fef5f4 0%, #ffffff 100%) !important;
-            position: sticky;
-            left: 0;
-            z-index: 20;
-            min-width: 150px;
             padding-left: 14px;
         }}
         #{table_id} .linha-canal-analitico:nth-child(even) {{
@@ -2930,6 +3140,7 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
     </style>
     <div id="{table_id}" class="tabela-container-analitico">
     <table class="tabela-analitico">
+    {colgroup_html}
     <thead><tr>
     """
 
@@ -3211,6 +3422,11 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         return ""
 
     colunas = list(df_formatado.columns)
+    total_colunas = max(len(colunas), 1)
+    largura_col_pct = 100.0 / total_colunas
+    colgroup_html = "<colgroup>" + "".join(
+        [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+    ) + "</colgroup>"
     col_canal = colunas[0] if colunas else 'CANAL_PLAN'
     col_meta = colunas[5] if len(colunas) > 5 else 'Meta'
     col_mom = colunas[4] if len(colunas) > 4 else 'MoM'
@@ -3222,7 +3438,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             width: 100%;
             max-height: 500px;
             overflow-y: auto;
-            overflow-x: auto;
+            overflow-x: hidden;
             border: 2px solid #790E09;
             border-radius: 10px;
             box-shadow: 0 4px 20px rgba(121, 14, 9, 0.14);
@@ -3236,7 +3452,6 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             border-spacing: 0;
             font-size: 12px;
             line-height: 1.3;
-            min-width: 760px;
             table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
         }}
@@ -3253,23 +3468,12 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             text-align: center;
             border-bottom: 3px solid #5A0A06;
             border-right: 1px solid #FFFFFF;
-            white-space: nowrap;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
             text-transform: uppercase;
             letter-spacing: 0.3px;
             font-size: 12px;
-        }}
-        #{table_id} .tabela-resultado-canais th:first-child {{
-            width: 140px;
-            min-width: 140px;
-            max-width: 140px;
-            text-align: left;
-            padding-left: 9px;
-        }}
-        #{table_id} .tabela-resultado-canais th:not(:first-child),
-        #{table_id} .tabela-resultado-canais td:not(.col-canal) {{
-            width: 103px;
-            min-width: 103px;
-            max-width: 103px;
         }}
         #{table_id} .tabela-resultado-canais th.col-var {{
             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
@@ -3286,17 +3490,14 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             font-variant-numeric: tabular-nums;
             color: #1F2937;
             font-size: 12px;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }}
         #{table_id} .tabela-resultado-canais td.col-canal {{
             text-align: left;
             color: #2F3747;
             background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
-            position: sticky;
-            left: 0;
-            z-index: 20;
-            min-width: 140px;
-            width: 140px;
-            max-width: 140px;
             padding-left: 9px;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par td {{
@@ -3387,6 +3588,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     </style>
     <div id="{table_id}" class="tabela-container-resultado-canais">
     <table class="tabela-resultado-canais">
+    {colgroup_html}
     <thead><tr>
     """
 
@@ -3466,16 +3668,11 @@ def validate_data(df):
 # CARREGAR E VALIDAR DADOS
 # =========================
 file_path = "base_final_trt_new3.xlsx"
-df = load_data(file_path)
+file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
+df = load_data(file_path, file_mtime)
 
 # Validar dados
 validate_data(df)
-
-# Normalizar coluna de tendência (fallback para QTDE quando não existir)
-if 'TEND_QTD' in df.columns:
-    df['TEND_QTD'] = normalizar_numerico_serie(df['TEND_QTD']).fillna(0)
-else:
-    df['TEND_QTD'] = normalizar_numerico_serie(df.get('QTDE', 0)).fillna(0)
 
 # =========================
 # FILTROS GERAIS (SIDEBAR)
@@ -3516,20 +3713,47 @@ with st.sidebar:
         st.markdown("**ℹ️ Informações:**")
         st.info(f"Total de registros: {len(df):,}")
 
-# Filtro vazio no widget = "Todos" para manter comportamento anterior
-region_filter_eff = region_filter if len(region_filter) > 0 else df['REGIONAL'].dropna().unique().tolist()
-canal_filter_eff = canal_filter if len(canal_filter) > 0 else df['CANAL_PLAN'].dropna().unique().tolist()
-data_filter_eff = data_filter if len(data_filter) > 0 else df['dat_tratada'].dropna().unique().tolist()
-indicador_filter_eff = indicador_filter if len(indicador_filter) > 0 else df['DSC_INDICADOR'].dropna().unique().tolist()
+def aplicar_filtros_globais(
+    df_base: pd.DataFrame,
+    regionais: list[str],
+    canais: list[str],
+    periodos: list[str],
+    indicadores: list[str],
+    incluir_periodo: bool = True
+) -> pd.DataFrame:
+    """Aplica filtros globais com máscara booleana (mais eficiente que query em alto volume)."""
+    if df_base.empty:
+        return df_base
 
-# Aplicar filtros
-df_filtered = df.query(
-    "REGIONAL in @region_filter_eff and CANAL_PLAN in @canal_filter_eff and dat_tratada in @data_filter_eff and DSC_INDICADOR in @indicador_filter_eff"
+    mask = np.ones(len(df_base), dtype=bool)
+    if regionais:
+        mask &= df_base['REGIONAL'].isin(set(regionais)).to_numpy()
+    if canais:
+        mask &= df_base['CANAL_PLAN'].isin(set(canais)).to_numpy()
+    if incluir_periodo and periodos:
+        mask &= df_base['dat_tratada'].isin(set(periodos)).to_numpy()
+    if indicadores:
+        mask &= df_base['DSC_INDICADOR'].isin(set(indicadores)).to_numpy()
+    return df_base.loc[mask]
+
+# Aplicar filtros (seleção vazia = todos)
+df_filtered = aplicar_filtros_globais(
+    df,
+    region_filter,
+    canal_filter,
+    data_filter,
+    indicador_filter,
+    incluir_periodo=True
 )
 
 # Versão sem filtro de período (para tabelas dinâmicas de ciclo)
-df_filtered_sem_periodo = df.query(
-    "REGIONAL in @region_filter_eff and CANAL_PLAN in @canal_filter_eff and DSC_INDICADOR in @indicador_filter_eff"
+df_filtered_sem_periodo = aplicar_filtros_globais(
+    df,
+    region_filter,
+    canal_filter,
+    data_filter,
+    indicador_filter,
+    incluir_periodo=False
 )
 
 # Logo institucional no topo (quando disponível no caminho local)
@@ -3562,7 +3786,7 @@ st.markdown("""
 # =========================
 # ABAS PRINCIPAIS
 # =========================
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📱 Ativados", "📉 Desativados", "📋 Pedidos", "📞 Ligações", "📊 Analítico"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📱 ATIVADOS", "📉 DESATIVADOS", "📋 PEDIDOS", "📞 LIGAÇÕES", "📊 ANALÍTICO"])
 
 # Persistir aba selecionada entre reruns para evitar voltar para Ativados ao filtrar
 components.html(
@@ -3702,34 +3926,60 @@ with tab1:
     
     mes_corrente_ref = get_mes_atual_formatado().strip().lower()
 
+    # Pré-agregação para cards de Ativados (evita múltiplos .query por canal/plataforma).
+    if not df_filtered.empty:
+        agg_kpi_canal = df_filtered.groupby(
+            ['CANAL_PLAN', 'COD_PLATAFORMA', 'dat_tratada'],
+            as_index=False,
+            observed=True
+        )[['QTDE', 'TEND_QTD', 'DESAFIO_QTD']].sum()
+        kpi_lookup_qtde = {
+            (row['CANAL_PLAN'], row['COD_PLATAFORMA'], row['dat_tratada']): float(row['QTDE'] or 0)
+            for _, row in agg_kpi_canal.iterrows()
+        }
+        kpi_lookup_tend = {
+            (row['CANAL_PLAN'], row['COD_PLATAFORMA'], row['dat_tratada']): float(row['TEND_QTD'] or 0)
+            for _, row in agg_kpi_canal.iterrows()
+        }
+        kpi_lookup_meta = {
+            (row['CANAL_PLAN'], row['COD_PLATAFORMA'], row['dat_tratada']): float(row['DESAFIO_QTD'] or 0)
+            for _, row in agg_kpi_canal.iterrows()
+        }
+    else:
+        kpi_lookup_qtde = {}
+        kpi_lookup_tend = {}
+        kpi_lookup_meta = {}
+
+    # Fallback de tendência no dataset completo para não perder parcial quando o recorte filtrar indicador.
+    agg_tend_global = df.groupby(
+        ['CANAL_PLAN', 'COD_PLATAFORMA', 'dat_tratada'],
+        as_index=False,
+        observed=True
+    )[['TEND_QTD']].sum()
+    kpi_lookup_tend_global = {
+        (row['CANAL_PLAN'], row['COD_PLATAFORMA'], row['dat_tratada']): float(row['TEND_QTD'] or 0)
+        for _, row in agg_tend_global.iterrows()
+    }
+
     # Função para calcular métricas
     def calcular_metricas_canal(canal, plataforma, mes_atual, mes_anterior):
-        realizado_atual = df_filtered.query(
-            "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
-        )['QTDE'].sum()
-
-        tendencia_atual = df_filtered.query(
-            "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
-        )['TEND_QTD'].sum()
+        chave_atual = (canal, plataforma, mes_atual)
+        chave_anterior = (canal, plataforma, mes_anterior)
+        realizado_atual = float(kpi_lookup_qtde.get(chave_atual, 0))
+        tendencia_atual = float(kpi_lookup_tend.get(chave_atual, 0))
 
         usar_tendencia_mes = str(mes_atual).strip().lower() == mes_corrente_ref
         # Fallback: quando TEND_QTD não vier no recorte filtrado (ex.: indicador),
         # tenta recuperar no dataset completo para não perder a sinalização de parcial.
         if usar_tendencia_mes and tendencia_atual <= 0:
-            tendencia_atual = df.query(
-                "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
-            )['TEND_QTD'].sum()
+            tendencia_atual = float(kpi_lookup_tend_global.get(chave_atual, 0))
 
         usar_tendencia = usar_tendencia_mes and (tendencia_atual > 0)
         atual = tendencia_atual if usar_tendencia else realizado_atual
         
-        anterior = df_filtered.query(
-            "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_anterior"
-        )['QTDE'].sum()
+        anterior = float(kpi_lookup_qtde.get(chave_anterior, 0))
         
-        meta = df_filtered.query(
-            "CANAL_PLAN == @canal and COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
-        )['DESAFIO_QTD'].sum()
+        meta = float(kpi_lookup_meta.get(chave_atual, 0))
         
         variacao_mom = ((atual - anterior) / anterior * 100) if anterior > 0 else 0
         
@@ -3818,17 +4068,17 @@ with tab1:
                     
                     meta_html = f'<div class="kpi-variacao-item {classe_meta}" style="font-size: 10px !important;">{desvio_meta:+.0f}% Meta</div>'
                 else:
-                    meta_html = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
+                    meta_html = '<div class="kpi-variacao-item variacao-neutra" style="font-size: 10px !important;">Meta N/A</div>'
                 
                 bloco_html += (
                     f'<div class="kpi-block-dinamico">'
-                    f'<div style="font-size: 13px; color: #333333; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">{plataforma}</div>'
+                    f'<div style="font-size: 13px; color: #333333; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">{plataforma}</div>'
                     f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_formatado}</div>{tendencia_icon_html}</div>'
                     f'{real_hint_html}'
                     f'<div class="kpi-meta-line">'
                     f'{build_kpi_meta_line(anterior_formatado, meta_formatado, mes_anterior_cards, mes_selecionado_cards)}'
                     f'</div>'
-                    f'<div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 10px;">'
+                    f'<div style="display: flex; justify-content: space-between; gap: 7px; margin-top: 8px;">'
                     f'<div class="kpi-variacao-item {classe_mom}" style="flex: 1; font-size: 10px !important;">{variacao_mom:+.0f}% MoM</div>'
                     f'{meta_html}'
                     f'</div>'
@@ -3840,7 +4090,7 @@ with tab1:
                     st.markdown(
                         f'<div class="kpi-card-dinamico animate-fade-in-up">'
                         f'<div class="kpi-title-dinamico">{canal}</div>'
-                        f'<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">{bloco_html}</div>'
+                        f'<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">{bloco_html}</div>'
                         f'</div>',
                         unsafe_allow_html=True
                     )
@@ -3921,11 +4171,10 @@ with tab1:
             labels={'Valor': 'Volume', 'Mês': ''},
             markers=True,
             line_shape='spline',
-            color_discrete_map=cores_personalizadas,
-            text='Valor_Formatado'
+            color_discrete_map=cores_personalizadas
         )
         
-        apply_standard_line_layout(fig_linhas, 'VOLUME', height=500)
+        apply_standard_line_layout(fig_linhas, 'VOLUME', height=400)
         apply_standard_line_traces(fig_linhas, cores_personalizadas, valor_label='Valor', meta_year='2026')
         
         # Container de informações
@@ -3971,24 +4220,6 @@ with tab1:
     
     # Usar o mesmo mês selecionado nos cards KPI
     mes_selecionado = mes_selecionado_cards
-    
-    st.markdown(f"""
-        <div class="info-box">
-            <div class="info-box-title">Período de Análise</div>
-            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 14px; color: #333333; font-weight: 600;">Mês Selecionado:</span>
-                    <span style="font-size: 16px; color: #FF2800; font-weight: 800; 
-                            background: rgba(255, 40, 0, 0.1); padding: 8px 20px; border-radius: 25px;">
-                        {mes_selecionado}
-                    </span>
-                </div>
-                <div style="font-size: 14px; color: #666666; font-weight: 600;">
-                    Gráfico sincronizado com a seleção dos cards KPI
-                </div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
     
     # Filtrar dados
     df_mes_selecionado = df_filtered[df_filtered['dat_tratada'] == mes_selecionado]
@@ -4094,13 +4325,15 @@ with tab1:
             )
 
         eixo_x_max = max_total_canal * 1.24 if max_total_canal > 0 else 1
+        altura_base_bar = max(470, 66 * len(canais_plot) + 110)
+        altura_bar_reduzida = max(400, int(altura_base_bar * 0.85))
         fig_bar.update_layout(
             barmode='stack',
             plot_bgcolor='#FFFFFF',
             paper_bgcolor='#FFFFFF',
             font=dict(family='Manrope', size=13, color='#2F3747'),
             margin=dict(l=22, r=220, t=72, b=32),
-            height=max(470, 66 * len(canais_plot) + 110),
+            height=altura_bar_reduzida,
             xaxis=dict(
                 title='',
                 showgrid=False,
@@ -4240,7 +4473,6 @@ with tab1:
     meses_ordem = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
     
     # FUNÇÃO PARA CRIAR TABELA PIVOT ATUALIZADA
-    @st.cache_data
     def create_pivot_table_updated(df_tabela, mes_atual):
         """
         Função para criar tabela pivot dinâmica atualizada (Ativados)
@@ -4408,356 +4640,368 @@ with tab1:
     
     # Função para criar tabela HTML estilizada
     def criar_tabela_html(df):
+        total_colunas = max(len(df.columns), 1)
+        largura_col_pct = 100.0 / total_colunas
+        colgroup_html = "<colgroup>" + "".join(
+            [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+        ) + "</colgroup>"
         html = """
-        <style>
-            .tabela-container-melhorada {
-                width: 100%;
-                max-height: 650px;
-                overflow-y: auto;
-                overflow-x: auto;
-                border: 2px solid #790E09;
-                border-radius: 10px;
-                box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-                margin: 20px 0;
-                background: white;
-            }
-            
-            .tabela-melhorada {
-                width: 100%;
-                border-collapse: collapse;
-                border-spacing: 0;
-                font-size: 13px;
-                line-height: 1.5;
-            }
-            
-            .tabela-melhorada thead {
-                position: sticky;
-                top: 0;
-                z-index: 100;
-            }
-            
-            .tabela-melhorada th {
-                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
-                color: white !important;
-                font-weight: 600;
-                padding: 9px 8px; /* reduced height */
-                text-align: center;
-                border-bottom: 3px solid #5A0A06;
-                border-right: 1px solid #FFFFFF;
-                white-space: nowrap;
-                font-size: 12px;
-                letter-spacing: 0.5px;
-                text-transform: uppercase;
-                position: relative;
-                transition: all 0.2s ease;
-            }
-            
-            .tabela-melhorada th:hover {
-                background: linear-gradient(135deg, #8A1F1A 0%, #6B0F0B 100%) !important;
-            }
-            
-            .tabela-melhorada th:first-child {
-                border-left: none;
-                border-top-left-radius: 8px;
-            }
-            
-            .tabela-melhorada th:last-child {
-                border-right: none;
-                border-top-right-radius: 8px;
-            }
-            
-            .tabela-melhorada th.col-total-anual {
-                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
-            }
-            
-            .tabela-melhorada th.col-real-mes {
-                background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
-            }
-            
-            .tabela-melhorada th.col-meta {
-                background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
-            }
-            
-            .tabela-melhorada th.col-alcance,
-            .tabela-melhorada th.col-variacao {
-                background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
-            }
-            
-            .tabela-melhorada td {
-                padding: 8px 8px; /* reduced height */
-                text-align: center;
-                border-bottom: 1px solid #FFFFFF;
-                border-right: 1px solid #FFFFFF;
-                font-weight: 400;
-                transition: all 0.2s ease;
-            }
-            
-            .tabela-melhorada tr:not(.linha-total-melhorada) td:first-child {
-                border-left: none;
-                text-align: left;
-                font-weight: 600;
-                color: #333;
-                background: transparent !important;
-                padding-left: 15px;
-            }
-            
-            .tabela-melhorada td:last-child {
-                border-right: none;
-            }
-            
-            .linha-total-melhorada {
-                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
-                color: white !important;
-                position: sticky;
-                bottom: 0;
-                z-index: 50;
-                border-top: 2px solid #790E09;
-            }
-            
-            .linha-total-melhorada td {
-                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
-                color: white !important;
-                border-bottom: none;
-                font-weight: 700;
-                font-size: 14px;
-                border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-            }
-            
-            .linha-total-melhorada td.col-total-anual,
-            .linha-total-melhorada td.col-mes,
-            .linha-total-melhorada td.col-real-mes,
-            .linha-total-melhorada td.col-meta,
-            .linha-total-melhorada td.col-alcance,
-            .linha-total-melhorada td.col-variacao {
-                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
-                color: white !important;
-                border-left: none !important;
-                border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-                padding-left: 10px !important;
-            }
-            
-            .linha-total-melhorada td.col-alcance::before,
-            .linha-total-melhorada td.col-variacao::before,
-            .linha-total-melhorada td.percentual-positivo::before,
-            .linha-total-melhorada td.percentual-negativo::before,
-            .linha-total-melhorada td.percentual-neutro::before {
-                content: "" !important;
-            }
-            
-            .linha-total-melhorada td:first-child {
-                font-weight: 800;
-                background: linear-gradient(135deg, #3D0704 0%, #5A0A06 100%) !important;
-            }
-            
-            .linha-regional-melhorada:nth-child(even) {
-                background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
-            }
-            
-            .linha-regional-melhorada:nth-child(odd) {
-                background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
-            }
-            
-            .linha-regional-melhorada:hover {
-                background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                box-shadow: inset 0 0 0 1px #F1CBC4;
-                transform: translateY(-1px);
-            }
-            
-            .linha-regional-melhorada td.col-total-anual {
-                background: transparent !important;
-                color: #790E09 !important;
-                font-weight: 600;
-                border-left: 1px solid #FFFFFF;
-                border-right: 1px solid #FFFFFF;
-            }
-            
-            .linha-regional-melhorada td.col-mes {
-                background: transparent !important;
-                color: #333 !important;
-                border-left: 1px solid #FFFFFF;
-                border-right: 1px solid #FFFFFF;
-            }
-            
-            .linha-regional-melhorada td.col-real-mes {
-                background: transparent !important;
-                color: #6B1F1A !important;
-                font-weight: 600;
-                border-left: 1px solid #FFFFFF;
-                border-right: 1px solid #FFFFFF;
-            }
-            
-            .linha-regional-melhorada td.col-meta {
-                background: transparent !important;
-                color: #B71C1C !important;
-                font-weight: 600;
-                border-left: 1px solid #FFFFFF;
-                border-right: 1px solid #FFFFFF;
-            }
-            
-            .linha-regional-melhorada td.col-alcance,
-            .linha-regional-melhorada td.col-variacao {
-                background-color: transparent !important;
-            }
-            
-            .linha-regional-melhorada td.col-alcance.percentual-positivo,
-            .linha-regional-melhorada td.col-variacao.percentual-positivo {
-                color: #1B5E20 !important;
-                background: transparent !important;
-                font-weight: 700;
-                position: relative;
-                padding-left: 24px !important;
-                border-left: 1px solid #FFFFFF !important;
-                border-right: 1px solid #FFFFFF !important;
-            }
-            
-            .linha-regional-melhorada td.col-alcance.percentual-positivo::before,
-            .linha-regional-melhorada td.col-variacao.percentual-positivo::before {
-                content: "▲";
-                position: absolute;
-                left: 10px;
-                top: 50%;
-                transform: translateY(-50%);
-                font-size: 11px;
-                font-weight: 900;
-                color: #2E7D32;
-            }
-            
-            .linha-regional-melhorada td.col-alcance.percentual-negativo,
-            .linha-regional-melhorada td.col-variacao.percentual-negativo {
-                color: #C62828 !important;
-                background: transparent !important;
-                font-weight: 700;
-                position: relative;
-                padding-left: 24px !important;
-                border-left: 1px solid #FFFFFF !important;
-                border-right: 1px solid #FFFFFF !important;
-            }
-            
-            .linha-regional-melhorada td.col-alcance.percentual-negativo::before,
-            .linha-regional-melhorada td.col-variacao.percentual-negativo::before {
-                content: "▼";
-                position: absolute;
-                left: 10px;
-                top: 50%;
-                transform: translateY(-50%);
-                font-size: 11px;
-                font-weight: 900;
-                color: #C62828;
-            }
-            
-            .linha-regional-melhorada td.col-alcance.percentual-neutro,
-            .linha-regional-melhorada td.col-variacao.percentual-neutro {
-                color: #666666 !important;
-                background: transparent !important;
-                font-weight: 500;
-            }
-            
-            .linha-regional-melhorada td:hover {
-                transform: scale(1.02);
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                z-index: 10;
-                position: relative;
-            }
-            
-            .linha-regional-melhorada td.performance-excelente {
-                animation: pulse-green 2s infinite;
-            }
-            
-            .linha-regional-melhorada td.performance-critica {
-                animation: pulse-red 2s infinite;
-            }
-            
-            @keyframes pulse-green {
-                0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
-                70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
-                100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-            }
-            
-            @keyframes pulse-red {
-                0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                70% { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
-                100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-            }
-            
-            .tabela-container-melhorada::-webkit-scrollbar {
-                width: 10px;
-                height: 10px;
-            }
-            
-            .tabela-container-melhorada::-webkit-scrollbar-track {
-                background: #F5F5F5;
-                border-radius: 10px;
-            }
-            
-            .tabela-container-melhorada::-webkit-scrollbar-thumb {
-                background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
-                border-radius: 10px;
-                border: 2px solid #F5F5F5;
-            }
-            
-            .tabela-container-melhorada::-webkit-scrollbar-thumb:hover {
-                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
-            }
-            
-            .tabela-container-melhorada::after {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 20px;
-                background: linear-gradient(to bottom, transparent, rgba(121, 14, 9, 0.05));
-                pointer-events: none;
-                border-bottom-left-radius: 10px;
-                border-bottom-right-radius: 10px;
-            }
-
-            /* Unified table visual override */
-            .tabela-melhorada th {
-                padding: 9px 7px !important;
-                font-size: 11px !important;
-                box-shadow: none !important;
-                font-family: 'Manrope', 'Segoe UI', sans-serif !important;
-            }
-
-            .tabela-melhorada td {
-                padding: 7px 7px !important;
-                font-size: 11px !important;
-                line-height: 1.25 !important;
-                box-shadow: none !important;
-                font-weight: 400 !important;
-                font-family: 'Manrope', 'Segoe UI', sans-serif !important;
-            }
-
-            .tabela-melhorada td:not(:first-child) {
-                text-align: right !important;
-                font-variant-numeric: tabular-nums;
-            }
-
-            .linha-regional-melhorada:hover {
-                background-color: #FFF2EF !important;
-                box-shadow: inset 0 0 0 1px #FFD9CF !important;
-            }
-
-            .linha-regional-melhorada td.performance-excelente,
-            .linha-regional-melhorada td.performance-critica {
-                animation: none !important;
-            }
-
-            .tabela-melhorada tr td:first-child,
-            .linha-total-melhorada td,
-            .tabela-melhorada td[class*="percentual-"] {
-                font-weight: 400 !important;
-            }
-        </style>
+    <style>
+        .tabela-container-melhorada {
+            width: 100%;
+            max-height: 650px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            border: 2px solid #790E09;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 20px 0;
+            background: white;
+        }
         
-        <div class="tabela-container-melhorada">
-        <table class="tabela-melhorada">
-        <thead>
-            <tr>
-        """
+        .tabela-melhorada {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            font-size: 11px;
+            line-height: 1.3;
+            table-layout: fixed;
+        }
         
+        .tabela-melhorada thead {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .tabela-melhorada th {
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+            color: white !important;
+            font-weight: 600;
+            padding: 7px 5px; /* compact */
+            text-align: center;
+            border-bottom: 3px solid #5A0A06;
+            border-right: 1px solid #FFFFFF;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        
+        .tabela-melhorada th:hover {
+            background: linear-gradient(135deg, #8A1F1A 0%, #6B0F0B 100%) !important;
+        }
+        
+        .tabela-melhorada th:first-child {
+            border-left: none;
+            border-top-left-radius: 8px;
+        }
+        
+        .tabela-melhorada th:last-child {
+            border-right: none;
+            border-top-right-radius: 8px;
+        }
+        
+        .tabela-melhorada th.col-total-anual {
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+        }
+        
+        .tabela-melhorada th.col-real-mes {
+            background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
+        }
+        
+        .tabela-melhorada th.col-meta {
+            background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
+        }
+        
+        .tabela-melhorada th.col-alcance,
+        .tabela-melhorada th.col-variacao {
+            background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+        }
+        
+        .tabela-melhorada td {
+            padding: 6px 5px; /* compact */
+            text-align: center;
+            border-bottom: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+            font-weight: 400;
+            transition: all 0.2s ease;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        
+        .tabela-melhorada tr:not(.linha-total-melhorada) td:first-child {
+            border-left: none;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            background: transparent !important;
+            padding-left: 10px;
+        }
+        
+        .tabela-melhorada td:last-child {
+            border-right: none;
+        }
+        
+        .linha-total-melhorada {
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: white !important;
+            position: sticky;
+            bottom: 0;
+            z-index: 50;
+            border-top: 2px solid #790E09;
+        }
+        
+        .linha-total-melhorada td {
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: white !important;
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 10.5px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        
+        .linha-total-melhorada td.col-total-anual,
+        .linha-total-melhorada td.col-mes,
+        .linha-total-melhorada td.col-real-mes,
+        .linha-total-melhorada td.col-meta,
+        .linha-total-melhorada td.col-alcance,
+        .linha-total-melhorada td.col-variacao {
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: white !important;
+            border-left: none !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            padding-left: 10px !important;
+        }
+        
+        .linha-total-melhorada td.col-alcance::before,
+        .linha-total-melhorada td.col-variacao::before,
+        .linha-total-melhorada td.percentual-positivo::before,
+        .linha-total-melhorada td.percentual-negativo::before,
+        .linha-total-melhorada td.percentual-neutro::before {
+            content: "" !important;
+        }
+        
+        .linha-total-melhorada td:first-child {
+            font-weight: 800;
+            background: linear-gradient(135deg, #3D0704 0%, #5A0A06 100%) !important;
+        }
+        
+        .linha-regional-melhorada:nth-child(even) {
+            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+        }
+        
+        .linha-regional-melhorada:nth-child(odd) {
+            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+        }
+        
+        .linha-regional-melhorada:hover {
+            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+            box-shadow: inset 0 0 0 1px #F1CBC4;
+            transform: translateY(-1px);
+        }
+        
+        .linha-regional-melhorada td.col-total-anual {
+            background: transparent !important;
+            color: #790E09 !important;
+            font-weight: 600;
+            border-left: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+        }
+        
+        .linha-regional-melhorada td.col-mes {
+            background: transparent !important;
+            color: #333 !important;
+            border-left: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+        }
+        
+        .linha-regional-melhorada td.col-real-mes {
+            background: transparent !important;
+            color: #6B1F1A !important;
+            font-weight: 600;
+            border-left: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+        }
+        
+        .linha-regional-melhorada td.col-meta {
+            background: transparent !important;
+            color: #B71C1C !important;
+            font-weight: 600;
+            border-left: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+        }
+        
+        .linha-regional-melhorada td.col-alcance,
+        .linha-regional-melhorada td.col-variacao {
+            background-color: transparent !important;
+        }
+        
+        .linha-regional-melhorada td.col-alcance.percentual-positivo,
+        .linha-regional-melhorada td.col-variacao.percentual-positivo {
+            color: #1B5E20 !important;
+            background: transparent !important;
+            font-weight: 700;
+            position: relative;
+            padding-left: 24px !important;
+            border-left: 1px solid #FFFFFF !important;
+            border-right: 1px solid #FFFFFF !important;
+        }
+        
+        .linha-regional-melhorada td.col-alcance.percentual-positivo::before,
+        .linha-regional-melhorada td.col-variacao.percentual-positivo::before {
+            content: "▲";
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            font-weight: 900;
+            color: #2E7D32;
+        }
+        
+        .linha-regional-melhorada td.col-alcance.percentual-negativo,
+        .linha-regional-melhorada td.col-variacao.percentual-negativo {
+            color: #C62828 !important;
+            background: transparent !important;
+            font-weight: 700;
+            position: relative;
+            padding-left: 24px !important;
+            border-left: 1px solid #FFFFFF !important;
+            border-right: 1px solid #FFFFFF !important;
+        }
+        
+        .linha-regional-melhorada td.col-alcance.percentual-negativo::before,
+        .linha-regional-melhorada td.col-variacao.percentual-negativo::before {
+            content: "▼";
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            font-weight: 900;
+            color: #C62828;
+        }
+        
+        .linha-regional-melhorada td.col-alcance.percentual-neutro,
+        .linha-regional-melhorada td.col-variacao.percentual-neutro {
+            color: #666666 !important;
+            background: transparent !important;
+            font-weight: 500;
+        }
+        
+        .linha-regional-melhorada td:hover {
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            position: relative;
+        }
+        
+        .linha-regional-melhorada td.performance-excelente {
+            animation: pulse-green 2s infinite;
+        }
+        
+        .linha-regional-melhorada td.performance-critica {
+            animation: pulse-red 2s infinite;
+        }
+        
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+        
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+        }
+        
+        .tabela-container-melhorada::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        .tabela-container-melhorada::-webkit-scrollbar-track {
+            background: #F5F5F5;
+            border-radius: 10px;
+        }
+        
+        .tabela-container-melhorada::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+            border-radius: 10px;
+            border: 2px solid #F5F5F5;
+        }
+        
+        .tabela-container-melhorada::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+        }
+        
+        .tabela-container-melhorada::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: linear-gradient(to bottom, transparent, rgba(121, 14, 9, 0.05));
+            pointer-events: none;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+        /* Unified table visual override */
+        .tabela-melhorada th {
+            padding: 7px 5px !important;
+            font-size: 10px !important;
+            box-shadow: none !important;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        .tabela-melhorada td {
+            padding: 6px 5px !important;
+            font-size: 10.5px !important;
+            line-height: 1.25 !important;
+            box-shadow: none !important;
+            font-weight: 400 !important;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        .tabela-melhorada td:not(:first-child) {
+            text-align: right !important;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .linha-regional-melhorada:hover {
+            background-color: #FFF2EF !important;
+            box-shadow: inset 0 0 0 1px #FFD9CF !important;
+        }
+
+        .linha-regional-melhorada td.performance-excelente,
+        .linha-regional-melhorada td.performance-critica {
+            animation: none !important;
+        }
+
+        .tabela-melhorada tr td:first-child,
+        .linha-total-melhorada td,
+        .tabela-melhorada td[class*="percentual-"] {
+            font-weight: 400 !important;
+        }
+    </style>
+    
+    <div class="tabela-container-melhorada">
+    <table class="tabela-melhorada">
+    <thead>
+        <tr>
+    """
+        html = html.replace('<table class="tabela-melhorada">', f'<table class="tabela-melhorada">{colgroup_html}', 1)
+    
         for i, col in enumerate(df.columns):
             classe = ""
             if col == 'Regional':
@@ -4774,20 +5018,20 @@ with tab1:
                 classe = "col-alcance"
             elif 'Var' in col or col == 'MOM':
                 classe = "col-variacao"
-            
+        
             html += f'<th class="{classe}">{col}</th>'
-        
+    
         html += "</tr></thead><tbody>"
-        
+    
         for idx, row in df.iterrows():
             is_total = row['Regional'] == 'TOTAL'
             classe_linha = "linha-total-melhorada" if is_total else "linha-regional-melhorada"
             html += f'<tr class="{classe_linha}">'
-            
+        
             for col in df.columns:
                 valor = row[col]
                 classe_celula = ""
-                
+            
                 if is_total:
                     if col == 'Regional':
                         classe_celula = ""
@@ -4818,13 +5062,13 @@ with tab1:
                         try:
                             valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                             num_valor = float(valor_limpo)
-                            
+                        
                             if num_valor > 0:
                                 if 'Alcance' in col or col == 'TEND vs META':
                                     classe_celula = "col-alcance percentual-positivo"
                                 else:
                                     classe_celula = "col-variacao percentual-positivo"
-                                
+                            
                                 if num_valor > 50:
                                     classe_celula += " performance-excelente"
                             elif num_valor < 0:
@@ -4832,7 +5076,7 @@ with tab1:
                                     classe_celula = "col-alcance percentual-negativo"
                                 else:
                                     classe_celula = "col-variacao percentual-negativo"
-                                
+                            
                                 if num_valor < -30:
                                     classe_celula += " performance-critica"
                             else:
@@ -4845,14 +5089,14 @@ with tab1:
                                 classe_celula = "col-alcance"
                             else:
                                 classe_celula = "col-variacao"
-                
-                html += f'<td class="{classe_celula}">{valor}</td>'
             
-            html += "</tr>"
+                html += f'<td class="{classe_celula}">{valor}</td>'
         
+            html += "</tr>"
+    
         html += "</tbody></table></div>"
         return html
-    
+
     # Exibir tabela
     if not df_exibicao.empty:
         st.markdown(criar_tabela_html(df_exibicao), unsafe_allow_html=True)
@@ -4978,7 +5222,8 @@ with tab2:
         """Carrega dados de desativados com tratamento especial"""
         try:
             file_path = "base_final_churn.xlsx"
-            df_desativados = pd.read_excel(file_path)
+            file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
+            df_desativados = load_excel_cached(file_path, file_mtime)
             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
             required_columns = ['COD_PLATAFORMA', 'DSC_REGIONAL_CMV', 'QTDE_AJUSTADA',
@@ -5284,7 +5529,7 @@ with tab2:
                 with cols[j]:
                     st.markdown(
                         f"""
-                        <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 108px !important; padding: 12px 12px !important;">
+                        <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 81px !important; padding: 9px 9px !important;">
                             <div class="kpi-title-dinamico">{canal}</div>
                             <div style="text-align: center; padding: 6px 0;">
                                 <div class="kpi-value-dinamico">{total_atual_fmt}</div>
@@ -5373,10 +5618,12 @@ with tab2:
                     tickfont=dict(size=11, color='#5B6578'),
                     gridcolor='rgba(230, 236, 244, 0.85)',
                     showgrid=False,
-                    showline=True,
+                    showline=False,
                     linecolor='#E6ECF4',
                     linewidth=1.3,
-                    zeroline=False
+                    zeroline=False,
+                    showticklabels=False,
+                    ticks=''
                 ),
                 yaxis=dict(
                     title='',
@@ -5396,13 +5643,6 @@ with tab2:
                 config={'displayModeBar': False, 'displaylogo': False}
             )
 
-            total_inad = df_inad['Inadimplentes'].sum()
-            total_base = df_inad['Total_Canal'].sum()
-            pct_geral_inad = (total_inad / total_base * 100) if total_base > 0 else 0
-            st.caption(
-                f"Total Inadimplentes: {formatar_numero_brasileiro(total_inad, 0)} | "
-                f"% Inadimplência Geral: {pct_geral_inad:.1f}%".replace('.', ',')
-            )
         else:
             st.warning("Sem dados para inadimplência no mês selecionado.")
     
@@ -5606,7 +5846,7 @@ with tab2:
             plot_bgcolor='white',
             paper_bgcolor='#FCFCFD',
             font=dict(family='Segoe UI', size=14, color='#2F3747'),
-            margin=dict(l=18, r=18, t=66, b=60),
+            margin=dict(l=18, r=18, t=86, b=60),
             height=530,
             xaxis=dict(
                 title='',
@@ -5636,9 +5876,9 @@ with tab2:
                 title=dict(text='<b>SÉRIE</b>', font=dict(size=12, color='#2F3747')),
                 orientation='h',
                 yanchor='bottom',
-                y=1.02,
-                xanchor='left',
-                x=0.0,
+                y=1.08,
+                xanchor='right',
+                x=1.0,
                 bgcolor='rgba(255,255,255,0.92)',
                 bordercolor='#E6ECF4',
                 borderwidth=1.2,
@@ -5879,13 +6119,18 @@ with tab2:
         
         # Criar tabela HTML estilizada
         def criar_tabela_html_desativados(df):
+            total_colunas = max(len(df.columns), 1)
+            largura_col_pct = 100.0 / total_colunas
+            colgroup_html = "<colgroup>" + "".join(
+                [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+            ) + "</colgroup>"
             html = """
             <style>
                 .tabela-container-desativados {
                     width: 100%;
                     max-height: 650px;
                     overflow-y: auto;
-                    overflow-x: auto;
+                    overflow-x: hidden;
                     border: 2px solid #790E09;
                     border-radius: 10px;
                     box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
@@ -5898,8 +6143,9 @@ with tab2:
                     width: 100%;
                     border-collapse: collapse;
                     border-spacing: 0;
-                    font-size: 13px;
-                    line-height: 1.5;
+                    font-size: 11px;
+                    line-height: 1.3;
+                    table-layout: fixed;
                 }
                 
                 .tabela-desativados thead {
@@ -5912,12 +6158,14 @@ with tab2:
                     background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                     color: white !important;
                     font-weight: 600;
-                    padding: 9px 8px; /* reduced height */
+                    padding: 7px 5px; /* compact */
                     text-align: center;
                     border-bottom: 3px solid #5A0A06;
                     border-right: 1px solid #FFFFFF;
-                    white-space: nowrap;
-                    font-size: 12px;
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                    font-size: 10px;
                     letter-spacing: 0.5px;
                     text-transform: uppercase;
                     position: relative;
@@ -5932,13 +6180,28 @@ with tab2:
                     border-right: none;
                     border-top-right-radius: 8px;
                 }
+
+                .tabela-desativados th.col-total-anual-desativados {
+                    background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+                }
+
+                .tabela-desativados th.col-real-mes-desativados {
+                    background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
+                }
+
+                .tabela-desativados th.col-variacao-desativados {
+                    background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+                }
                 
                 .tabela-desativados td {
-                    padding: 8px 8px; /* reduced height */
+                    padding: 6px 5px; /* compact */
                     text-align: center;
                     border-bottom: 1px solid #FFFFFF;
                     border-right: 1px solid #FFFFFF;
                     font-weight: 400;
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
                 }
                 
                 .tabela-desativados tr:not(.linha-total-desativados) td:first-child {
@@ -5947,7 +6210,7 @@ with tab2:
                     font-weight: 600;
                     color: #333;
                     background: linear-gradient(90deg, #fef5f4 0%, white 100%) !important;
-                    padding-left: 15px;
+                    padding-left: 10px;
                 }
                 
                 .tabela-desativados td:last-child {
@@ -5968,7 +6231,7 @@ with tab2:
                     color: white !important;
                     border-bottom: none;
                     font-weight: 700;
-                    font-size: 14px;
+                    font-size: 11px;
                     border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
                 }
                 
@@ -5986,6 +6249,26 @@ with tab2:
                 
                 .linha-regional-desativados:hover {
                     background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                }
+
+                .linha-regional-desativados td.col-total-anual-desativados {
+                    color: #790E09 !important;
+                    font-weight: 600;
+                    border-left: 1px solid #FFFFFF;
+                    border-right: 1px solid #FFFFFF;
+                    background: transparent !important;
+                }
+
+                .linha-regional-desativados td.col-real-mes-desativados {
+                    color: #6B1F1A !important;
+                    font-weight: 600;
+                    border-left: 1px solid #FFFFFF;
+                    border-right: 1px solid #FFFFFF;
+                    background: transparent !important;
+                }
+
+                .linha-regional-desativados td.col-variacao-desativados {
+                    background: transparent !important;
                 }
                 
                 .tabela-container-desativados::-webkit-scrollbar {
@@ -6006,14 +6289,14 @@ with tab2:
 
                 /* Unified table visual override */
                 .tabela-desativados th {
-                    padding: 9px 7px !important;
-                    font-size: 11px !important;
+                    padding: 7px 5px !important;
+                    font-size: 10px !important;
                     box-shadow: none !important;
                     font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                 }
 
                 .tabela-desativados td {
-                    padding: 7px 7px !important;
+                    padding: 6px 5px !important;
                     font-size: 11px !important;
                     line-height: 1.25 !important;
                     box-shadow: none !important;
@@ -6087,9 +6370,18 @@ with tab2:
             <thead>
                 <tr>
             """
+            html = html.replace('<table class="tabela-desativados">', f'<table class="tabela-desativados">{colgroup_html}', 1)
             
             for col in df.columns:
-                html += f'<th>{col}</th>'
+                col_str = str(col).strip()
+                classe_header = ""
+                if col_str in ['Total 2025', 'Silentes 2025']:
+                    classe_header = "col-total-anual-desativados"
+                elif col_str in ['Real Jan/26', 'Silentes Jan/26']:
+                    classe_header = "col-real-mes-desativados"
+                elif col_str in ['Var MoM', '% Silentes'] or col_str.startswith('%') or 'Var' in col_str:
+                    classe_header = "col-variacao-desativados"
+                html += f'<th class="{classe_header}">{col}</th>'
             
             html += "</tr></thead><tbody>"
             
@@ -6100,8 +6392,15 @@ with tab2:
                 
                 for col in df.columns:
                     valor = row[col]
-                    classe_celula = ""
                     col_str = str(col).strip()
+                    classes_celula = []
+                    if col_str in ['Total 2025', 'Silentes 2025']:
+                        classes_celula.append("col-total-anual-desativados")
+                    elif col_str in ['Real Jan/26', 'Silentes Jan/26']:
+                        classes_celula.append("col-real-mes-desativados")
+                    elif col_str in ['Var MoM', '% Silentes'] or col_str.startswith('%') or 'Var' in col_str:
+                        classes_celula.append("col-variacao-desativados")
+
                     eh_coluna_percentual = (
                         col_str in ['Var MoM', '% Silentes'] or
                         col_str.startswith('%') or
@@ -6112,14 +6411,15 @@ with tab2:
                             valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                             num_valor = float(valor_limpo)
                             if num_valor > 0:
-                                classe_celula = "percentual-positivo-desativados"
+                                classes_celula.append("percentual-positivo-desativados")
                             elif num_valor < 0:
-                                classe_celula = "percentual-negativo-desativados"
+                                classes_celula.append("percentual-negativo-desativados")
                             else:
-                                classe_celula = "percentual-neutro-desativados"
+                                classes_celula.append("percentual-neutro-desativados")
                         except Exception:
-                            classe_celula = "percentual-neutro-desativados"
+                            classes_celula.append("percentual-neutro-desativados")
 
+                    classe_celula = " ".join(classes_celula).strip()
                     html += f'<td class="{classe_celula}">{valor}</td>'
                 
                 html += "</tr>"
@@ -6153,34 +6453,35 @@ with tab3:
     # - Meta = soma de DESAFIO_QTD
     # - Período baseado em DAT_MOVIMENTO2
     # =========================
-    # Reutilizar a base principal já carregada (evita nova leitura do mesmo arquivo)
-    df_pedidos = df.copy()
-
-    # Normalizar regional para evitar tabela vazia por coluna inconsistente
-    if 'REGIONAL' not in df_pedidos.columns and 'DSC_REGIONAL_CMV' in df_pedidos.columns:
-        df_pedidos['REGIONAL'] = df_pedidos['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
-    elif 'REGIONAL' in df_pedidos.columns:
-        df_pedidos['REGIONAL'] = df_pedidos['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
+    # Reutilizar a base principal já carregada sem copiar tudo (filtrar antes de copiar).
+    df_pedidos_base = df
 
     # Identificar coluna de canal (fallback para bases antigas)
-    coluna_canal = 'CANAL_PLAN' if 'CANAL_PLAN' in df_pedidos.columns else ('DSC_CANAL' if 'DSC_CANAL' in df_pedidos.columns else None)
+    coluna_canal = 'CANAL_PLAN' if 'CANAL_PLAN' in df_pedidos_base.columns else ('DSC_CANAL' if 'DSC_CANAL' in df_pedidos_base.columns else None)
 
-    if 'DSC_INDICADOR' not in df_pedidos.columns or coluna_canal is None:
+    if 'DSC_INDICADOR' not in df_pedidos_base.columns or coluna_canal is None:
         st.error("❌ Base de pedidos sem colunas obrigatórias (DSC_INDICADOR/CANAL).")
         df_pedidos = pd.DataFrame()
     else:
-        indicador_norm = df_pedidos['DSC_INDICADOR'].astype(str).str.strip().str.upper()
-        canal_norm = df_pedidos[coluna_canal].astype(str).str.strip().str.upper()
+        indicador_norm = df_pedidos_base['DSC_INDICADOR'].astype(str).str.strip().str.upper()
+        canal_norm = df_pedidos_base[coluna_canal].astype(str).str.strip().str.upper()
 
         mask_indicador = indicador_norm == 'PEDIDOS'
         mask_canal = canal_norm == 'E-COMMERCE'
 
-        df_pedidos = df_pedidos.loc[mask_indicador & mask_canal].copy()
+        df_pedidos = df_pedidos_base.loc[mask_indicador & mask_canal].copy()
+
+        # Normalizar regional no recorte final para evitar tabela vazia por coluna inconsistente
+        if 'REGIONAL' not in df_pedidos.columns and 'DSC_REGIONAL_CMV' in df_pedidos.columns:
+            df_pedidos['REGIONAL'] = df_pedidos['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
+        elif 'REGIONAL' in df_pedidos.columns:
+            df_pedidos['REGIONAL'] = df_pedidos['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
 
     if not df_pedidos.empty:
         # Garantir base temporal em DAT_MOVIMENTO2
         if 'DAT_MOVIMENTO2' in df_pedidos.columns:
-            df_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_pedidos['DAT_MOVIMENTO2'], errors='coerce')
+            if not pd.api.types.is_datetime64_any_dtype(df_pedidos['DAT_MOVIMENTO2']):
+                df_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_pedidos['DAT_MOVIMENTO2'], errors='coerce')
         elif 'PERIODO' in df_pedidos.columns:
             df_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_pedidos['PERIODO'], errors='coerce')
         else:
@@ -6316,30 +6617,43 @@ with tab3:
         # FUNÇÃO PARA CALCULAR MÉTRICAS DE PEDIDOS
         # =========================
         mes_corrente_ref_pedidos = get_mes_atual_formatado().strip().lower()
+        agg_pedidos_pm = df_pedidos.groupby(
+            ['COD_PLATAFORMA', 'dat_tratada'],
+            as_index=False,
+            observed=True
+        )[['QTDE', 'TEND_QTD', 'DESAFIO_QTD']].sum()
+        pedidos_lookup_qtde = {
+            (row['COD_PLATAFORMA'], row['dat_tratada']): float(row['QTDE'] or 0)
+            for _, row in agg_pedidos_pm.iterrows()
+        }
+        pedidos_lookup_tend = {
+            (row['COD_PLATAFORMA'], row['dat_tratada']): float(row['TEND_QTD'] or 0)
+            for _, row in agg_pedidos_pm.iterrows()
+        }
+        pedidos_lookup_meta = {
+            (row['COD_PLATAFORMA'], row['dat_tratada']): float(row['DESAFIO_QTD'] or 0)
+            for _, row in agg_pedidos_pm.iterrows()
+        }
+
         def calcular_metricas_pedidos(plataforma, mes_atual, mes_anterior):
             """Calcula métricas de pedidos para uma plataforma específica"""
-            # Realizado no mês atual (QTDE)
-            realizado_atual = df_pedidos.query(
-                "COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
-            )['QTDE'].sum()
+            chave_atual = (plataforma, mes_atual)
+            chave_anterior = (plataforma, mes_anterior)
 
-            tendencia_atual = df_pedidos.query(
-                "COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
-            )['TEND_QTD'].sum()
+            # Realizado no mês atual (QTDE)
+            realizado_atual = float(pedidos_lookup_qtde.get(chave_atual, 0))
+
+            tendencia_atual = float(pedidos_lookup_tend.get(chave_atual, 0))
 
             usar_tendencia_mes = str(mes_atual).strip().lower() == mes_corrente_ref_pedidos
             usar_tendencia = usar_tendencia_mes and (tendencia_atual > 0)
             valor_atual = tendencia_atual if usar_tendencia else realizado_atual
             
             # Realizado no mês anterior (QTDE)
-            realizado_anterior = df_pedidos.query(
-                "COD_PLATAFORMA == @plataforma and dat_tratada == @mes_anterior"
-            )['QTDE'].sum()
+            realizado_anterior = float(pedidos_lookup_qtde.get(chave_anterior, 0))
             
             # Meta no mês atual (DESAFIO_QTD)
-            meta_atual = df_pedidos.query(
-                "COD_PLATAFORMA == @plataforma and dat_tratada == @mes_atual"
-            )['DESAFIO_QTD'].sum()
+            meta_atual = float(pedidos_lookup_meta.get(chave_atual, 0))
             
             # Calcular variações
             variacao_mom = ((valor_atual - realizado_anterior) / realizado_anterior * 100) if realizado_anterior > 0 else 0
@@ -6399,28 +6713,28 @@ with tab3:
             classe_meta_conta = "variacao-positiva" if metricas_conta['desvio_meta'] >= 0 else "variacao-negativa"
             meta_html_conta = f'<div class="kpi-variacao-item {classe_meta_conta}" style="font-size: 10px !important;">{metricas_conta["desvio_meta"]:+.0f}% Meta</div>'
         else:
-            meta_html_conta = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
+            meta_html_conta = '<div class="kpi-variacao-item variacao-neutra" style="font-size: 10px !important;">Meta N/A</div>'
         
         if metricas_fixa['desvio_meta'] is not None and np.isfinite(metricas_fixa['desvio_meta']):
             classe_meta_fixa = "variacao-positiva" if metricas_fixa['desvio_meta'] >= 0 else "variacao-negativa"
             meta_html_fixa = f'<div class="kpi-variacao-item {classe_meta_fixa}" style="font-size: 10px !important;">{metricas_fixa["desvio_meta"]:+.0f}% Meta</div>'
         else:
-            meta_html_fixa = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
+            meta_html_fixa = '<div class="kpi-variacao-item variacao-neutra" style="font-size: 10px !important;">Meta N/A</div>'
         
         # Layout: coluna esquerda com cards (mais larga) + coluna direita com donut
-        col_cards, col_donut = st.columns([0.62, 1.38])
+        col_cards, col_donut = st.columns([0.62, 1.10])
         
         with col_cards:
             card_conta_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 430px; min-height: 108px !important; padding: 12px 12px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 430px; min-height: 66px !important; padding: 7px 7px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS CONTA</div>'
-                f'<div style="text-align: center; padding: 6px 0;">'
+                f'<div style="text-align: center; padding: 5px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_conta_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
-                f'<div class="kpi-meta-line" style="margin: 7px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 6px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(anterior_conta_fmt, meta_conta_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 6px;">'
                 f'<div class="kpi-variacao-item {classe_mom_conta}" style="font-size: 10px !important;">'
                 f'{metricas_conta["variacao_mom"]:+.0f}% MoM'
                 f'</div>'
@@ -6432,15 +6746,15 @@ with tab3:
             st.markdown(card_conta_html, unsafe_allow_html=True)
 
             card_fixa_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 430px; min-height: 108px !important; padding: 12px 12px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 430px; min-height: 66px !important; padding: 7px 7px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS FIXA</div>'
-                f'<div style="text-align: center; padding: 6px 0;">'
+                f'<div style="text-align: center; padding: 5px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_fixa_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
-                f'<div class="kpi-meta-line" style="margin: 7px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 6px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(anterior_fixa_fmt, meta_fixa_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 6px;">'
                 f'<div class="kpi-variacao-item {classe_mom_fixa}" style="font-size: 10px !important;">'
                 f'{metricas_fixa["variacao_mom"]:+.0f}% MoM'
                 f'</div>'
@@ -6504,7 +6818,7 @@ with tab3:
             )
 
             fig_donut.update_layout(
-                height=430,
+                height=344,
                 plot_bgcolor='white',
                 paper_bgcolor='#FCFCFD',
                 font=dict(family='Segoe UI', size=13, color='#2F3747'),
@@ -6581,7 +6895,8 @@ with tab3:
             df_tabela_pedidos = df_tabela_pedidos[df_tabela_pedidos['DSC_INDICADOR'].isin(indicador_tabela_pedidos)]
         
         # Extrair ano e mês diretamente de DAT_MOVIMENTO2 (regra oficial)
-        df_tabela_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_tabela_pedidos['DAT_MOVIMENTO2'], errors='coerce')
+        if not pd.api.types.is_datetime64_any_dtype(df_tabela_pedidos['DAT_MOVIMENTO2']):
+            df_tabela_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_tabela_pedidos['DAT_MOVIMENTO2'], errors='coerce')
         df_tabela_pedidos['ano'] = df_tabela_pedidos['DAT_MOVIMENTO2'].dt.strftime('%y')
         df_tabela_pedidos['mes_ano'] = df_tabela_pedidos['dat_tratada']
         
@@ -6590,7 +6905,6 @@ with tab3:
         meses_2025_pedidos = [f'{mes}/25' for mes in meses_ordem_pedidos]
         
         # FUNÇÃO PARA CRIAR TABELA PIVOT DE PEDIDOS (NOVA)
-        @st.cache_data
         def create_pivot_table_pedidos_new(df_tabela_pedidos, mes_foco):
             meses_ordem = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
             meses_2025 = [f'{m}/25' for m in meses_ordem]
@@ -6637,7 +6951,6 @@ with tab3:
             return pivot
 
         # FUNÇÃO PARA CRIAR TABELA PIVOT DE PEDIDOS
-        @st.cache_data
         def create_pivot_table_pedidos(df_tabela_pedidos, meses_2025_pedidos):
             """
             Função para criar tabela pivot dinâmica para pedidos
@@ -6819,13 +7132,18 @@ with tab3:
             
             # Função para criar tabela HTML estilizada (similar à aba de ativados)
             def criar_tabela_html_pedidos(df):
+                total_colunas = max(len(df.columns), 1)
+                largura_col_pct = 100.0 / total_colunas
+                colgroup_html = "<colgroup>" + "".join(
+                    [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+                ) + "</colgroup>"
                 html = dedent("""
                 <style>
                     .tabela-container-pedidos {
                         width: 100%;
                         max-height: 650px;
                         overflow-y: auto;
-                        overflow-x: auto;
+                        overflow-x: hidden;
                         border: 2px solid #790E09;
                         border-radius: 10px;
                         box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
@@ -6838,8 +7156,9 @@ with tab3:
                         width: 100%;
                         border-collapse: collapse;
                         border-spacing: 0;
-                        font-size: 13px;
-                        line-height: 1.5;
+                        font-size: 11px;
+                        line-height: 1.3;
+                        table-layout: fixed;
                     }
                     
                     .tabela-pedidos thead {
@@ -6852,12 +7171,14 @@ with tab3:
                 background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                 color: white !important;
                 font-weight: 600;
-                padding: 9px 8px; /* reduced height */
+                padding: 7px 5px; /* compact */
                 text-align: center;
                 border-bottom: 3px solid #5A0A06;
                 border-right: 1px solid #FFFFFF;
-                white-space: nowrap;
-                font-size: 12px;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+                font-size: 10px;
                 letter-spacing: 0.5px;
                 text-transform: uppercase;
                 position: relative;
@@ -6900,12 +7221,15 @@ with tab3:
                     }
                     
             .tabela-pedidos td {
-                padding: 8px 8px; /* reduced height */
+                padding: 6px 5px; /* compact */
                 text-align: center;
                 border-bottom: 1px solid #FFFFFF;
                 border-right: 1px solid #FFFFFF;
                 font-weight: 400;
                 transition: all 0.2s ease;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
             }
                     
                     .tabela-pedidos tr:not(.linha-total-pedidos) td:first-child {
@@ -6914,7 +7238,7 @@ with tab3:
                         font-weight: 600;
                         color: #333;
                         background: transparent !important;
-                        padding-left: 15px;
+                        padding-left: 10px;
                     }
                     
                     .tabela-pedidos td:last-child {
@@ -6935,7 +7259,7 @@ with tab3:
                         color: white !important;
                         border-bottom: none;
                         font-weight: 700;
-                        font-size: 14px;
+                        font-size: 11px;
                         border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
                     }
                     
@@ -7130,14 +7454,14 @@ with tab3:
 
                     /* Unified table visual override */
                     .tabela-pedidos th {
-                        padding: 9px 7px !important;
-                        font-size: 11px !important;
+                        padding: 7px 5px !important;
+                        font-size: 10px !important;
                         box-shadow: none !important;
                         font-family: 'Manrope', 'Segoe UI', sans-serif !important;
                     }
 
                     .tabela-pedidos td {
-                        padding: 7px 7px !important;
+                        padding: 6px 5px !important;
                         font-size: 11px !important;
                         line-height: 1.25 !important;
                         box-shadow: none !important;
@@ -7172,6 +7496,7 @@ with tab3:
                 <thead>
                     <tr>
                 """)
+                html = html.replace('<table class="tabela-pedidos">', f'<table class="tabela-pedidos">{colgroup_html}', 1)
                 
                 for i, col in enumerate(df.columns):
                     classe = ""
@@ -7331,7 +7656,8 @@ with tab3:
                     """Cria dados para gráfico de linhas temporal para pedidos"""
                     # Garantir que temos as colunas de ano e mês
                     if 'DAT_MOVIMENTO2' in df_grafico.columns:
-                        df_grafico['DAT_MOVIMENTO2'] = pd.to_datetime(df_grafico['DAT_MOVIMENTO2'], errors='coerce')
+                        if not pd.api.types.is_datetime64_any_dtype(df_grafico['DAT_MOVIMENTO2']):
+                            df_grafico['DAT_MOVIMENTO2'] = pd.to_datetime(df_grafico['DAT_MOVIMENTO2'], errors='coerce')
                         df_grafico['ANO'] = df_grafico['DAT_MOVIMENTO2'].dt.year
                         df_grafico['DAT_MÊS'] = df_grafico['DAT_MOVIMENTO2'].dt.month
                     else:
@@ -7417,11 +7743,10 @@ with tab3:
                     labels={'Valor': 'Volume', 'Mês': ''},
                     markers=True,
                     line_shape='spline',
-                    color_discrete_map=cores_personalizadas,
-                    text='Valor_Formatado'
+                    color_discrete_map=cores_personalizadas
                 )
                 
-                apply_standard_line_layout(fig_linhas_pedidos, 'VOLUME DE PEDIDOS', height=500)
+                apply_standard_line_layout(fig_linhas_pedidos, 'VOLUME DE PEDIDOS', height=400)
                 apply_standard_line_traces(fig_linhas_pedidos, cores_personalizadas, valor_label='Valor', meta_year='2026')
                 
                 # Container de informações
@@ -7484,7 +7809,8 @@ with tab4:
             ligacoes_path = "televendas_ligacoes2.xlsx"
             
             # Carregar dados
-            df_ligacoes = pd.read_excel(ligacoes_path)
+            ligacoes_mtime = Path(ligacoes_path).stat().st_mtime if Path(ligacoes_path).exists() else None
+            df_ligacoes = load_excel_cached(ligacoes_path, ligacoes_mtime)
             
             # Verificar se as colunas necessárias existem
             colunas_necessarias = ['PERIODO', 'CABEADO', 'TELEFONE', 'DSC_REGIONAL_CMV', 'QTD']
@@ -7585,15 +7911,27 @@ with tab4:
         """Carrega METAS de ligações a partir da base principal já carregada."""
         try:
             # Reutilizar o mesmo DataFrame principal (base_final_trt_new3.xlsx)
-            df_metas = df.copy()
+            df_metas_base = df
             
             # Verificar se as colunas necessárias existem
             colunas_necessarias = ['DESAFIO_QTD', 'DSC_INDICADOR', 'COD_PLATAFORMA', 'DAT_MOVIMENTO2', 'REGIONAL', 'CANAL_PLAN', 'dat_tratada']
-            colunas_faltantes = [col for col in colunas_necessarias if col not in df_metas.columns]
+            colunas_faltantes = [col for col in colunas_necessarias if col not in df_metas_base.columns]
             
             if colunas_faltantes:
                 st.error(f"❌ **Colunas faltantes no arquivo de metas:** {colunas_faltantes}")
-                st.write("**Colunas disponíveis:**", list(df_metas.columns))
+                st.write("**Colunas disponíveis:**", list(df_metas_base.columns))
+                return pd.DataFrame()
+
+            # Filtrar primeiro para reduzir custo de cópia/transformações.
+            colunas_usadas = list(dict.fromkeys(colunas_necessarias + ['TEND_QTD']))
+            df_metas = df_metas_base.loc[
+                (df_metas_base['DSC_INDICADOR'] == 'LIGACOES') &
+                (df_metas_base['CANAL_PLAN'] == 'Televendas Receptivo'),
+                [c for c in colunas_usadas if c in df_metas_base.columns]
+            ].copy()
+
+            if df_metas.empty:
+                st.warning("⚠️ Nenhuma meta de ligações encontrada no arquivo")
                 return pd.DataFrame()
             
             # Garantir que DESAFIO_QTD seja numérico
@@ -7609,12 +7947,6 @@ with tab4:
             if not pd.api.types.is_datetime64_any_dtype(df_metas['DAT_MOVIMENTO2']):
                 df_metas['DAT_MOVIMENTO2'] = pd.to_datetime(df_metas['DAT_MOVIMENTO2'], errors='coerce')
             
-            # Filtrar apenas ligações (DSC_INDICADOR == 'LIGACOES') e CANAL_PLAN == 'Televendas Receptivo'
-            df_metas = df_metas[
-                (df_metas['DSC_INDICADOR'] == 'LIGACOES') & 
-                (df_metas['CANAL_PLAN'] == 'Televendas Receptivo')
-            ].copy()
-
             # Normalizar coluna de tendência para uso nos cards do mês atual
             if 'TEND_QTD' in df_metas.columns:
                 df_metas['TEND_QTD'] = normalizar_numerico_serie(df_metas['TEND_QTD']).fillna(0)
@@ -7902,17 +8234,45 @@ with tab4:
             unsafe_allow_html=True
         )
         
-        # Calcular valores do mês atual (realizados)
-        total_real_atual = calcular_total_ligacoes(df_lig, mes_selecionado, regional_selecionada)
-        fixa_real_atual = calcular_ligacoes_fixa(df_lig, mes_selecionado, regional_selecionada)
-        conta_real_atual = calcular_ligacoes_conta(df_lig, mes_selecionado, regional_selecionada)
-        clicktocall_atual = calcular_ligacoes_clicktocall(df_lig, mes_selecionado, regional_selecionada)
-        
-        # Calcular valores do mês anterior
-        total_anterior = calcular_total_ligacoes(df_lig, mes_anterior, regional_selecionada)
-        fixa_anterior = calcular_ligacoes_fixa(df_lig, mes_anterior, regional_selecionada)
-        conta_anterior = calcular_ligacoes_conta(df_lig, mes_anterior, regional_selecionada)
-        clicktocall_anterior = calcular_ligacoes_clicktocall(df_lig, mes_anterior, regional_selecionada)
+        # Pré-agregação KPI por mês para reduzir custo de filtros repetidos.
+        if regional_selecionada != "Todas":
+            df_lig_kpi = df_lig[df_lig['REGIONAL'] == regional_selecionada].copy()
+        else:
+            df_lig_kpi = df_lig
+
+        serie_total_mes = (
+            df_lig_kpi.groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            if not df_lig_kpi.empty else {}
+        )
+        serie_fixa_mes = (
+            df_lig_kpi.loc[
+                df_lig_kpi['CABEADO'].astype(str).str.upper().eq('SIM')
+            ].groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            if not df_lig_kpi.empty else {}
+        )
+        serie_conta_mes = (
+            df_lig_kpi.loc[
+                df_lig_kpi['TIPO_CHAMADA'].eq('DEMAIS')
+            ].groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            if not df_lig_kpi.empty else {}
+        )
+        serie_ctc_mes = (
+            df_lig_kpi.loc[
+                df_lig_kpi['TIPO_CHAMADA'].eq('Click to Call')
+            ].groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            if not df_lig_kpi.empty else {}
+        )
+
+        # Calcular valores do mês atual e anterior (realizados)
+        total_real_atual = float(serie_total_mes.get(mes_selecionado, 0))
+        fixa_real_atual = float(serie_fixa_mes.get(mes_selecionado, 0))
+        conta_real_atual = float(serie_conta_mes.get(mes_selecionado, 0))
+        clicktocall_atual = float(serie_ctc_mes.get(mes_selecionado, 0))
+
+        total_anterior = float(serie_total_mes.get(mes_anterior, 0))
+        fixa_anterior = float(serie_fixa_mes.get(mes_anterior, 0))
+        conta_anterior = float(serie_conta_mes.get(mes_anterior, 0))
+        clicktocall_anterior = float(serie_ctc_mes.get(mes_anterior, 0))
 
         # Aplicar tendência apenas no mês corrente
         mes_corrente_lig_ref = get_mes_atual_formatado().strip().lower()
@@ -7984,13 +8344,13 @@ with tab4:
             classe_meta_fixa = "variacao-positiva" if alcance_meta_fixa >= 100 else "variacao-negativa"
             meta_fixa_html = f'<div class="kpi-variacao-item {classe_meta_fixa}" style="font-size: 10px !important;">{alcance_meta_fixa:.0f}% Meta</div>'
         else:
-            meta_fixa_html = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
+            meta_fixa_html = '<div class="kpi-variacao-item variacao-neutra" style="font-size: 10px !important;">Meta N/A</div>'
         
         if meta_conta > 0:
             classe_meta_conta = "variacao-positiva" if alcance_meta_conta >= 100 else "variacao-negativa"
             meta_conta_html = f'<div class="kpi-variacao-item {classe_meta_conta}" style="font-size: 10px !important;">{alcance_meta_conta:.0f}% Meta</div>'
         else:
-            meta_conta_html = '<div class="kpi-variacao-item" style="background: #F5F5F5 !important; color: #666666 !important; border: 1.5px solid #E0E0E0 !important; font-size: 10px !important;">Meta N/A</div>'
+            meta_conta_html = '<div class="kpi-variacao-item variacao-neutra" style="font-size: 10px !important;">Meta N/A</div>'
         
         # Layout dos cards KPI - 4 colunas
         col1, col2, col3, col4 = st.columns(4)
@@ -7999,13 +8359,13 @@ with tab4:
             card_total_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">TOTAL LIGAÇÕES</div>'
-                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div style="text-align: center; padding: 5px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{total_atual_fmt}</div>{tendencia_icon_total}</div>'
                 f'{real_hint_total}'
-                f'<div class="kpi-meta-line" style="margin: 10px 0;">'
+                f'<div class="kpi-meta-line" style="margin: 4px 0;">'
                 f'{build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
                 f'<div class="kpi-variacao-item {classe_total}" style="font-size: 10px !important;">'
                 f'{variacao_total:+.0f}% MoM'
                 f'</div>'
@@ -8022,13 +8382,13 @@ with tab4:
             card_fixa_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">LIGAÇÕES FIXA</div>'
-                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div style="text-align: center; padding: 5px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{fixa_atual_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
-                f'<div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(fixa_anterior_fmt, meta_fixa_fmt, mes_anterior, mes_selecionado, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
                 f'<div class="kpi-variacao-item {classe_fixa}" style="font-size: 10px !important;">'
                 f'{variacao_fixa:+.0f}% MoM'
                 f'</div>'
@@ -8046,13 +8406,13 @@ with tab4:
             card_conta_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">LIGAÇÕES CONTA</div>'
-                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div style="text-align: center; padding: 5px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{conta_atual_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
-                f'<div class="kpi-meta-line" style="margin: 10px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(conta_anterior_fmt, meta_conta_fmt, mes_anterior, mes_selecionado, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
                 f'<div class="kpi-variacao-item {classe_conta}" style="font-size: 10px !important;">'
                 f'{variacao_conta:+.0f}% MoM'
                 f'</div>'
@@ -8070,12 +8430,12 @@ with tab4:
             card_ctc_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">CLICK TO CALL</div>'
-                f'<div style="text-align: center; padding: 15px 0;">'
+                f'<div style="text-align: center; padding: 5px 0;">'
                 f'<div class="kpi-value-dinamico">{clicktocall_atual_fmt}</div>'
-                f'<div class="kpi-meta-line" style="margin: 10px 0;">'
+                f'<div class="kpi-meta-line" style="margin: 4px 0;">'
                 f'{build_kpi_meta_line(clicktocall_anterior_fmt, mes_anterior_ref=mes_anterior)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
                 f'<div class="kpi-variacao-item {classe_clicktocall}" style="font-size: 10px !important;">'
                 f'{variacao_clicktocall:+.0f}% MoM'
                 f'</div>'
@@ -8141,7 +8501,6 @@ with tab4:
                 return df_base[df_base["COD_PLATAFORMA"] == plataforma]
             return df_base
 
-        @st.cache_data(ttl=3600)
         def create_line_chart_data_ligacoes_otimizado(
             df_lig_reais,
             df_metas_lig,
@@ -8164,11 +8523,21 @@ with tab4:
 
             dados_grafico = []
 
+            # Agregação única de realizado por ano/mês para evitar 24 filtros por recorte.
+            if not df_filtrado.empty:
+                df_real_mes = df_filtrado.copy()
+                df_real_mes['ANO'] = df_real_mes['DAT_MOVIMENTO2'].dt.year
+                df_real_mes['MES_NUM'] = df_real_mes['DAT_MOVIMENTO2'].dt.month
+                serie_realizado = df_real_mes.groupby(
+                    ['ANO', 'MES_NUM'],
+                    observed=True
+                )['QTDE'].sum()
+            else:
+                serie_realizado = pd.Series(dtype='float64')
+
             for ano in [2024, 2025]:
-                df_ano = df_filtrado[df_filtrado["DAT_MOVIMENTO2"].dt.year == ano]
                 for mes_num in range(1, 13):
-                    df_mes = df_ano[df_ano["DAT_MOVIMENTO2"].dt.month == mes_num]
-                    valor = df_mes["QTDE"].sum()
+                    valor = float(serie_realizado.get((ano, mes_num), 0))
                     dados_grafico.append({
                         "Ano": str(ano),
                         "Mês": meses_pt[mes_num],
@@ -8262,11 +8631,10 @@ with tab4:
                 labels={'Valor': 'Volume de Ligações', 'Mês': ''},
                 markers=True,
                 line_shape='spline',
-                color_discrete_map=cores_personalizadas,
-                text='Valor_Formatado'
+                color_discrete_map=cores_personalizadas
             )
             
-            apply_standard_line_layout(fig_linhas_lig, 'VOLUME DE LIGAÇÕES', height=600)
+            apply_standard_line_layout(fig_linhas_lig, 'VOLUME DE LIGAÇÕES', height=480)
             apply_standard_line_traces(fig_linhas_lig, cores_personalizadas, valor_label='Realizado', meta_year='2026')
             
             # Container de informações
@@ -8308,55 +8676,6 @@ with tab4:
                 'displaylogo': False,
                 'responsive': True
             })
-            
-            # =========================
-            # RESUMO ESTATÍSTICO
-            # =========================
-            st.markdown("---")
-            
-            col_res1, col_res2, col_res3, col_res4 = st.columns(4)
-            
-            with col_res1:
-                total_2024 = df_linhas_lig[
-                    (df_linhas_lig['Ano'] == '2024') & 
-                    (df_linhas_lig['Tipo'] == 'Realizado')
-                ]['Valor'].sum()
-                st.metric(
-                    label="Total 2024",
-                    value=formatar_numero_brasileiro(total_2024, 0),
-                    delta=None
-                )
-            
-            with col_res2:
-                total_2025 = df_linhas_lig[
-                    (df_linhas_lig['Ano'] == '2025') & 
-                    (df_linhas_lig['Tipo'] == 'Realizado')
-                ]['Valor'].sum()
-                crescimento = ((total_2025 - total_2024) / total_2024 * 100) if total_2024 > 0 else 0
-                st.metric(
-                    label="Total 2025",
-                    value=formatar_numero_brasileiro(total_2025, 0),
-                    delta=f"{crescimento:+.1f}%"
-                )
-            
-            with col_res3:
-                meta_2026 = df_linhas_lig[
-                    (df_linhas_lig['Ano'] == '2026') & 
-                    (df_linhas_lig['Tipo'] == 'Meta')
-                ]['Valor'].sum()
-                st.metric(
-                    label="Meta 2026",
-                    value=formatar_numero_brasileiro(meta_2026, 0),
-                    delta=None
-                )
-            
-            with col_res4:
-                crescimento_projetado = ((meta_2026 - total_2025) / total_2025 * 100) if total_2025 > 0 else 0
-                st.metric(
-                    label="Crescimento Projetado",
-                    value=f"{crescimento_projetado:+.1f}%",
-                    delta=None
-                )
             
             # =========================
             # DETALHES DOS DADOS
@@ -8465,7 +8784,6 @@ with tab4:
             # =========================
             # FUNÇÃO PRINCIPAL PARA CRIAR TABELA DINÂMICA CORRIGIDA
             # =========================
-            @st.cache_data(ttl=3600)
             def criar_tabela_dinamica_ligacoes_completa(
                 df_lig_reais, 
                 df_metas_lig, 
@@ -8652,6 +8970,15 @@ with tab4:
                 # Manter apenas colunas que existem
                 colunas_ordenadas = [col for col in colunas_ordenadas if col in df_tabela_final.columns]
                 df_tabela_final = df_tabela_final[colunas_ordenadas]
+
+                # Ajuste visual do mês foco:
+                # - Renomeia "Real fev/26" para "FEV/26"
+                # - Mantém a coluna com estilo de mês regular (não variação)
+                col_real_mes = f'Real {mes_selecionado}'
+                col_real_exib = str(mes_selecionado).upper()
+                col_meta_mes = f'Meta {mes_selecionado}'
+                if col_real_mes in df_tabela_final.columns:
+                    df_tabela_final = df_tabela_final.rename(columns={col_real_mes: col_real_exib})
                 
                 # Formatar números
                 def formatar_valor_tabela(valor, coluna):
@@ -8682,6 +9009,11 @@ with tab4:
                 # =========================
                 def criar_tabela_html_ligacoes(df_formatado, df_numerico, meses_lista, mes_foco):
                     """Cria tabela HTML estilizada para ligações"""
+                    total_colunas = max(len(df_formatado.columns), 1)
+                    largura_col_pct = 100.0 / total_colunas
+                    colgroup_html = "<colgroup>" + "".join(
+                        [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+                    ) + "</colgroup>"
                     
                     html = """
                     <style>
@@ -8689,7 +9021,7 @@ with tab4:
                             width: 100%;
                             max-height: 650px;
                             overflow-y: auto;
-                            overflow-x: auto;
+                            overflow-x: hidden;
                             border: 2px solid #790E09;
                             border-radius: 10px;
                             box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
@@ -8703,8 +9035,9 @@ with tab4:
                             width: 100%;
                             border-collapse: collapse;
                             border-spacing: 0;
-                            font-size: 12px;
-                            line-height: 1.4;
+                            font-size: 11px;
+                            line-height: 1.3;
+                            table-layout: fixed;
                         }
                         
                         .tabela-ligacoes thead {
@@ -8717,27 +9050,26 @@ with tab4:
                             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                             color: white !important;
                             font-weight: 700;
-                            padding: 8px 6px; /* reduced height */
+                            padding: 7px 5px; /* compact */
                             text-align: center;
                             border-bottom: 3px solid #5A0A06;
                             border-right: 1px solid #FFFFFF;
-                            white-space: nowrap;
-                            font-size: 11px;
+                            white-space: normal;
+                            overflow-wrap: anywhere;
+                            word-break: break-word;
+                            font-size: 10px;
                             letter-spacing: 0.3px;
                             text-transform: uppercase;
                             position: relative;
-                            min-width: 70px;
                         }
                         
                         .tabela-ligacoes th.col-regional {
-                            min-width: 100px;
                             text-align: left;
-                            padding-left: 15px;
+                            padding-left: 10px;
                         }
                         
                         .tabela-ligacoes th.col-total-anual {
                             background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
-                            min-width: 90px;
                         }
                         
                         .tabela-ligacoes th.col-mes-2025 {
@@ -8745,37 +9077,36 @@ with tab4:
                         }
                         
                         .tabela-ligacoes th.col-mes-2026 {
-                            background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+                            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                         }
                         
                         .tabela-ligacoes th.col-real-mes {
                             background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
-                            min-width: 90px;
                         }
                         
                         .tabela-ligacoes th.col-meta-mes {
-                            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
-                            min-width: 90px;
+                            background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
                         }
                         
                         .tabela-ligacoes th.col-alcance {
                             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
-                            min-width: 90px;
                         }
                         
                         .tabela-ligacoes th.col-variacao {
                             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
-                            min-width: 90px;
                         }
                         
                         .tabela-ligacoes td {
-                            padding: 7px 6px; /* reduced height */
+                            padding: 6px 5px; /* compact */
                             text-align: center;
                             border-bottom: 1px solid #FFFFFF;
                             border-right: 1px solid #FFFFFF;
                             font-weight: 500;
                             transition: all 0.2s ease;
-                            font-size: 11px;
+                            font-size: 10px;
+                            white-space: normal;
+                            overflow-wrap: anywhere;
+                            word-break: break-word;
                         }
                         
                         .tabela-ligacoes tr:not(.linha-total-ligacoes) td:first-child {
@@ -8783,12 +9114,8 @@ with tab4:
                             font-weight: 700;
                             color: #333;
                             background: linear-gradient(90deg, #fef5f4 0%, white 100%) !important;
-                            padding-left: 15px;
-                            position: sticky;
-                            left: 0;
-                            z-index: 10;
+                            padding-left: 10px;
                             border-right: 1px solid #FFFFFF;
-                            min-width: 100px;
                         }
                         
                         .linha-total-ligacoes {
@@ -8810,9 +9137,6 @@ with tab4:
                         }
                         
                         .linha-total-ligacoes td:first-child {
-                            position: sticky;
-                            left: 0;
-                            z-index: 60;
                             border-right: 2px solid rgba(255, 255, 255, 0.2);
                         }
                         
@@ -8952,20 +9276,22 @@ with tab4:
                     <thead>
                         <tr>
                     """
+                    html = html.replace('<table class="tabela-ligacoes">', f'<table class="tabela-ligacoes">{colgroup_html}', 1)
                     
                     # Cabeçalhos
                     for i, col in enumerate(df_formatado.columns):
                         classe = ""
+                        col_real_mes_nome = str(mes_foco).upper()
                         
                         if col == 'Regional':
                             classe = "col-regional"
+                        elif col == col_real_mes_nome:
+                            classe = "col-mes-2025"
                         elif col in meses_lista:
                             if '/25' in col:
                                 classe = "col-mes-2025"
                             elif '/26' in col:
                                 classe = "col-mes-2026"
-                        elif 'Real' in col:
-                            classe = "col-real-mes"
                         elif 'Meta' in col and col != 'TEND vs META':
                             classe = "col-meta-mes"
                         elif 'Alcance' in col or col == 'TEND vs META':
@@ -9027,7 +9353,7 @@ with tab4:
                                         pass
                             
                             # Se for célula de mês atual, destacar
-                            if f'Real {mes_foco}' in col or f'Meta {mes_foco}' in col:
+                            if col == str(mes_foco).upper() or col == f'Meta {mes_foco}':
                                 classes_celula.append("highlight-animation")
                             
                             classe_str = ' '.join(classes_celula)
@@ -9050,159 +9376,19 @@ with tab4:
                 
                 st.markdown(tabela_html, unsafe_allow_html=True)
                 
-                # =========================
-                # RESUMO ESTATÍSTICO
-                # =========================
-                st.markdown("---")
-                st.markdown(
-                    '<div class="section-title"><span class="section-icon">📈</span> RESUMO ESTATÍSTICO</div>',
-                    unsafe_allow_html=True
+                filtros_ativos = []
+                if regional_selecionada != "Todas":
+                    filtros_ativos.append(f"Regional: {regional_selecionada}")
+                if "Todas" not in plataforma_filtro_tabela:
+                    filtros_ativos.append(f"Produto: {', '.join(plataforma_filtro_tabela)}")
+                if "Todos" not in tipo_chamada_filtro_tabela:
+                    filtros_ativos.append(f"Tipo: {', '.join(tipo_chamada_filtro_tabela)}")
+                resumo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Sem filtros específicos"
+                total_registros = max(len(pivot_data_completa) - 1, 0)
+                st.caption(
+                    f"Resumo da Tabela: {total_registros} regiões | Período: {meses_tabela[0]} a {meses_tabela[-1]} | "
+                    f"Mês Foco: {mes_selecionado} | Filtros: {resumo_filtros}"
                 )
-                
-                col_res1, col_res2, col_res3, col_res4 = st.columns(4)
-                
-                with col_res1:
-                    total_registros = len(pivot_data_completa) - 1  # Excluir linha de TOTAL
-                    st.metric(
-                        label="Regiões Analisadas",
-                        value=total_registros,
-                        delta=None
-                    )
-                
-                with col_res2:
-                    if len(pivot_data_completa) > 1:
-                        # Calcular alcance médio (excluindo TOTAL)
-                        df_alcance = pd.DataFrame(pivot_data_completa[1:])  # Excluir linha TOTAL
-                        alcance_medio = df_alcance['TEND vs META'].mean() if 'TEND vs META' in df_alcance.columns else 0
-                        st.metric(
-                            label="Média TEND vs META",
-                            value=f"{alcance_medio:.1f}%",
-                            delta=None
-                        )
-                
-                with col_res3:
-                    if len(pivot_data_completa) > 1:
-                        # Calcular MOM médio
-                        df_var = pd.DataFrame(pivot_data_completa[1:])
-                        crescimento_medio = df_var['MOM'].mean() if 'MOM' in df_var.columns else 0
-                        st.metric(
-                            label="MOM Médio",
-                            value=f"{crescimento_medio:+.1f}%",
-                            delta=None
-                        )
-                
-                with col_res4:
-                    total_geral = df_tabela_final.iloc[0]['Total 2025'] if len(df_tabela_final) > 0 else 0
-                    st.metric(
-                        label="Total Ligações 2025",
-                        value=formatar_numero_brasileiro(total_geral, 0),
-                        delta=None
-                    )
-                
-                # =========================
-                # BOTÕES DE EXPORTAÇÃO
-                # =========================
-                st.markdown("---")
-                col_exp1, col_exp2, col_exp3 = st.columns([1, 1, 2])
-                
-                with col_exp1:
-                    def exportar_excel_tabela_ligacoes(df_numerico):
-                        output = BytesIO()
-                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                            df_numerico.to_excel(writer, index=False, sheet_name='Tabela_Ligacoes')
-                            
-                            workbook = writer.book
-                            worksheet = writer.sheets['Tabela_Ligacoes']
-                            
-                            # Formatação para cabeçalho
-                            header_format = workbook.add_format({
-                                'bold': True,
-                                'bg_color': '#790E09',
-                                'font_color': 'white',
-                                'align': 'center',
-                                'border': 1,
-                                'font_size': 10
-                            })
-                            
-                            # Formatação para números
-                            number_format = workbook.add_format({
-                                'num_format': '#,##0',
-                                'align': 'center'
-                            })
-                            
-                            # Formatação para porcentagens
-                            percent_format = workbook.add_format({
-                                'num_format': '0.0%',
-                                'align': 'center'
-                            })
-                            
-                            # Aplicar formatação
-                            for col_num, col_name in enumerate(df_numerico.columns):
-                                worksheet.write(0, col_num, col_name, header_format)
-                                
-                                for row_num in range(1, len(df_numerico) + 1):
-                                    value = df_numerico.iloc[row_num-1, col_num]
-                                    
-                                    if pd.isna(value):
-                                        worksheet.write(row_num, col_num, '')
-                                    elif col_name == 'Regional':
-                                        worksheet.write(row_num, col_num, value)
-                                    elif '%' in col_name:
-                                        # Converter para decimal para formato Excel
-                                        try:
-                                            value_pct = float(str(value).replace('%', '')) / 100
-                                            worksheet.write(row_num, col_num, value_pct, percent_format)
-                                        except:
-                                            worksheet.write(row_num, col_num, value)
-                                    else:
-                                        worksheet.write(row_num, col_num, value, number_format)
-                            
-                            # Ajustar largura das colunas
-                            for i, col in enumerate(df_numerico.columns):
-                                column_width = max(df_numerico[col].astype(str).map(len).max(), len(col)) + 2
-                                worksheet.set_column(i, i, min(column_width, 20))
-                        
-                        return output.getvalue()
-                    
-                    excel_data = exportar_excel_tabela_ligacoes(df_tabela_final)
-                    st.download_button(
-                        label="📥 Exportar Excel",
-                        data=excel_data,
-                        file_name=f"tabela_ligacoes_{mes_selecionado.replace('/', '_')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-                
-                with col_exp2:
-                    @st.cache_data
-                    def exportar_csv_tabela_ligacoes(df_numerico):
-                        return df_numerico.to_csv(index=False, sep=';', decimal=',').encode('utf-8')
-                    
-                    csv_data = exportar_csv_tabela_ligacoes(df_tabela_final)
-                    st.download_button(
-                        label="📄 Exportar CSV",
-                        data=csv_data,
-                        file_name=f"tabela_ligacoes_{mes_selecionado.replace('/', '_')}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                
-                with col_exp3:
-                    # Resumo dos filtros aplicados
-                    filtros_ativos = []
-                    if regional_selecionada != "Todas":
-                        filtros_ativos.append(f"Regional: {regional_selecionada}")
-                    if "Todas" not in plataforma_filtro_tabela:
-                        filtros_ativos.append(f"Produto: {', '.join(plataforma_filtro_tabela)}")
-                    if "Todos" not in tipo_chamada_filtro_tabela:
-                        filtros_ativos.append(f"Tipo: {', '.join(tipo_chamada_filtro_tabela)}")
-                    
-                    resumo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Sem filtros específicos"
-                    
-                    st.caption(f"""
-                    **📋 Resumo da Tabela:** {total_registros} regiões | **Período:** {meses_tabela[0]} a {meses_tabela[-1]} | 
-                    **Mês Foco:** {mes_selecionado} | **Filtros:** {resumo_filtros}
-                    """)
                 
             else:
                 st.warning("""
@@ -9290,7 +9476,6 @@ with tab5:
         except Exception:
             return mes_ref
 
-    @st.cache_data(ttl=1800)
     def preparar_base_analitica(df_in: pd.DataFrame) -> pd.DataFrame:
         """Normaliza campos de uso recorrente para acelerar filtros/consultas no analítico."""
         if df_in is None or df_in.empty:
@@ -9315,7 +9500,8 @@ with tab5:
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
-            df_lig = pd.read_excel(ligacoes_path)
+            ligacoes_mtime = Path(ligacoes_path).stat().st_mtime
+            df_lig = load_excel_cached(ligacoes_path, ligacoes_mtime)
             colunas_min = ['PERIODO', 'CABEADO', 'QTD', 'DSC_REGIONAL_CMV']
             if any(col not in df_lig.columns for col in colunas_min):
                 return pd.DataFrame(columns=colunas_saida)
@@ -9630,13 +9816,18 @@ with tab5:
             return "pct-neutro"
 
     def criar_tabela_html_performance_canal(linhas, mes_atual_ref, mes_m1_ref, mes_m2_ref, mes_m3_ref):
+        total_colunas = 9
+        largura_col_pct = 100.0 / total_colunas
+        colgroup_html = "<colgroup>" + "".join(
+            [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+        ) + "</colgroup>"
         html = """
         <style>
             .tabela-container-performance-canal {
                 width: 100%;
                 max-height: 620px;
                 overflow-y: auto;
-                overflow-x: auto;
+                overflow-x: hidden;
                 border: 1px solid #DCC2BE;
                 border-radius: 14px;
                 box-shadow: 0 10px 28px rgba(121, 14, 9, 0.14), 0 2px 8px rgba(61, 7, 4, 0.08);
@@ -9646,12 +9837,13 @@ with tab5:
             }
 
             .tabela-performance-canal {
-                width: max-content;
+                width: 100%;
                 min-width: 100%;
                 border-collapse: collapse;
                 border-spacing: 0;
                 font-size: 10px;
                 line-height: 1.2;
+                table-layout: fixed;
             }
 
             .tabela-performance-canal thead {
@@ -9669,11 +9861,12 @@ with tab5:
                 text-align: center;
                 border-bottom: 2px solid #5A0A06;
                 border-right: 1px solid rgba(255, 255, 255, 0.14);
-                white-space: nowrap;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
                 letter-spacing: 0.35px;
                 text-transform: uppercase;
                 font-size: 9.6px;
-                min-width: 92px;
             }
 
             .tabela-performance-canal td {
@@ -9683,8 +9876,10 @@ with tab5:
                 text-align: right;
                 font-variant-numeric: tabular-nums;
                 color: #2F3747;
-                white-space: nowrap;
-                font-size: 10px;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+                font-size: 11px;
                 transition: background-color 0.2s ease, box-shadow 0.2s ease;
             }
 
@@ -9950,8 +10145,8 @@ with tab5:
             .tabela-performance-canal {
                 font-size: 11px !important;
                 line-height: 1.25 !important;
-                table-layout: auto !important;
-                width: max-content !important;
+                table-layout: fixed !important;
+                width: 100% !important;
                 min-width: 100% !important;
                 font-family: 'Manrope', 'Segoe UI', sans-serif !important;
             }
@@ -10003,52 +10198,11 @@ with tab5:
                 height: 1px !important;
             }
 
-            /* Compactação horizontal por coluna */
-            .tabela-performance-canal th:nth-child(1),
-            .tabela-performance-canal td:nth-child(1) {
-                width: 160px !important;
-                min-width: 160px !important;
-                max-width: 160px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(2),
-            .tabela-performance-canal td:nth-child(2),
-            .tabela-performance-canal th:nth-child(3),
-            .tabela-performance-canal td:nth-child(3),
-            .tabela-performance-canal th:nth-child(4),
-            .tabela-performance-canal td:nth-child(4),
-            .tabela-performance-canal th:nth-child(5),
-            .tabela-performance-canal td:nth-child(5) {
-                width: 90px !important;
-                min-width: 90px !important;
-                max-width: 90px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(6),
-            .tabela-performance-canal td:nth-child(6),
-            .tabela-performance-canal th:nth-child(8),
-            .tabela-performance-canal td:nth-child(8),
-            .tabela-performance-canal th:nth-child(11),
-            .tabela-performance-canal td:nth-child(11) {
-                width: 92px !important;
-                min-width: 92px !important;
-                max-width: 92px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(7),
-            .tabela-performance-canal td:nth-child(7) {
-                width: 104px !important;
-                min-width: 104px !important;
-                max-width: 104px !important;
-            }
-
-            .tabela-performance-canal th:nth-child(9),
-            .tabela-performance-canal td:nth-child(9),
-            .tabela-performance-canal th:nth-child(10),
-            .tabela-performance-canal td:nth-child(10) {
-                width: 88px !important;
-                min-width: 88px !important;
-                max-width: 88px !important;
+            .tabela-performance-canal th,
+            .tabela-performance-canal td {
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: none !important;
             }
         </style>
 
@@ -10064,21 +10218,20 @@ with tab5:
                         <th class="col-variacao">MoM</th>
                         <th class="col-meta">""" + f"Meta {mes_atual_ref}" + """</th>
                         <th class="col-alcance">Ating Meta</th>
-                        <th class="col-total-anual">2024</th>
                         <th class="col-total-anual">2025</th>
-                        <th class="col-variacao">YoY</th>
                     </tr>
                 </thead>
                 <tbody>
         """
+        html = html.replace('<table class="tabela-performance-canal">', f'<table class="tabela-performance-canal">{colgroup_html}', 1)
 
         for linha in linhas:
             if linha['tipo'] == 'grupo':
-                html += f'<tr class="linha-grupo-performance"><td colspan="11">{linha["grupo"]}</td></tr>'
+                html += f'<tr class="linha-grupo-performance"><td colspan="9">{linha["grupo"]}</td></tr>'
                 continue
 
             if linha['tipo'] == 'separador':
-                html += '<tr class="linha-separador-performance"><td colspan="11"></td></tr>'
+                html += '<tr class="linha-separador-performance"><td colspan="9"></td></tr>'
                 continue
 
             html += '<tr class="linha-item-performance">'
@@ -10090,9 +10243,7 @@ with tab5:
             html += f'<td class="col-variacao {classe_pct(linha["MOM_RAW"])}">{linha["MOM"]}</td>'
             html += f'<td class="col-meta">{linha["META_MES"]}</td>'
             html += f'<td class="col-alcance {classe_pct(linha["ATING_META_RAW"])}">{linha["ATING_META"]}</td>'
-            html += f'<td class="col-total-anual">{linha["2024"]}</td>'
             html += f'<td class="col-total-anual">{linha["2025"]}</td>'
-            html += f'<td class="col-variacao {classe_pct(linha["YOY_RAW"])}">{linha["YOY"]}</td>'
             html += '</tr>'
 
         html += """
@@ -10131,7 +10282,6 @@ with tab5:
                 "<th>Indicador</th>",
                 f"<th>{mes_anterior_ref}</th>",
                 f"<th>{mes_atual_ref}</th>",
-                "<th>2024</th>",
                 "<th>2025</th>",
                 "</tr></thead>",
                 "<tbody>",
@@ -10143,7 +10293,6 @@ with tab5:
                     f"<td>{linha.get('indicador', '')}</td>",
                     f"<td>{linha.get('MES_ANT', '0,0%')}</td>",
                     f"<td>{linha.get('MES_ATU', '0,0%')}</td>",
-                    f"<td>{linha.get('2024', '0,0%')}</td>",
                     f"<td>{linha.get('2025', '0,0%')}</td>",
                     "</tr>",
                 ])
@@ -10438,7 +10587,7 @@ with tab5:
                     linhas_tabela_perf.append({'tipo': 'separador'})
 
             st.caption(
-                f"Mês atual da análise: {mes_perf_sel} | Mês anterior: {mes_anterior_perf} | YoY referência: {mes_yoy_perf}"
+                f"Mês atual da análise: {mes_perf_sel} | Mês anterior: {mes_anterior_perf}"
             )
             st.markdown(
                 criar_tabela_html_performance_canal(
@@ -10451,19 +10600,13 @@ with tab5:
                 unsafe_allow_html=True
             )
 
-
-    st.markdown(
-        '<div class="section-title"><span class="section-icon">📊</span> ANALÍTICO - PLANEJAMENTO DIÁRIO PARA META</div>',
-        unsafe_allow_html=True
-    )
-
     base_analitica = preparar_base_analitica(df)
 
     # ------------------------------------------------------------
     # NOVO VISUAL: PERFORMANCE REGIONAL CONSOLIDADA (PEDIDOS/LIGAÇÕES/V.B/ATIVADOS)
     # ------------------------------------------------------------
     st.markdown(
-        '<div class="subsection-title" style="margin-top:12px;">📌 PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES</div>',
+        '<div class="subsection-title" style="margin-top:12px;"><span class="section-icon">📊</span> PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES</div>',
         unsafe_allow_html=True
     )
 
@@ -10478,7 +10621,8 @@ with tab5:
                 path = "televendas_ligacoes2.xlsx"
                 if not Path(path).exists():
                     return pd.DataFrame()
-                df_lig = pd.read_excel(path)
+                ligacoes_mtime = Path(path).stat().st_mtime
+                df_lig = load_excel_cached(path, ligacoes_mtime)
                 if df_lig.empty:
                     return pd.DataFrame()
                 df_lig['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig['PERIODO'], errors='coerce')
@@ -10700,7 +10844,7 @@ with tab5:
                 <style>
                 .{tabela_id}-container {{
                     width: 100%;
-                    overflow-x: auto;
+                    overflow-x: hidden;
                     border: 2px solid #790E09;
                     border-radius: 12px;
                     box-shadow: 0 6px 18px rgba(121,14,9,0.16);
@@ -10710,7 +10854,7 @@ with tab5:
                 table.{tabela_id} {{
                     border-collapse: collapse;
                     width: 100%;
-                    min-width: 940px;
+                    table-layout: fixed;
                     font-size: 12px;
                 }}
                 .{tabela_id} thead th {{
@@ -10722,6 +10866,9 @@ with tab5:
                     text-align: center;
                     font-weight: 800;
                     letter-spacing: 0.4px;
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
                 }}
                 .{tabela_id} tbody td {{
                     padding: 8px 8px;
@@ -10729,6 +10876,10 @@ with tab5:
                     border-bottom: 1px solid #F0E4E2;
                     font-weight: 600;
                     color: #2F3747;
+                    font-size: 13px;
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
                 }}
                 .{tabela_id} tbody tr:nth-child(odd) td {{ background: #FFF9F8; }}
                 .{tabela_id} tbody tr:nth-child(even) td {{ background: #FDF3F2; }}
@@ -10745,6 +10896,11 @@ with tab5:
                     "REGIONAL", "DEMANDA", "META DEMANDA",
                     "VENDA BRUTA", "CONVERSÃO V.B", "ATIVADOS", "META ATIVADOS", "CONVERSÃO ATIV"
                 ]
+                total_colunas = max(len(header_cols), 1)
+                largura_col_pct = 100.0 / total_colunas
+                colgroup_html = "<colgroup>" + "".join(
+                    [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+                ) + "</colgroup>"
                 html_rows = ""
                 for _, row in df_fmt.iterrows():
                     html_rows += "<tr>"
@@ -10761,6 +10917,7 @@ with tab5:
                 {css_reg}
                 <div class="{tabela_id}-container">
                   <table class="{tabela_id}">
+                    {colgroup_html}
                     <thead>
                       <tr>{" ".join([f"<th>{col}</th>" for col in header_cols])}</tr>
                     </thead>
@@ -10785,7 +10942,7 @@ with tab5:
         idx_mes_analitico = meses_analitico.index(mes_corrente_ref) if mes_corrente_ref in meses_analitico else len(meses_analitico) - 1
 
         st.markdown(
-            '<div class="subsection-title" style="margin-top:18px;">📋 RESULTADO DOS CANAIS</div>',
+            '<div class="subsection-title" style="margin-top:18px;"><span class="section-icon">📋</span> RESULTADO DOS CANAIS</div>',
             unsafe_allow_html=True
         )
         col_res_a1, col_res_a2 = st.columns([1.1, 1.1])
@@ -10869,7 +11026,7 @@ with tab5:
                     st.success("Observações aplicadas e salvas.")
 
         st.markdown(
-            '<div class="subsection-title" style="margin-top:22px;">📌 PLANEJAMENTO DIÁRIO PARA META</div>',
+            '<div class="subsection-title" style="margin-top:22px;"><span class="section-icon">🎯</span> PLANEJAMENTO DIÁRIO PARA META</div>',
             unsafe_allow_html=True
         )
         col_f_a1, col_f_a2 = st.columns([1.2, 1.2])
@@ -10913,7 +11070,7 @@ with tab5:
         # TABELA 1: CONTA
         # -------------------------
         st.markdown(
-            '<div class="subsection-title" style="margin-top:18px;">📋 CONTA - NECESSIDADE DIÁRIA</div>',
+            '<div class="subsection-title" style="margin-top:18px;"><span class="section-icon">📋</span> CONTA - NECESSIDADE DIÁRIA</div>',
             unsafe_allow_html=True
         )
         tabela_conta, ctx_conta = construir_tabela_analitica_produto(
@@ -10958,7 +11115,7 @@ with tab5:
         # TABELA 2: FIXA
         # -------------------------
         st.markdown(
-            '<div class="subsection-title" style="margin-top:24px;">📋 FIXA - NECESSIDADE DIÁRIA</div>',
+            '<div class="subsection-title" style="margin-top:24px;"><span class="section-icon">📋</span> FIXA - NECESSIDADE DIÁRIA</div>',
             unsafe_allow_html=True
         )
         tabela_fixa, ctx_fixa = construir_tabela_analitica_produto(
