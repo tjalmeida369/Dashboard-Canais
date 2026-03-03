@@ -3696,7 +3696,7 @@ def validate_data(df):
 # =========================
 # CARREGAR E VALIDAR DADOS
 # =========================
-file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_trt_new3.xlsx"
+file_path = "base_final_trt_new3.xlsx"
 file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
 df = load_data(file_path, file_mtime)
 
@@ -5334,7 +5334,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\base_final_churn.xlsx"
+            file_path = "base_final_churn.xlsx"
             file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
             df_desativados = load_excel_cached(file_path, file_mtime)
             
@@ -7919,7 +7919,7 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+            ligacoes_path = "televendas_ligacoes2.xlsx"
             
             # Carregar dados
             ligacoes_mtime = Path(ligacoes_path).stat().st_mtime if Path(ligacoes_path).exists() else None
@@ -9687,7 +9687,7 @@ with tab5:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+            ligacoes_path = "televendas_ligacoes2.xlsx"
             if not Path(ligacoes_path).exists():
                 return pd.DataFrame(columns=colunas_saida)
 
@@ -12265,7 +12265,7 @@ with tab5:
                     @st.cache_data(ttl=1800)
                     def load_ligacoes_demanda_diaria() -> pd.DataFrame:
                         try:
-                            path_lig = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+                            path_lig = r"televendas_ligacoes2.xlsx"
                             if not Path(path_lig).exists():
                                 return pd.DataFrame()
                             lig_mtime = Path(path_lig).stat().st_mtime
@@ -12476,7 +12476,7 @@ with tab5:
         def load_ligacoes_resumo():
             """Carrega ligações reais (televendas_ligacoes2.xlsx) já tratadas para REGIONAL/mes/plataforma."""
             try:
-                path = r"C:\Users\F270665\OneDrive - Claro SA\Documentos\Extração_VDI\FÍSICOS_MOBILIDADE\televendas_ligacoes2.xlsx"
+                path = "televendas_ligacoes2.xlsx"
                 if not Path(path).exists():
                     return pd.DataFrame()
                 ligacoes_mtime = Path(path).stat().st_mtime
@@ -13287,3 +13287,4 @@ with tab5:
                 ),
                 unsafe_allow_html=True
             )
+
