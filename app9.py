@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -3552,7 +3552,7 @@ def criar_tabela_html_necessidade_diaria_produto(
     def fmt_pct(v: float) -> str:
         if pd.isna(v):
             return "-"
-        return f"{float(v):.1f}%".replace(".", ",")
+        return f"{float(v):.0f}%".replace(".", ",")
 
     def classe_pct(v: float) -> str:
         if pd.isna(v):
@@ -3564,7 +3564,7 @@ def criar_tabela_html_necessidade_diaria_produto(
         return "pct-neutro"
 
     total_cols_dinamicas = sum(len(dias_semana_map.get(int(s), [])) + 1 for s in semanas) + 1
-    largura_label = 13.0
+    largura_label = 7.5
     largura_dinamica = (100.0 - largura_label) / float(max(total_cols_dinamicas, 1))
     colgroup = "<colgroup>"
     colgroup += f'<col style="width:{largura_label:.4f}%;">'
@@ -3699,23 +3699,25 @@ def criar_tabela_html_necessidade_diaria_produto(
         min-width: 100%;
         max-width: 100%;
         table-layout: fixed;
-        font-size: 9.2px;
+        font-size: clamp(9px, 0.72vw, 11px);
         line-height: 1.0;
     }}
     .{table_id} thead th {{
         background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
         color: #fff;
-        padding: 3px 2px;
+        padding: 5px 3px;
         text-align: center;
-        font-weight: 700;
+        font-weight: 800;
+        letter-spacing: 0.15px;
         border-right: 1px solid rgba(255,255,255,0.88);
-        white-space: nowrap;
+        white-space: normal;
         line-height: 1.0;
+        font-size: clamp(8.2px, 0.66vw, 10.2px);
     }}
     .{table_id} thead th.th-semana {{
         background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
-        border-bottom: 1px solid rgba(255,255,255,0.22);
-        font-size: 9.4px;
+        border-bottom: 2px solid rgba(255,255,255,0.22);
+        font-size: clamp(8.6px, 0.70vw, 10.8px);
     }}
     .{table_id} thead th.th-dia-tot {{
         background: linear-gradient(135deg, #B23A31 0%, #8F1B14 100%) !important;
@@ -3729,20 +3731,25 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id} thead th.th-dia.th-dia-tend {{
         background: linear-gradient(135deg, #B7443B 0%, #8F241D 100%) !important;
     }}
+    .{table_id} thead tr:nth-child(2) th {{
+        font-size: clamp(7.8px, 0.60vw, 9.6px);
+    }}
     .{table_id} tbody td {{
-        padding: 3px 2px;
+        padding: 4px 3px;
         text-align: center;
         border-bottom: 1px solid #FFFFFF;
         border-right: 1px solid #FFFFFF;
         color: #2F3747;
-        font-size: 9px;
+        font-weight: 400;
+        font-size: clamp(8.6px, 0.68vw, 10.5px);
         vertical-align: bottom;
         white-space: nowrap;
     }}
     .{table_id} tbody td.col-linha {{
         text-align: left;
-        padding-left: 6px;
+        padding-left: 5px;
         font-weight: 600;
+        line-height: 1.05;
         position: sticky;
         left: 0;
         z-index: 5;
@@ -3810,6 +3817,12 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id} tbody tr.linha-realizado td.col-linha,
     .{table_id} tbody tr.linha-ating td.col-linha {{
         background: #FFFFFF !important;
+    }}
+    @media (max-width: 1600px) {{
+        table.{table_id} {{ min-width: 100%; }}
+    }}
+    @media (max-width: 1366px) {{
+        table.{table_id} {{ min-width: 100%; }}
     }}
     </style>
     """
@@ -4597,9 +4610,16 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         }}
         #{table_id} .linha-total-resultado {{
             position: sticky;
-            top: 35px;
+            /* Alinha o sticky da linha total com a altura real do header para
+               evitar sobreposição visual na primeira linha de canal. */
+            top: 28px;
             z-index: 95;
             border-bottom: 2px solid #790E09;
+        }}
+        #{table_id} .tabela-resultado-canais tbody tr.linha-canal-resultado td {{
+            min-height: 24px;
+            padding-top: 7px !important;
+            padding-bottom: 3px !important;
         }}
         #{table_id} .linha-total-resultado td {{
             background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
@@ -14265,4 +14285,3 @@ with tab5:
                 html_fixa,
                 unsafe_allow_html=True
             )
-
