@@ -810,24 +810,42 @@ st.markdown("""
         .kpi-card-dinamico,
         .kpi-block-dinamico,
         [data-testid="stMetric"] {
-            background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%) !important;
-            border: 1px solid #E6EAF0 !important;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.99) 100%),
+                linear-gradient(135deg, rgba(162, 59, 54, 0.03) 0%, rgba(162, 59, 54, 0.00) 42%) !important;
+            border: 1px solid #E5EBF2 !important;
+            border-radius: 20px !important;
             box-shadow:
-                0 1px 1px rgba(16, 24, 40, 0.04),
-                0 6px 16px rgba(16, 24, 40, 0.08) !important;
+                0 1px 2px rgba(16, 24, 40, 0.04),
+                0 14px 32px rgba(16, 24, 40, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.96),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.55) !important;
+            position: relative;
         }
 
         .kpi-card-dinamico {
             overflow: hidden;
-            min-height: 70px !important;
+            min-height: 68px !important;
             padding: 6px !important;
             margin: 4px 0 !important;
+        }
+
+        .kpi-block-dinamico {
+            border-radius: 16px !important;
+            padding: 8px 7px !important;
+            min-height: 100%;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%) !important;
+            border-color: rgba(226, 232, 240, 0.92) !important;
+            box-shadow:
+                0 8px 18px rgba(15, 23, 42, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
         }
 
         .kpi-card-dinamico::before,
         .kpi-block-dinamico::before {
             height: 3px;
-            background: linear-gradient(90deg, var(--ds-primary), var(--ds-primary-soft));
+            background: linear-gradient(90deg, #D96A5F 0%, var(--ds-primary) 40%, #6B0D09 100%);
             opacity: 1;
         }
 
@@ -836,48 +854,54 @@ st.markdown("""
             position: absolute;
             top: 0;
             right: 0;
-            width: 42%;
+            width: 54%;
             height: 100%;
-            background: radial-gradient(circle at top right, rgba(162, 59, 54, 0.10), rgba(162, 59, 54, 0.00) 62%);
+            background:
+                radial-gradient(circle at top right, rgba(162, 59, 54, 0.12), rgba(162, 59, 54, 0.00) 60%),
+                linear-gradient(135deg, rgba(162, 59, 54, 0.04), rgba(162, 59, 54, 0.00) 52%),
+                repeating-linear-gradient(135deg, rgba(162, 59, 54, 0.018) 0 8px, rgba(162, 59, 54, 0.00) 8px 16px);
             pointer-events: none;
         }
 
         .kpi-card-dinamico:hover,
         .kpi-block-dinamico:hover {
             transform: translateY(-2px);
-            border-color: #D7DEE8 !important;
+            border-color: #D5DEE8 !important;
             box-shadow:
-                0 2px 4px rgba(16, 24, 40, 0.05),
-                0 12px 24px rgba(16, 24, 40, 0.12) !important;
+                0 4px 10px rgba(16, 24, 40, 0.06),
+                0 18px 34px rgba(16, 24, 40, 0.12) !important;
         }
 
         .kpi-title-dinamico {
             background: none !important;
-            color: var(--ds-primary) !important;
-            -webkit-text-fill-color: var(--ds-primary) !important;
-            font-size: 15px !important;
+            color: #7A1E19 !important;
+            -webkit-text-fill-color: #7A1E19 !important;
+            font-size: 12px !important;
             font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
             font-weight: 800 !important;
-            letter-spacing: 0.35px;
-            margin-bottom: 9px !important;
+            letter-spacing: 1.2px;
+            margin-bottom: 8px !important;
             text-transform: uppercase;
+            text-align: center;
         }
 
         .kpi-title-dinamico::after {
             height: 2px;
-            width: 42px;
-            background: var(--ds-primary);
+            width: 30px;
+            background: linear-gradient(90deg, rgba(162, 59, 54, 0.10), var(--ds-primary), rgba(162, 59, 54, 0.10));
         }
 
         .kpi-value-dinamico {
-            font-size: 20px !important;
+            font-size: 24px !important;
             color: var(--ds-text) !important;
             background: none !important;
             -webkit-text-fill-color: var(--ds-text) !important;
             font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
-            font-weight: 800 !important;
+            font-weight: 900 !important;
             text-shadow: none;
-            letter-spacing: -0.3px;
+            letter-spacing: -0.55px;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
         }
 
         .kpi-variacao-item {
@@ -912,42 +936,131 @@ st.markdown("""
         }
 
         .kpi-meta-line {
-            font-size: 12.5px;
-            color: #666666;
-            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            font-size: 11.5px;
+            color: #64748B;
+            margin: 5px 0 4px 0;
             line-height: 1.35;
-            font-weight: 500;
+            font-weight: 600;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
         }
 
         .kpi-meta-label {
-            font-weight: 700;
-            color: #334155;
+            font-weight: 800;
+            font-size: 9px;
+            letter-spacing: 0.9px;
+            text-transform: uppercase;
+            color: #7A1E19;
             cursor: help;
-            border-bottom: 1px dotted #94A3B8;
-            text-underline-offset: 2px;
-            transition: color 0.2s ease, border-color 0.2s ease;
+            transition: color 0.2s ease;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
         }
 
         .kpi-meta-label:hover {
-            color: #1E293B;
-            border-bottom-color: #64748B;
+            color: #641411;
+        }
+
+        .kpi-meta-items {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .kpi-meta-items-break {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .kpi-meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 25px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid #E2E8F0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.92),
+                0 3px 8px rgba(15, 23, 42, 0.04);
+            white-space: nowrap;
+        }
+
+        .kpi-meta-chip-anterior {
+            border-color: rgba(100, 116, 139, 0.22);
+            background: linear-gradient(180deg, #FFFFFF 0%, #F5F8FC 100%);
+        }
+
+        .kpi-meta-chip-orc {
+            border-color: rgba(162, 59, 54, 0.18);
+            background: linear-gradient(180deg, #FFF9F8 0%, #FFEFEA 100%);
+        }
+
+        .kpi-meta-chip-silentes {
+            border-color: rgba(180, 35, 24, 0.18);
+            background: linear-gradient(180deg, #FFF8F7 0%, #FEEDEA 100%);
+        }
+
+        .kpi-meta-value {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #0F172A;
+            font-variant-numeric: tabular-nums;
         }
 
         .kpi-parcial-note {
-            font-size: 12px;
-            color: #666666;
-            font-weight: 700;
-            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: fit-content;
+            min-height: 20px;
+            padding: 2px 9px;
+            border-radius: 999px;
+            border: 1px solid rgba(162, 59, 54, 0.16);
+            background: linear-gradient(180deg, #FFF9F8 0%, #FFF2EF 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+            font-size: 10px;
+            color: #7A1E19;
+            font-weight: 800;
+            margin: 0 auto;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        .kpi-parcial-note::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: #B42318;
+            box-shadow: 0 0 0 2px rgba(180, 35, 24, 0.12);
+            flex: 0 0 auto;
         }
 
         .kpi-value-wrap {
             position: relative;
-            display: inline-block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: fit-content;
             line-height: 1;
             overflow: visible;
+            padding: 5px 11px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%),
+                linear-gradient(135deg, rgba(162, 59, 54, 0.02), rgba(162, 59, 54, 0.00));
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                0 6px 16px rgba(15, 23, 42, 0.06);
+            margin: 0 auto 4px auto;
         }
 
         .kpi-value-wrap .kpi-value-dinamico {
@@ -959,16 +1072,19 @@ st.markdown("""
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            font-size: 9px;
-            font-weight: 800;
+            min-width: 34px;
+            height: 18px;
+            padding: 0 7px;
+            border-radius: 999px;
+            font-size: 8px;
+            font-weight: 900;
+            letter-spacing: 0.8px;
+            white-space: nowrap;
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
-            background: #790E09 !important;
+            background: linear-gradient(135deg, #B63A33 0%, #790E09 100%) !important;
             border: 1px solid rgba(255, 255, 255, 0.9);
-            box-shadow: 0 1px 4px rgba(121, 14, 9, 0.35);
+            box-shadow: 0 4px 10px rgba(121, 14, 9, 0.25);
             cursor: help;
             line-height: 1;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
@@ -977,9 +1093,27 @@ st.markdown("""
         .kpi-tooltip-inline {
             position: absolute;
             left: 100%;
-            top: 50%;
-            transform: translate(6px, -50%);
-            z-index: 2;
+            top: 4px;
+            transform: translate(10px, 0);
+            z-index: 3;
+        }
+
+        .kpi-block-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: fit-content;
+            min-height: 21px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, rgba(162, 59, 54, 0.09) 0%, rgba(162, 59, 54, 0.04) 100%);
+            border: 1px solid rgba(162, 59, 54, 0.14);
+            color: #7A1E19;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.9px;
+            text-transform: uppercase;
+            margin: 0 auto 6px auto;
         }
 
         .variacao-positiva {
@@ -1013,6 +1147,156 @@ st.markdown("""
         .variacao-neutra::before {
             background: #94A3B8;
             box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20);
+        }
+
+        .evo-monthly-panel {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 11px 13px;
+            margin: 11px 0 2px 0;
+            border-radius: 14px;
+            border: 1px solid #E5EBF2;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(246,248,252,0.98) 100%),
+                linear-gradient(135deg, rgba(162,59,54,0.04) 0%, rgba(162,59,54,0.00) 46%);
+            box-shadow:
+                0 1px 2px rgba(16, 24, 40, 0.04),
+                0 10px 24px rgba(16, 24, 40, 0.07),
+                inset 0 1px 0 rgba(255, 255, 255, 0.96);
+        }
+
+        .evo-monthly-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 5px;
+            background: linear-gradient(180deg, #D96A5F 0%, #A23B36 58%, #6B0D09 100%);
+        }
+
+        .evo-monthly-summary {
+            position: relative;
+            z-index: 1;
+            flex: 1 1 250px;
+            min-width: 215px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(162, 59, 54, 0.14);
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,249,248,0.98) 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.96),
+                0 6px 16px rgba(121, 14, 9, 0.06);
+        }
+
+        .evo-monthly-summary-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 0.9px;
+            text-transform: uppercase;
+            color: #7A1E19;
+            margin-bottom: 5px;
+        }
+
+        .evo-monthly-summary-label::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #A23B36;
+            box-shadow: 0 0 0 2px rgba(162, 59, 54, 0.14);
+            flex: 0 0 auto;
+        }
+
+        .evo-monthly-summary-value {
+            font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
+            font-size: 19px;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.3px;
+            color: #1F2937;
+            word-break: break-word;
+        }
+
+        .evo-monthly-summary-aux {
+            margin-top: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 1.3;
+            color: #64748B;
+            word-break: break-word;
+        }
+
+        .evo-monthly-legends {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: stretch;
+            justify-content: flex-end;
+            gap: 8px;
+            flex: 1 1 380px;
+            flex-wrap: wrap;
+        }
+
+        .evo-monthly-legend-card {
+            min-width: 118px;
+            flex: 1 1 118px;
+            padding: 9px 10px;
+            border-radius: 12px;
+            border: 1px solid #E2E8F0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.96),
+                0 5px 14px rgba(15, 23, 42, 0.05);
+        }
+
+        .evo-monthly-legend-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .evo-monthly-legend-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 999px;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 2px 5px rgba(15,23,42,0.10);
+            flex: 0 0 auto;
+        }
+
+        .evo-monthly-legend-dot.is-orc {
+            border-radius: 3px;
+        }
+
+        .evo-monthly-legend-title {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: #7A1E19;
+        }
+
+        .evo-monthly-legend-text {
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.25;
+            color: #334155;
+        }
+
+        .evo-monthly-legend-note {
+            margin-top: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            color: #64748B;
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -1417,7 +1701,7 @@ st.markdown("""
             }
 
             .kpi-card-dinamico {
-                min-height: 58px;
+                min-height: 52px;
             }
 
             .analitico-corte-info {
@@ -1433,13 +1717,16 @@ if KPI_PILL_VARIANT == "clean":
     kpi_pill_style = """
     <style>
         .kpi-variacao-item {
-            border-radius: 999px !important;
+            border-radius: 12px !important;
             border-width: 1px !important;
-            min-height: 24px !important;
-            padding: 4px 11px !important;
-            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+            min-height: 26px !important;
+            padding: 4px 10px !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFD 100%) !important;
             color: #475569 !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 1px 2px rgba(15, 23, 42, 0.07) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94), 0 3px 8px rgba(15, 23, 42, 0.06) !important;
+            transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.25px !important;
         }
         .kpi-variacao-item::before {
             content: "" !important;
@@ -1450,9 +1737,13 @@ if KPI_PILL_VARIANT == "clean":
             box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20) !important;
             flex: 0 0 auto !important;
         }
+        .kpi-variacao-item:hover {
+            transform: translateY(-1px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.97), 0 5px 12px rgba(15, 23, 42, 0.10) !important;
+        }
         .variacao-positiva {
             color: #166534 !important;
-            background: linear-gradient(180deg, #F5FCF7 0%, #EDF8F0 100%) !important;
+            background: linear-gradient(180deg, #F6FCF7 0%, #E8F5ED 100%) !important;
             border-color: rgba(22, 101, 52, 0.28) !important;
         }
         .variacao-positiva::before {
@@ -1461,7 +1752,7 @@ if KPI_PILL_VARIANT == "clean":
         }
         .variacao-negativa {
             color: #B42318 !important;
-            background: linear-gradient(180deg, #FFF6F6 0%, #FDECEC 100%) !important;
+            background: linear-gradient(180deg, #FFF8F7 0%, #FDE8E6 100%) !important;
             border-color: rgba(180, 35, 24, 0.30) !important;
         }
         .variacao-negativa::before {
@@ -1483,13 +1774,16 @@ else:
     kpi_pill_style = """
     <style>
         .kpi-variacao-item {
-            border-radius: 999px !important;
+            border-radius: 12px !important;
             border-width: 1px !important;
-            min-height: 24px !important;
-            padding: 4px 11px !important;
-            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+            min-height: 26px !important;
+            padding: 4px 10px !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFD 100%) !important;
             color: #475569 !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 3px rgba(15, 23, 42, 0.10) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 3px 8px rgba(15, 23, 42, 0.09) !important;
+            transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.25px !important;
         }
         .kpi-variacao-item::before {
             content: "" !important;
@@ -1500,9 +1794,13 @@ else:
             box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20) !important;
             flex: 0 0 auto !important;
         }
+        .kpi-variacao-item:hover {
+            transform: translateY(-1px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.97), 0 5px 14px rgba(15, 23, 42, 0.12) !important;
+        }
         .variacao-positiva {
             color: #14532D !important;
-            background: linear-gradient(180deg, #ECF9F0 0%, #DDF3E4 100%) !important;
+            background: linear-gradient(180deg, #EDF9F1 0%, #D8F0E1 100%) !important;
             border-color: rgba(22, 101, 52, 0.38) !important;
         }
         .variacao-positiva::before {
@@ -1511,7 +1809,7 @@ else:
         }
         .variacao-negativa {
             color: #991B1B !important;
-            background: linear-gradient(180deg, #FEEFEF 0%, #FDDDDD 100%) !important;
+            background: linear-gradient(180deg, #FEF1F1 0%, #FCD8D6 100%) !important;
             border-color: rgba(185, 28, 28, 0.42) !important;
         }
         .variacao-negativa::before {
@@ -1657,11 +1955,10 @@ def build_tendencia_icon_html(usa_tendencia: bool) -> str:
         return ""
     return (
         '<span class="kpi-tooltip kpi-tooltip-inline" '
-        'style="background:#790E09 !important;color:#FFFFFF !important;'
-        '-webkit-text-fill-color:#FFFFFF !important;border:1px solid rgba(255,255,255,0.9);'
-        'box-shadow:0 1px 4px rgba(121,14,9,0.35);" '
+        'style="color:#FFFFFF !important;'
+        '-webkit-text-fill-color:#FFFFFF !important;border:1px solid rgba(255,255,255,0.9);" '
         'title="Tendência = projeção de fechamento do mês com base no ritmo atual." '
-        'aria-label="Tendência aplicada ao valor">i</span>'
+        'aria-label="Tendência aplicada ao valor">TEND</span>'
     )
 
 def build_kpi_meta_line(
@@ -1674,35 +1971,89 @@ def build_kpi_meta_line(
     """Gera linha de meta dos cards com tooltip de referência de mês."""
     mes_anterior_txt = str(mes_anterior_ref).strip() if mes_anterior_ref else ""
     mes_meta_txt = str(mes_meta_ref).strip() if mes_meta_ref else ""
+    anterior_txt = escape(str(anterior_valor))
 
     hint_anterior = (
         f"M-1: referente ao mês {mes_anterior_txt}"
         if mes_anterior_txt
         else "M-1: valor de referência"
     )
-    label_anterior = (
-        f'<span class="kpi-meta-label" title="{escape(hint_anterior)}" '
-        f'aria-label="{escape(hint_anterior)}">M-1:</span>'
+    chip_anterior = (
+        f'<span class="kpi-meta-chip kpi-meta-chip-anterior" title="{escape(hint_anterior)}" '
+        f'aria-label="{escape(hint_anterior)}">'
+        f'<span class="kpi-meta-label">M-1</span>'
+        f'<span class="kpi-meta-value">{anterior_txt}</span>'
+        f'</span>'
     )
 
     if meta_valor is None:
-        return f"{label_anterior} {anterior_valor}"
+        return f'<span class="kpi-meta-items">{chip_anterior}</span>'
 
+    meta_txt = escape(str(meta_valor))
     hint_meta = (
         f"Orç: referente ao mês {mes_meta_txt}"
         if mes_meta_txt
         else "Orç: valor de meta do mês selecionado"
     )
-    label_meta = (
-        f'<span class="kpi-meta-label" title="{escape(hint_meta)}" '
-        f'aria-label="{escape(hint_meta)}">Orç:</span>'
+    chip_meta = (
+        f'<span class="kpi-meta-chip kpi-meta-chip-orc" title="{escape(hint_meta)}" '
+        f'aria-label="{escape(hint_meta)}">'
+        f'<span class="kpi-meta-label">Orç</span>'
+        f'<span class="kpi-meta-value">{meta_txt}</span>'
+        f'</span>'
     )
-    separador = (
-        "<br>"
-        if break_line
-        else '<span style="display:inline-block; margin: 0 8px; color:#94A3B8;">|</span>'
+    classes = "kpi-meta-items kpi-meta-items-break" if break_line else "kpi-meta-items"
+    return f'<span class="{classes}">{chip_anterior}{chip_meta}</span>'
+
+def build_painel_contexto_evolucao_mensal(
+    resumo_label: str,
+    resumo_valor: str,
+    resumo_aux: str | None = None,
+    legenda_2025: str = '2025 (Real)',
+    legenda_2026: str = '2026 (Real/Tend Mês)',
+    legenda_orc: str = '2026 (Orç)'
+) -> str:
+    """Renderiza painel executivo de contexto para evolução mensal."""
+    aux_html = (
+        f'<div class="evo-monthly-summary-aux">{escape(str(resumo_aux))}</div>'
+        if resumo_aux and str(resumo_aux).strip()
+        else ''
     )
-    return f"{label_anterior} {anterior_valor}{separador}{label_meta} {meta_valor}"
+    return (
+        '<div class="evo-monthly-panel">'
+        '<div class="evo-monthly-summary">'
+        f'<div class="evo-monthly-summary-label">{escape(str(resumo_label))}</div>'
+        f'<div class="evo-monthly-summary-value">{escape(str(resumo_valor))}</div>'
+        f'{aux_html}'
+        '</div>'
+        '<div class="evo-monthly-legends">'
+        '<div class="evo-monthly-legend-card">'
+        '<div class="evo-monthly-legend-head">'
+        '<div class="evo-monthly-legend-dot" style="background:#790E09;"></div>'
+        '<div class="evo-monthly-legend-title">Série Histórica</div>'
+        '</div>'
+        f'<div class="evo-monthly-legend-text">{escape(str(legenda_2025))}</div>'
+        '<div class="evo-monthly-legend-note">Base de comparação do ano anterior.</div>'
+        '</div>'
+        '<div class="evo-monthly-legend-card">'
+        '<div class="evo-monthly-legend-head">'
+        '<div class="evo-monthly-legend-dot" style="background:#FF2800;"></div>'
+        '<div class="evo-monthly-legend-title">Série Principal</div>'
+        '</div>'
+        f'<div class="evo-monthly-legend-text">{escape(str(legenda_2026))}</div>'
+        '<div class="evo-monthly-legend-note">Real até a data e tendência no mês atual.</div>'
+        '</div>'
+        '<div class="evo-monthly-legend-card">'
+        '<div class="evo-monthly-legend-head">'
+        '<div class="evo-monthly-legend-dot is-orc" style="background:#5A6268;"></div>'
+        '<div class="evo-monthly-legend-title">Referência</div>'
+        '</div>'
+        f'<div class="evo-monthly-legend-text">{escape(str(legenda_orc))}</div>'
+        '<div class="evo-monthly-legend-note">Linha de orçamento mensal.</div>'
+        '</div>'
+        '</div>'
+        '</div>'
+    )
 
 def get_data_realizado_max_formatada(df_base: pd.DataFrame) -> str:
     """Retorna a data máxima de realizado no formato dd/mm/aaaa."""
@@ -1991,7 +2342,7 @@ def apply_standard_line_traces(fig, color_map: dict, valor_label: str = 'Valor',
             mode='lines+markers+text',
             connectgaps=False,
             marker=dict(
-                size=11,
+                size=9,
                 line=dict(width=1.8, color='white'),
                 symbol='diamond' if is_meta else 'circle',
                 opacity=0.92
@@ -2036,6 +2387,643 @@ def apply_standard_title_style(fig, size: int = 16):
             font=dict(size=size, color='#2F3747', family='Segoe UI')
         )
     )
+
+def aplicar_estilo_visual_evolucao_mensal(fig: go.Figure, altura: int = 400) -> None:
+    """Refina apenas o visual dos gráficos mensais de linha fora da aba Analítico."""
+    if fig is None or not hasattr(fig, 'data'):
+        return
+
+    data_ref = pd.Timestamp.today()
+    meses_pt = {
+        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+    }
+    rotulo_mes_foco = f"{meses_pt.get(int(data_ref.month), 'mes')}/{str(int(data_ref.year))[-2:]}".upper()
+    ticktext_meses = [m.upper() if m == meses_pt.get(int(data_ref.month), '') else m for m in MESES_TICKVALS]
+
+    fig.update_layout(
+        plot_bgcolor='#FFFFFF',
+        paper_bgcolor='#F4F7FB',
+        font=dict(family='Segoe UI', size=14, color='#2F3747'),
+        margin=dict(l=38, r=24, t=86, b=54),
+        xaxis=dict(
+            title='',
+            tickmode='array',
+            tickvals=MESES_TICKVALS,
+            ticktext=ticktext_meses,
+            tickfont=dict(size=12, color='#5B6578'),
+            showgrid=False,
+            linecolor='#E2E8F0',
+            linewidth=1.4,
+            mirror=False,
+            tickangle=0,
+            showline=True,
+            ticks='outside',
+            ticklen=6,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title='',
+            title_font=dict(size=13, color='#2F3747'),
+            tickfont=dict(size=12, color='#5B6578'),
+            showgrid=True,
+            gridcolor='rgba(226, 232, 240, 0.78)',
+            gridwidth=1,
+            linecolor='#E2E8F0',
+            linewidth=1.4,
+            mirror=False,
+            showline=True,
+            ticks='outside',
+            ticklen=5,
+            zeroline=False,
+            rangemode='tozero'
+        ),
+        hovermode='x unified',
+        hoverlabel=dict(
+            bgcolor='white',
+            font_size=12,
+            font_family='Segoe UI',
+            bordercolor='#E2E8F0',
+            font_color='#2F3747'
+        ),
+        height=altura,
+        showlegend=False
+    )
+
+    fig.add_shape(
+        type='line',
+        x0=meses_pt.get(int(data_ref.month), ''),
+        x1=meses_pt.get(int(data_ref.month), ''),
+        y0=0,
+        y1=1,
+        xref='x',
+        yref='paper',
+        line=dict(color='rgba(162, 59, 54, 0.18)', width=1.6, dash='dot'),
+        layer='below'
+    )
+
+    fig.add_annotation(
+        xref='paper',
+        yref='paper',
+        x=0.995,
+        y=1.14,
+        xanchor='right',
+        yanchor='top',
+        text=f"<b>Mês Foco: {rotulo_mes_foco}</b>",
+        showarrow=False,
+        font=dict(size=10, color='#7A1E19'),
+        bgcolor='rgba(255, 249, 248, 0.96)',
+        bordercolor='rgba(162, 59, 54, 0.18)',
+        borderwidth=1,
+        borderpad=5
+    )
+
+    glow_traces: list[go.Scatter] = []
+    for trace in fig.data:
+        nome = str(getattr(trace, 'name', ''))
+        if nome == '2026 Real/Tend':
+            trace.update(
+                line=dict(width=4.0, color='#FF2800', shape='spline', smoothing=1.25),
+                marker=dict(size=9, color='#FF2800', line=dict(width=1.8, color='white'), symbol='circle'),
+                textfont=dict(size=11, color='#FF2800'),
+                fill='tozeroy',
+                fillcolor='rgba(255, 40, 0, 0.07)'
+            )
+            glow_traces.append(
+                go.Scatter(
+                    x=list(getattr(trace, 'x', [])),
+                    y=list(getattr(trace, 'y', [])),
+                    mode='lines',
+                    line=dict(width=10.5, color='rgba(255, 40, 0, 0.10)', shape='spline', smoothing=1.25),
+                    hoverinfo='skip',
+                    showlegend=False,
+                    cliponaxis=False
+                )
+            )
+        elif nome == '2025':
+            trace.update(
+                line=dict(width=3.0, color='#790E09', shape='spline', smoothing=1.15),
+                marker=dict(size=8, color='#790E09', line=dict(width=1.7, color='white'), symbol='circle-open'),
+                textfont=dict(size=10, color='#790E09')
+            )
+        elif nome == '2026':
+            trace.update(
+                line=dict(width=3.2, color='#5A6268', dash='dash', shape='spline', smoothing=1.1),
+                marker=dict(size=8, color='#5A6268', line=dict(width=1.7, color='white'), symbol='diamond-open'),
+                textfont=dict(size=10, color='#5A6268')
+            )
+
+    if glow_traces:
+        qtd_glow = len(glow_traces)
+        fig.add_traces(glow_traces)
+        traces_atuais = list(fig.data)
+        fig.data = tuple(traces_atuais[-qtd_glow:] + traces_atuais[:-qtd_glow])
+
+def aplicar_estilo_visual_evolucao_semanal(
+    fig: go.Figure,
+    rotulo_mes_foco: str,
+    nome_serie_real: str,
+    altura: int = 460
+) -> None:
+    """Aplica ao grafico semanal o mesmo acabamento visual dos graficos mensais refinados."""
+    if fig is None or not hasattr(fig, 'data'):
+        return
+
+    fig.update_layout(
+        plot_bgcolor='#FFFFFF',
+        paper_bgcolor='#F4F7FB',
+        font=dict(family='Segoe UI', size=14, color='#2F3747'),
+        margin=dict(l=38, r=24, t=92, b=54),
+        xaxis=dict(
+            title='',
+            type='multicategory',
+            tickfont=dict(size=11, color='#5B6578'),
+            showgrid=False,
+            linecolor='#E2E8F0',
+            linewidth=1.4,
+            mirror=False,
+            showline=True,
+            ticks='outside',
+            ticklen=6,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title='',
+            tickfont=dict(size=12, color='#5B6578'),
+            showgrid=True,
+            gridcolor='rgba(226, 232, 240, 0.78)',
+            gridwidth=1,
+            linecolor='#E2E8F0',
+            linewidth=1.4,
+            mirror=False,
+            showline=True,
+            ticks='outside',
+            ticklen=5,
+            zeroline=False,
+            rangemode='tozero'
+        ),
+        hovermode='x unified',
+        hoverlabel=dict(
+            bgcolor='white',
+            font_size=12,
+            font_family='Segoe UI',
+            bordercolor='#E2E8F0',
+            font_color='#2F3747'
+        ),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.01,
+            xanchor='center',
+            x=0.5,
+            bgcolor='rgba(255,255,255,0.92)',
+            bordercolor='#E2E8F0',
+            borderwidth=1.2,
+            font=dict(size=12, color='#2F3747'),
+            title=dict(text='')
+        ),
+        height=altura,
+        showlegend=True
+    )
+
+    fig.add_annotation(
+        xref='paper',
+        yref='paper',
+        x=0.995,
+        y=1.15,
+        xanchor='right',
+        yanchor='top',
+        text=f"<b>Mês Foco: {str(rotulo_mes_foco).upper()}</b>",
+        showarrow=False,
+        font=dict(size=10, color='#7A1E19'),
+        bgcolor='rgba(255, 249, 248, 0.96)',
+        bordercolor='rgba(162, 59, 54, 0.18)',
+        borderwidth=1,
+        borderpad=5
+    )
+
+    glow_traces: list[go.Scatter] = []
+    for trace in fig.data:
+        nome = str(getattr(trace, 'name', ''))
+        if nome == str(nome_serie_real):
+            trace.update(
+                line=dict(width=4.0, color='#FF2800', shape='spline', smoothing=1.25),
+                marker=dict(size=9, color='#FF2800', line=dict(width=1.8, color='white'), symbol='circle'),
+                textfont=dict(size=11, color='#FF2800'),
+                fill='tozeroy',
+                fillcolor='rgba(255, 40, 0, 0.07)'
+            )
+            glow_traces.append(
+                go.Scatter(
+                    x=list(getattr(trace, 'x', [])),
+                    y=list(getattr(trace, 'y', [])),
+                    mode='lines',
+                    line=dict(width=10.5, color='rgba(255, 40, 0, 0.10)', shape='spline', smoothing=1.25),
+                    hoverinfo='skip',
+                    showlegend=False,
+                    cliponaxis=False
+                )
+            )
+        elif nome == 'Realizado M-1':
+            trace.update(
+                line=dict(width=3.0, color='#790E09', shape='spline', smoothing=1.15),
+                marker=dict(size=8, color='#790E09', line=dict(width=1.7, color='white'), symbol='circle-open'),
+                textfont=dict(size=10, color='#790E09')
+            )
+        elif nome == 'Orç Mes':
+            trace.update(
+                line=dict(width=3.2, color='#5A6268', dash='dash', shape='spline', smoothing=1.1),
+                marker=dict(size=8, color='#5A6268', line=dict(width=1.7, color='white'), symbol='diamond-open'),
+                textfont=dict(size=10, color='#5A6268')
+            )
+
+    if glow_traces:
+        qtd_glow = len(glow_traces)
+        fig.add_traces(glow_traces)
+        traces_atuais = list(fig.data)
+        fig.data = tuple(traces_atuais[-qtd_glow:] + traces_atuais[:-qtd_glow])
+
+def criar_grafico_barras_resumo_evolucao_semanal(
+    categorias_totais: list[str],
+    valores_totais: list[float],
+    cores_totais: list[str],
+    altura: int = 460
+) -> go.Figure:
+    """Cria o grafico lateral semanal no mesmo padrao visual dos resumos mensais."""
+    def _hex_to_rgba(cor_hex: str, alpha: float) -> str:
+        cor_limpa = str(cor_hex).strip().lstrip('#')
+        if len(cor_limpa) != 6:
+            return f'rgba(90, 98, 104, {alpha})'
+        r = int(cor_limpa[0:2], 16)
+        g = int(cor_limpa[2:4], 16)
+        b = int(cor_limpa[4:6], 16)
+        return f'rgba({r}, {g}, {b}, {alpha})'
+
+    fig = go.Figure()
+    posicoes_x = list(range(len(categorias_totais)))
+    textos_totais = [formatar_numero_brasileiro(v, 0) for v in valores_totais]
+    fig.add_trace(go.Bar(
+        x=posicoes_x,
+        y=valores_totais,
+        width=[0.42] * len(posicoes_x),
+        marker=dict(color=cores_totais, line=dict(color='white', width=1.4)),
+        text=[''] * len(posicoes_x),
+        textposition='outside',
+        textfont=dict(size=12, color='#2F3747'),
+        customdata=categorias_totais,
+        hovertemplate="<b>%{customdata}</b><br><b>Total:</b> %{y:,.0f}<extra></extra>",
+        cliponaxis=False
+    ))
+
+    max_val = float(max(valores_totais)) if valores_totais else 0.0
+    offset_rotulo = max((max_val * 0.055), 1.0)
+    offset_seta = max((max_val * 0.19), 1.0)
+    cor_seta = '#6B7280'
+
+    base_destaque = max((max_val * 0.012), 1.0)
+    for pos_x, valor_barra, cor_barra in zip(posicoes_x, valores_totais, cores_totais):
+        fig.add_shape(
+            type='rect',
+            xref='x',
+            yref='y',
+            x0=float(pos_x) - 0.31,
+            x1=float(pos_x) + 0.31,
+            y0=0,
+            y1=max(float(valor_barra) + base_destaque, base_destaque),
+            line=dict(color=_hex_to_rgba(cor_barra, 0.18), width=1.0),
+            fillcolor=_hex_to_rgba(cor_barra, 0.07),
+            layer='below'
+        )
+
+    for pos_x, valor_barra, texto_barra, cor_barra in zip(posicoes_x, valores_totais, textos_totais, cores_totais):
+        fig.add_annotation(
+            x=pos_x,
+            y=float(valor_barra) + offset_rotulo,
+            xref='x',
+            yref='y',
+            text=f"<b>{texto_barra}</b>",
+            showarrow=False,
+            font=dict(size=11, color=cor_barra),
+            bgcolor='rgba(255,255,255,0.96)',
+            bordercolor=cor_barra,
+            borderwidth=1.1,
+            borderpad=5
+        )
+
+    def _formatar_variacao(valor_origem: float, valor_destino: float) -> tuple[str, str]:
+        if not np.isfinite(valor_origem) or float(valor_origem) == 0.0:
+            return ("N/A", '#6B7280')
+        variacao = ((float(valor_destino) - float(valor_origem)) / float(valor_origem)) * 100.0
+        if variacao > 0:
+            cor_var = '#2E7D32'
+        elif variacao < 0:
+            cor_var = '#C62828'
+        else:
+            cor_var = '#475569'
+        return (f"{variacao:+.1f}%".replace('.', ','), cor_var)
+
+    comparacoes = [
+        {'origem': 1, 'destino': 0},
+        {'origem': 2, 'destino': 0},
+    ]
+
+    for idx_seta, cfg in enumerate(comparacoes):
+        idx_origem = int(cfg['origem'])
+        idx_destino = int(cfg['destino'])
+        valor_origem = float(valores_totais[idx_origem])
+        valor_destino = float(valores_totais[idx_destino])
+        y_linha = max(valor_origem, valor_destino) + (offset_seta * (1.0 + (idx_seta * 1.0)))
+        x0 = float(posicoes_x[idx_origem])
+        x1 = float(posicoes_x[idx_destino])
+
+        fig.add_annotation(
+            x=x1, y=y_linha, ax=x0, ay=y_linha,
+            xref='x', yref='y', axref='x', ayref='y',
+            text='',
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1.1,
+            arrowwidth=1.8,
+            arrowcolor=cor_seta
+        )
+        fig.add_annotation(
+            x=x0, y=y_linha, ax=x1, ay=y_linha,
+            xref='x', yref='y', axref='x', ayref='y',
+            text='',
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1.1,
+            arrowwidth=1.8,
+            arrowcolor=cor_seta
+        )
+
+        texto_var, cor_texto = _formatar_variacao(valor_origem, valor_destino)
+        fig.add_annotation(
+            x=(x0 + x1) / 2.0,
+            y=y_linha + (offset_seta * 0.16),
+            xref='x',
+            yref='y',
+            text=f"<b>{texto_var}</b>",
+            showarrow=False,
+            font=dict(size=11, color=cor_texto),
+            bgcolor='rgba(255,255,255,0.97)',
+            bordercolor='rgba(107, 114, 128, 0.70)',
+            borderwidth=1.4,
+            borderpad=6
+        )
+
+    y_top = (max_val + offset_rotulo + (offset_seta * 4.4)) if max_val > 0 else 5.0
+    fig.update_layout(
+        plot_bgcolor='#FFFFFF',
+        paper_bgcolor='#F4F7FB',
+        font=dict(family='Segoe UI', size=13, color='#2F3747'),
+        margin=dict(l=20, r=16, t=64, b=52),
+        xaxis=dict(
+            title='',
+            tickmode='array',
+            tickvals=posicoes_x,
+            ticktext=categorias_totais,
+            tickfont=dict(size=11, color='#5B6578'),
+            showgrid=False,
+            linecolor='#E2E8F0',
+            linewidth=1.3,
+            showline=True,
+            ticks='outside',
+            ticklen=5,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title='',
+            tickfont=dict(size=11, color='#5B6578'),
+            showticklabels=False,
+            ticks='',
+            showgrid=True,
+            gridcolor='rgba(226, 232, 240, 0.70)',
+            gridwidth=1,
+            linecolor='#E2E8F0',
+            linewidth=1.3,
+            showline=True,
+            zeroline=False,
+            rangemode='tozero',
+            range=[0, y_top]
+        ),
+        bargap=0.38,
+        bargroupgap=0.0,
+        height=altura,
+        showlegend=False
+    )
+
+    return fig
+
+def criar_grafico_barras_resumo_evolucao_mensal(
+    df_linhas_base: pd.DataFrame,
+    altura: int = 400,
+    serie_real_tend: str = '2026 Real/Tend',
+    serie_orc: str = '2026',
+    serie_ano_anterior: str = '2025'
+) -> go.Figure:
+    """Cria gráfico lateral com Mês atual, M-1 e Orç a partir da mesma base da linha."""
+    meses_pt = {
+        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+    }
+
+    base = df_linhas_base.copy() if df_linhas_base is not None else pd.DataFrame()
+    if base.empty:
+        return go.Figure()
+
+    base['Ano'] = base.get('Ano', '').astype(str)
+    base['Mês_Num'] = pd.to_numeric(base.get('Mês_Num', 0), errors='coerce').fillna(0).astype(int)
+    base['Valor'] = pd.to_numeric(base.get('Valor', 0), errors='coerce').fillna(0.0)
+
+    def _valor_mes(nome_serie: str, mes_num: int) -> float:
+        mask = base['Ano'].eq(str(nome_serie)) & base['Mês_Num'].eq(int(mes_num))
+        valores = base.loc[mask, 'Valor']
+        if valores.empty:
+            return 0.0
+        return float(valores.iloc[0] or 0.0)
+
+    data_ref = pd.Timestamp.today()
+    mes_atual = int(data_ref.month)
+    ano_atual = int(data_ref.year)
+    mes_anterior = 12 if mes_atual == 1 else (mes_atual - 1)
+
+    valor_m0 = _valor_mes(serie_real_tend, mes_atual)
+    if mes_atual == 1:
+        valor_m1 = _valor_mes(serie_ano_anterior, mes_anterior)
+    else:
+        valor_m1 = _valor_mes(serie_real_tend, mes_anterior)
+    valor_orc = _valor_mes(serie_orc, mes_atual)
+
+    rotulo_mes_atual = f"{meses_pt.get(mes_atual, 'mes')}/{str(ano_atual)[-2:]}".upper()
+    categorias = [rotulo_mes_atual, 'M-1', 'ORÇ']
+    valores = [valor_m0, valor_m1, valor_orc]
+    posicoes_x = list(range(len(categorias)))
+    cores = ['#FF2800', '#790E09', '#5A6268']
+    textos = [formatar_numero_brasileiro(v, 0) for v in valores]
+
+    def _hex_to_rgba(cor_hex: str, alpha: float) -> str:
+        cor_limpa = str(cor_hex).strip().lstrip('#')
+        if len(cor_limpa) != 6:
+            return f'rgba(90, 98, 104, {alpha})'
+        r = int(cor_limpa[0:2], 16)
+        g = int(cor_limpa[2:4], 16)
+        b = int(cor_limpa[4:6], 16)
+        return f'rgba({r}, {g}, {b}, {alpha})'
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=posicoes_x,
+        y=valores,
+        width=[0.42, 0.42, 0.42],
+        marker=dict(color=cores, line=dict(color='white', width=1.4)),
+        text=['', '', ''],
+        textposition='outside',
+        textfont=dict(size=12, color='#2F3747'),
+        customdata=categorias,
+        hovertemplate="<b>%{customdata}</b><br><b>Total:</b> %{y:,.0f}<extra></extra>",
+        cliponaxis=False
+    ))
+
+    max_val = float(max(valores)) if valores else 0.0
+    offset_rotulo = max((max_val * 0.055), 1.0)
+    offset_seta = max((max_val * 0.19), 1.0)
+    cor_seta = '#6B7280'
+
+    base_destaque = max((max_val * 0.012), 1.0)
+    for pos_x, valor_barra, cor_barra in zip(posicoes_x, valores, cores):
+        fig.add_shape(
+            type='rect',
+            xref='x',
+            yref='y',
+            x0=float(pos_x) - 0.31,
+            x1=float(pos_x) + 0.31,
+            y0=0,
+            y1=max(float(valor_barra) + base_destaque, base_destaque),
+            line=dict(color=_hex_to_rgba(cor_barra, 0.18), width=1.0),
+            fillcolor=_hex_to_rgba(cor_barra, 0.07),
+            layer='below'
+        )
+
+    for pos_x, valor_barra, texto_barra, cor_barra in zip(posicoes_x, valores, textos, cores):
+        fig.add_annotation(
+            x=pos_x,
+            y=float(valor_barra) + offset_rotulo,
+            xref='x',
+            yref='y',
+            text=f"<b>{texto_barra}</b>",
+            showarrow=False,
+            font=dict(size=11, color=cor_barra),
+            bgcolor='rgba(255,255,255,0.96)',
+            bordercolor=cor_barra,
+            borderwidth=1.1,
+            borderpad=5
+        )
+
+    def _formatar_variacao(valor_origem: float, valor_destino: float) -> tuple[str, str]:
+        if not np.isfinite(valor_origem) or float(valor_origem) == 0.0:
+            return ("N/A", '#6B7280')
+        variacao = ((float(valor_destino) - float(valor_origem)) / float(valor_origem)) * 100.0
+        if variacao > 0:
+            cor_var = '#2E7D32'
+        elif variacao < 0:
+            cor_var = '#C62828'
+        else:
+            cor_var = '#475569'
+        return (f"{variacao:+.1f}%".replace('.', ','), cor_var)
+
+    comparacoes = [
+        {'origem': 1, 'destino': 0},  # M-0 vs M-1
+        {'origem': 2, 'destino': 0},  # M-0 vs Orç
+    ]
+
+    for idx_seta, cfg in enumerate(comparacoes):
+        idx_origem = int(cfg['origem'])
+        idx_destino = int(cfg['destino'])
+        valor_origem = float(valores[idx_origem])
+        valor_destino = float(valores[idx_destino])
+        y_linha = max(valor_origem, valor_destino) + (offset_seta * (1.0 + (idx_seta * 1.0)))
+        x0 = float(posicoes_x[idx_origem])
+        x1 = float(posicoes_x[idx_destino])
+
+        fig.add_annotation(
+            x=x1, y=y_linha, ax=x0, ay=y_linha,
+            xref='x', yref='y', axref='x', ayref='y',
+            text='',
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1.1,
+            arrowwidth=1.8,
+            arrowcolor=cor_seta
+        )
+        fig.add_annotation(
+            x=x0, y=y_linha, ax=x1, ay=y_linha,
+            xref='x', yref='y', axref='x', ayref='y',
+            text='',
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1.1,
+            arrowwidth=1.8,
+            arrowcolor=cor_seta
+        )
+
+        texto_var, cor_texto = _formatar_variacao(valor_origem, valor_destino)
+        fig.add_annotation(
+            x=(x0 + x1) / 2.0,
+            y=y_linha + (offset_seta * 0.16),
+            xref='x',
+            yref='y',
+            text=f"<b>{texto_var}</b>",
+            showarrow=False,
+            font=dict(size=11, color=cor_texto),
+            bgcolor='rgba(255,255,255,0.97)',
+            bordercolor='rgba(107, 114, 128, 0.70)',
+            borderwidth=1.4,
+            borderpad=6
+        )
+
+    y_top = (max_val + offset_rotulo + (offset_seta * 4.4)) if max_val > 0 else 5.0
+    fig.update_layout(
+        plot_bgcolor='#FFFFFF',
+        paper_bgcolor='#F4F7FB',
+        font=dict(family='Segoe UI', size=13, color='#2F3747'),
+        margin=dict(l=20, r=16, t=64, b=52),
+        xaxis=dict(
+            title='',
+            tickmode='array',
+            tickvals=posicoes_x,
+            ticktext=categorias,
+            tickfont=dict(size=11, color='#5B6578'),
+            showgrid=False,
+            linecolor='#E2E8F0',
+            linewidth=1.3,
+            showline=True,
+            ticks='outside',
+            ticklen=5,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title='',
+            tickfont=dict(size=11, color='#5B6578'),
+            showticklabels=False,
+            ticks='',
+            showgrid=True,
+            gridcolor='rgba(226, 232, 240, 0.70)',
+            gridwidth=1,
+            linecolor='#E2E8F0',
+            linewidth=1.3,
+            showline=True,
+            zeroline=False,
+            rangemode='tozero',
+            range=[0, y_top]
+        ),
+        bargap=0.38,
+        bargroupgap=0.0,
+        height=altura,
+        showlegend=False
+    )
+
+    return fig
 
 def normalizar_rotulo_produto(valor) -> str:
     """Normaliza rótulo de produto para uso em legenda e barras."""
@@ -3052,6 +4040,158 @@ def _alocar_inteiros_por_peso(total_valor: float, pesos: list[float]) -> list[in
                 resto += 1
     return [int(v) for v in aloc_base.tolist()]
 
+def _formatar_mes_ano_pt_br(data_ref) -> str:
+    try:
+        ts = pd.Timestamp(data_ref)
+        if pd.isna(ts):
+            return ""
+        meses_pt = {
+            1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+            7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+        }
+        return f"{meses_pt.get(int(ts.month), 'jan')}/{ts.strftime('%y')}"
+    except Exception:
+        return ""
+
+def _montar_contexto_pesos_projecao_semana_dia(
+    df_hist: pd.DataFrame,
+    mes_ref: str,
+    valor_col: str = 'QTDE'
+) -> dict:
+    serie_vazia = pd.Series(dtype='float64')
+    taxas_default = {wd: 1.0 for wd in range(7)}
+    ctx_default = {
+        'mes_ref_5s': '',
+        'mes_ref_m1': '',
+        'lookup_5s': serie_vazia,
+        'lookup_m1': serie_vazia,
+        'wd_media_5s': serie_vazia,
+        'wd_media_m1': serie_vazia,
+        'taxas_bayes': taxas_default
+    }
+    if df_hist is None or df_hist.empty:
+        return ctx_default
+
+    try:
+        dt_mes_ref = pd.Timestamp(mes_ano_para_data(str(mes_ref))).normalize()
+    except Exception:
+        return ctx_default
+
+    df_tmp = df_hist.copy()
+    col_data = next((c for c in ['DATA_DIA', 'DATA', 'DAT_MOVIMENTO2'] if c in df_tmp.columns), None)
+    if col_data is None:
+        return ctx_default
+
+    df_tmp['DATA_DIA_REF'] = pd.to_datetime(df_tmp[col_data], errors='coerce').dt.normalize()
+    df_tmp = df_tmp[df_tmp['DATA_DIA_REF'].notna()].copy()
+    if df_tmp.empty:
+        return ctx_default
+
+    if valor_col in df_tmp.columns:
+        df_tmp['VALOR_REF'] = pd.to_numeric(df_tmp[valor_col], errors='coerce').fillna(0.0)
+    else:
+        df_tmp['VALOR_REF'] = pd.to_numeric(df_tmp.get('QTDE', 0), errors='coerce').fillna(0.0)
+
+    col_mes = next((c for c in ['MES_NORM', 'dat_tratada', 'mes_ano'] if c in df_tmp.columns), None)
+    if col_mes is not None:
+        df_tmp['MES_REF_NORM'] = df_tmp[col_mes].astype(str).str.strip().str.lower()
+    else:
+        df_tmp['MES_REF_NORM'] = df_tmp['DATA_DIA_REF'].apply(_formatar_mes_ano_pt_br).astype(str).str.strip().str.lower()
+
+    soma_mes_hist = (
+        df_tmp.groupby('MES_REF_NORM', observed=True)['VALOR_REF'].sum()
+        if not df_tmp.empty else pd.Series(dtype='float64')
+    )
+    meses_hist = []
+    for mes_hist in df_tmp['MES_REF_NORM'].dropna().astype(str).str.strip().unique().tolist():
+        if not mes_hist:
+            continue
+        try:
+            dt_hist = pd.Timestamp(mes_ano_para_data(mes_hist)).normalize()
+        except Exception:
+            continue
+        if dt_hist >= dt_mes_ref:
+            continue
+        if float(soma_mes_hist.get(mes_hist, 0.0) or 0.0) <= 0:
+            continue
+        meses_hist.append((dt_hist, mes_hist))
+
+    if not meses_hist:
+        return ctx_default
+
+    meses_hist = [mes for _, mes in sorted(meses_hist, key=lambda x: x[0])]
+    mes_ref_m1 = meses_hist[-1]
+    mes_ref_5s = ''
+    for mes_hist in reversed(meses_hist):
+        cal_hist = _montar_calendario_semana_mes_analitico(mes_hist)
+        if not cal_hist.empty and int(cal_hist['SEMANA_IDX'].max()) >= 5:
+            mes_ref_5s = mes_hist
+            break
+    if not mes_ref_5s:
+        mes_ref_5s = mes_ref_m1
+
+    def _montar_lookup_mes(mes_lookup: str) -> tuple[pd.Series, pd.Series]:
+        if not mes_lookup:
+            return serie_vazia, serie_vazia
+        cal_lookup = _montar_calendario_semana_mes_analitico(mes_lookup)
+        if cal_lookup.empty:
+            return serie_vazia, serie_vazia
+        df_mes_lookup = df_tmp[df_tmp['MES_REF_NORM'].eq(str(mes_lookup).strip().lower())].copy()
+        agg_lookup = (
+            df_mes_lookup.groupby('DATA_DIA_REF', observed=True)['VALOR_REF'].sum()
+            if not df_mes_lookup.empty else pd.Series(dtype='float64')
+        )
+        serie_lookup = cal_lookup[['DATA_DIA', 'SEMANA_IDX', 'DIA_SEMANA']].copy()
+        serie_lookup = serie_lookup.merge(
+            agg_lookup.rename('VALOR_DIA').reset_index().rename(columns={'DATA_DIA_REF': 'DATA_DIA'}),
+            on='DATA_DIA',
+            how='left'
+        )
+        serie_lookup['VALOR_DIA'] = pd.to_numeric(
+            serie_lookup.get('VALOR_DIA', 0),
+            errors='coerce'
+        ).fillna(0.0)
+        lookup = serie_lookup.set_index(['SEMANA_IDX', 'DIA_SEMANA'])['VALOR_DIA']
+        wd_media = serie_lookup.groupby('DIA_SEMANA', observed=True)['VALOR_DIA'].mean()
+        return lookup, wd_media
+
+    lookup_5s, wd_media_5s = _montar_lookup_mes(mes_ref_5s)
+    lookup_m1, wd_media_m1 = _montar_lookup_mes(mes_ref_m1)
+
+    df_bayes = df_tmp[['DATA_DIA_REF', 'VALOR_REF']].copy()
+    df_bayes['DAT_MOVIMENTO2'] = df_bayes['DATA_DIA_REF']
+    df_bayes['QTDE'] = df_bayes['VALOR_REF']
+    taxas_bayes = _calcular_taxas_bayes_ultimos_3_meses(df_bayes[['DAT_MOVIMENTO2', 'QTDE']], mes_ref)
+
+    return {
+        'mes_ref_5s': mes_ref_5s,
+        'mes_ref_m1': mes_ref_m1,
+        'lookup_5s': lookup_5s,
+        'lookup_m1': lookup_m1,
+        'wd_media_5s': wd_media_5s,
+        'wd_media_m1': wd_media_m1,
+        'taxas_bayes': taxas_bayes
+    }
+
+def _obter_peso_projecao_semana_dia(ctx_peso: dict, semana_idx: int, dia_semana: int) -> float:
+    semana_idx = int(semana_idx)
+    dia_semana = int(dia_semana)
+    for chave_lookup in ['lookup_5s', 'lookup_m1']:
+        lookup = ctx_peso.get(chave_lookup, pd.Series(dtype='float64'))
+        peso = lookup.get((semana_idx, dia_semana), np.nan)
+        if pd.notna(peso) and float(peso) > 0:
+            return float(peso)
+    for chave_media in ['wd_media_5s', 'wd_media_m1']:
+        wd_media = ctx_peso.get(chave_media, pd.Series(dtype='float64'))
+        peso = wd_media.get(dia_semana, np.nan)
+        if pd.notna(peso) and float(peso) > 0:
+            return float(peso)
+    taxas_bayes = ctx_peso.get('taxas_bayes', {})
+    peso_bayes = float(taxas_bayes.get(dia_semana, 0.0) or 0.0)
+    if peso_bayes > 0:
+        return peso_bayes
+    return 1.0
+
 def _calcular_taxas_bayes_ultimos_3_meses(df_hist: pd.DataFrame, mes_ref: str) -> dict[int, float]:
     taxas_default = {wd: 1.0 for wd in range(7)}
     if df_hist is None or df_hist.empty:
@@ -3325,27 +4465,10 @@ def criar_tabela_html_necessidade_diaria_produto(
         serie_atual['VALOR_DIA'] = pd.to_numeric(serie_atual.get('VALOR_DIA', 0), errors='coerce').fillna(0.0)
         serie_atual['VALOR_FINAL'] = pd.to_numeric(serie_atual['VALOR_DIA'], errors='coerce').fillna(0.0)
 
-        # Pesos de referência do M-1 (SEMANA_IDX + DIA_SEMANA), exatamente como na evolução semanal.
-        cal_m1 = _montar_calendario_semana_mes_analitico(mes_m1)
-        if cal_m1.empty:
-            serie_m1 = pd.DataFrame(columns=['DATA_DIA', 'SEMANA_IDX', 'DIA_SEMANA', 'VALOR_DIA'])
-        else:
-            serie_m1 = cal_m1[['DATA_DIA', 'SEMANA_IDX', 'DIA_SEMANA']].copy()
-            serie_m1['DATA_DIA'] = pd.to_datetime(serie_m1['DATA_DIA'], errors='coerce').dt.normalize()
-            serie_m1 = serie_m1.merge(
-                agg_real_m1.rename('VALOR_DIA').reset_index(),
-                on='DATA_DIA',
-                how='left'
-            )
-            serie_m1['VALOR_DIA'] = pd.to_numeric(serie_m1.get('VALOR_DIA', 0), errors='coerce').fillna(0.0)
-
-        prev_lookup = (
-            serie_m1.set_index(['SEMANA_IDX', 'DIA_SEMANA'])['VALOR_DIA']
-            if not serie_m1.empty else pd.Series(dtype='float64')
-        )
-        prev_wd_media = (
-            serie_m1.groupby('DIA_SEMANA', observed=True)['VALOR_DIA'].mean()
-            if not serie_m1.empty else pd.Series(dtype='float64')
+        ctx_peso_proj = _montar_contexto_pesos_projecao_semana_dia(
+            df_real_all,
+            mes_ref,
+            valor_col='QTDE'
         )
 
         # Linha Realizado: replica 1:1 a lógica de "Realizado + Tendência" da evolução semanal.
@@ -3396,11 +4519,11 @@ def criar_tabela_html_necessidade_diaria_produto(
                     for idx_row in idx_restantes:
                         semana_idx = int(serie_atual.at[idx_row, 'SEMANA_IDX'])
                         dia_semana = int(serie_atual.at[idx_row, 'DIA_SEMANA'])
-                        peso = prev_lookup.get((semana_idx, dia_semana), np.nan)
-                        if pd.isna(peso) or float(peso) <= 0:
-                            peso = prev_wd_media.get(dia_semana, np.nan)
-                        if pd.isna(peso) or float(peso) <= 0:
-                            peso = 1.0
+                        peso = _obter_peso_projecao_semana_dia(
+                            ctx_peso_proj,
+                            semana_idx,
+                            dia_semana
+                        )
                         pesos_tend.append(max(float(peso), 0.0))
 
                     soma_pesos_tend = float(np.sum(pesos_tend))
@@ -3476,11 +4599,11 @@ def criar_tabela_html_necessidade_diaria_produto(
             for row in serie_atual.itertuples(index=False):
                 semana_idx = int(row.SEMANA_IDX)
                 dia_semana = int(row.DIA_SEMANA)
-                peso = prev_lookup.get((semana_idx, dia_semana), np.nan)
-                if pd.isna(peso) or float(peso) <= 0:
-                    peso = prev_wd_media.get(dia_semana, np.nan)
-                if pd.isna(peso) or float(peso) <= 0:
-                    peso = 1.0
+                peso = _obter_peso_projecao_semana_dia(
+                    ctx_peso_proj,
+                    semana_idx,
+                    dia_semana
+                )
                 datas_meta.append(pd.Timestamp(row.DATA_DIA).normalize())
                 pesos_meta.append(max(float(peso), 0.0))
 
@@ -5141,7 +6264,7 @@ with tab1:
             'real_atual': realizado_atual,
             'tend_atual': tendencia_atual,
             'usa_tendencia': usar_tendencia,
-            'mostrar_parcial': usar_tendencia_mes and (realizado_atual > 0),
+            'mostrar_parcial': usar_tendencia_mes,
             'anterior': anterior,
             'meta': meta,
             'variacao_mom': variacao_mom,
@@ -5220,13 +6343,13 @@ with tab1:
                 
                 bloco_html += (
                     f'<div class="kpi-block-dinamico">'
-                    f'<div style="font-size: 13px; color: #333333; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">{plataforma}</div>'
+                    f'<div class="kpi-block-label">{plataforma}</div>'
                     f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_formatado}</div>{tendencia_icon_html}</div>'
                     f'{real_hint_html}'
                     f'<div class="kpi-meta-line">'
                     f'{build_kpi_meta_line(anterior_formatado, meta_formatado, mes_anterior_cards, mes_selecionado_cards)}'
                     f'</div>'
-                    f'<div style="display: flex; justify-content: space-between; gap: 7px; margin-top: 8px;">'
+                    f'<div style="display: flex; justify-content: space-between; gap: 7px; margin-top: 5px;">'
                     f'<div class="kpi-variacao-item {classe_mom}" style="flex: 1; font-size: 10px !important;">{variacao_mom:+.0f}% MoM</div>'
                     f'{meta_html}'
                     f'</div>'
@@ -5290,8 +6413,8 @@ with tab1:
             df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
         
         # Criar dados para gráfico
-        df_linhas = create_line_chart_data(df_grafico)
-        df_linhas = aplicar_regra_sem_zeros_e_fallback_orc(df_linhas)
+        df_linhas_base = create_line_chart_data(df_grafico)
+        df_linhas = aplicar_regra_sem_zeros_e_fallback_orc(df_linhas_base)
         
         # Criar título dinâmico
         filtros_ativos = []
@@ -5316,7 +6439,7 @@ with tab1:
             x='Mês',
             y='Valor',
             color='Ano',
-            title=f'<b>EVOLUÇÃO MENSAL</b><br><span style="font-size: 14px; color: #666666;">{titulo_filtros}</span>',
+            title=f'<b>EVOLUÇÃO MENSAL</b><br><span style="font-size: 13px; color: #666666;">{titulo_filtros}</span>',
             labels={'Valor': 'Volume', 'Mês': ''},
             markers=True,
             line_shape='spline',
@@ -5326,42 +6449,31 @@ with tab1:
         apply_standard_line_layout(fig_linhas, 'VOLUME', height=400)
         apply_standard_line_traces(fig_linhas, cores_personalizadas, valor_label='Valor', meta_year='2026')
         ocultar_rotulo_orc_sobreposto(fig_linhas)
+        aplicar_estilo_visual_evolucao_mensal(fig_linhas, altura=400)
+        fig_bar_resumo = criar_grafico_barras_resumo_evolucao_mensal(
+            df_linhas_base,
+            altura=400
+        )
         
-        # Container de informações
-        st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #FFFFFF, #F8F9FA); 
-                        padding: 15px 20px; 
-                        border-radius: 12px; 
-                        border: 2px solid #E9ECEF;
-                        margin: 15px 0 5px 0;
-                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                    <div style="font-size: 14px; color: #333333; font-weight: 700;">
-                        <span>📊 Dados Filtrados:</span>
-                        <span style="color: #FF2800; margin-left: 8px;">{len(df_grafico):,}</span>
-                    </div>
-                    <div style="font-size: 13px; color: #666666; display: flex; gap: 20px; flex-wrap: wrap;">
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <div style="width: 12px; height: 12px; background: #790E09; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                            <span style="font-weight: 600;">2025 (Real)</span>
-                        </span>
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <div style="width: 12px; height: 12px; background: #FF2800; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                            <span style="font-weight: 600;">2026 (Real/Tend Mês)</span>
-                        </span>
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <div style="width: 12px; height: 12px; background: #5A6268; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                            <span style="font-weight: 600;">2026 (Orç)</span>
-                            <span style="color: #5A6268; margin-left: 4px;">— —</span>
-                        </span>
-                    </div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            build_painel_contexto_evolucao_mensal(
+                resumo_label='Dados Filtrados',
+                resumo_valor=formatar_numero_brasileiro(len(df_grafico), 0),
+                resumo_aux=titulo_filtros if titulo_filtros != 'Todos os Filtros' else 'Sem filtros adicionais aplicados.',
+                legenda_2025='2025 (Real)',
+                legenda_2026='2026 (Real/Tend Mês)',
+                legenda_orc='2026 (Orç)'
+            ),
+            unsafe_allow_html=True
+        )
         
-        # Exibir gráfico
-        apply_standard_title_style(fig_linhas)
-        st.plotly_chart(fig_linhas, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
+        # Exibir gráficos
+        apply_standard_title_style(fig_linhas, size=15)
+        col_evolucao_ativ, col_resumo_ativ = st.columns([2.25, 0.68], gap='small')
+        with col_evolucao_ativ:
+            st.plotly_chart(fig_linhas, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
+        with col_resumo_ativ:
+            st.plotly_chart(fig_bar_resumo, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
     
     # =========================
     # GRÁFICO DE BARRAS HORIZONTAIS
@@ -6679,14 +7791,18 @@ with tab2:
                 with cols[j]:
                     st.markdown(
                         f"""
-                        <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 81px !important; padding: 9px 9px !important;">
+                        <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 10px auto; max-width: 360px; min-height: 72px !important; padding: 7px 8px !important;">
                             <div class="kpi-title-dinamico">{canal}</div>
-                            <div style="text-align: center; padding: 6px 0;">
+                            <div style="text-align: center; padding: 3px 0;">
                                 <div class="kpi-value-dinamico">{total_atual_fmt}</div>
-                                <div class="kpi-meta-line" style="margin: 7px 0; white-space: nowrap;">
-                                    {build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)} | <span style="font-weight: 600;">Silentes:</span> {silentes_fmt}
+                                <div class="kpi-meta-line" style="margin: 5px 0; white-space: nowrap;">
+                                    {build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}
+                                    <span class="kpi-meta-chip kpi-meta-chip-silentes">
+                                        <span class="kpi-meta-label">Silentes</span>
+                                        <span class="kpi-meta-value">{silentes_fmt}</span>
+                                    </span>
                                 </div>
-                                <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
+                                <div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">
                                     <div class="kpi-variacao-item {classe_mom}" style="font-size: 10px !important;">
                                         {variacao_mom:+.0f}% MoM
                                     </div>
@@ -7876,15 +8992,15 @@ with tab3:
         
         with col_cards:
             card_conta_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 430px; min-height: 66px !important; padding: 7px 7px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 10px auto; max-width: 430px; min-height: 58px !important; padding: 6px 7px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS CONTA</div>'
-                f'<div style="text-align: center; padding: 5px 0;">'
+                f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_conta_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
-                f'<div class="kpi-meta-line" style="margin: 6px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(anterior_conta_fmt, meta_conta_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 6px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 4px;">'
                 f'<div class="kpi-variacao-item {classe_mom_conta}" style="font-size: 10px !important;">'
                 f'{metricas_conta["variacao_mom"]:+.0f}% MoM'
                 f'</div>'
@@ -7896,15 +9012,15 @@ with tab3:
             st.markdown(card_conta_html, unsafe_allow_html=True)
 
             card_fixa_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 430px; min-height: 66px !important; padding: 7px 7px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 430px; min-height: 58px !important; padding: 6px 7px !important;">'
                 f'<div class="kpi-title-dinamico">PEDIDOS FIXA</div>'
-                f'<div style="text-align: center; padding: 5px 0;">'
+                f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_fixa_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
-                f'<div class="kpi-meta-line" style="margin: 6px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(anterior_fixa_fmt, meta_fixa_fmt, mes_anterior_pedidos, mes_selecionado_pedidos, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 6px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 4px;">'
                 f'<div class="kpi-variacao-item {classe_mom_fixa}" style="font-size: 10px !important;">'
                 f'{metricas_fixa["variacao_mom"]:+.0f}% MoM'
                 f'</div>'
@@ -8762,7 +9878,7 @@ with tab3:
                 
                 # Filtros para o gráfico de evolução
                 with st.container():
-                    col_filtro_evo1, col_filtro_evo2, col_filtro_evo3 = st.columns(3)
+                    col_filtro_evo1, col_filtro_evo2 = st.columns(2)
                     
                     with col_filtro_evo1:
                         render_filter_label("PRODUTO")
@@ -8781,15 +9897,6 @@ with tab3:
                             key="filtro_regional_evo_pedidos",
                             label_visibility="collapsed"
                         )
-                    
-                    with col_filtro_evo3:
-                        render_filter_label("INDICADOR")
-                        indicador_evo = st.selectbox(
-                            "Selecione o Indicador",
-                            options=["Todos"] + sorted(df_pedidos['DSC_INDICADOR'].unique()),
-                            key="filtro_indicador_evo_pedidos",
-                            label_visibility="collapsed"
-                        )
                 
                 # Aplicar filtros para o gráfico de evolução
                 df_evo = df_pedidos.copy()
@@ -8798,8 +9905,6 @@ with tab3:
                     df_evo = df_evo[df_evo['COD_PLATAFORMA'] == plataforma_evo]
                 if regional_evo != "Todas":
                     df_evo = df_evo[df_evo['REGIONAL'] == regional_evo]
-                if indicador_evo != "Todos":
-                    df_evo = df_evo[df_evo['DSC_INDICADOR'] == indicador_evo]
                 
                 # Criar dados para o gráfico de linhas (similar à aba de Ativados)
                 def create_line_chart_data_pedidos(df_grafico):
@@ -8889,8 +9994,8 @@ with tab3:
                     return df_linhas
                 
                 # Criar dados para gráfico
-                df_linhas_pedidos = create_line_chart_data_pedidos(df_evo)
-                df_linhas_pedidos = aplicar_regra_sem_zeros_e_fallback_orc(df_linhas_pedidos)
+                df_linhas_base_pedidos = create_line_chart_data_pedidos(df_evo)
+                df_linhas_pedidos = aplicar_regra_sem_zeros_e_fallback_orc(df_linhas_base_pedidos)
                 
                 # Criar título dinâmico
                 filtros_ativos = []
@@ -8898,8 +10003,6 @@ with tab3:
                     filtros_ativos.append(f"Produto: {plataforma_evo}")
                 if regional_evo != "Todas":
                     filtros_ativos.append(f"Regional: {regional_evo}")
-                if indicador_evo != "Todos":
-                    filtros_ativos.append(f"Indicador: {indicador_evo}")
                 
                 titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
                 
@@ -8915,7 +10018,7 @@ with tab3:
                     x='Mês',
                     y='Valor',
                     color='Ano',
-                    title=f'<b>EVOLUÇÃO MENSAL DE PEDIDOS</b><br><span style="font-size: 14px; color: #666666;">{titulo_filtros}</span>',
+                    title=f'<b>EVOLUÇÃO MENSAL DE PEDIDOS</b><br><span style="font-size: 13px; color: #666666;">{titulo_filtros}</span>',
                     labels={'Valor': 'Volume', 'Mês': ''},
                     markers=True,
                     line_shape='spline',
@@ -8925,42 +10028,31 @@ with tab3:
                 apply_standard_line_layout(fig_linhas_pedidos, 'VOLUME DE PEDIDOS', height=400)
                 apply_standard_line_traces(fig_linhas_pedidos, cores_personalizadas, valor_label='Valor', meta_year='2026')
                 ocultar_rotulo_orc_sobreposto(fig_linhas_pedidos)
+                aplicar_estilo_visual_evolucao_mensal(fig_linhas_pedidos, altura=400)
+                fig_bar_resumo_pedidos = criar_grafico_barras_resumo_evolucao_mensal(
+                    df_linhas_base_pedidos,
+                    altura=400
+                )
                 
-                # Container de informações
-                st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #FFFFFF, #F8F9FA); 
-                                padding: 15px 20px; 
-                                border-radius: 12px; 
-                                border: 2px solid #E9ECEF;
-                                margin: 15px 0 5px 0;
-                                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                            <div style="font-size: 14px; color: #333333; font-weight: 700;">
-                                <span>📊 Dados Filtrados:</span>
-                                <span style="color: #FF2800; margin-left: 8px;">{len(df_evo):,}</span>
-                            </div>
-                            <div style="font-size: 13px; color: #666666; display: flex; gap: 20px; flex-wrap: wrap;">
-                                <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                    <div style="width: 12px; height: 12px; background: #790E09; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                    <span style="font-weight: 600;">2025 (Real)</span>
-                                </span>
-                                <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                    <div style="width: 12px; height: 12px; background: #FF2800; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                    <span style="font-weight: 600;">2026 (Real/Tend Mês)</span>
-                                </span>
-                                <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                    <div style="width: 12px; height: 12px; background: #5A6268; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                    <span style="font-weight: 600;">2026 (Orç)</span>
-                                    <span style="color: #5A6268; margin-left: 4px;">— —</span>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(
+                    build_painel_contexto_evolucao_mensal(
+                        resumo_label='Dados Filtrados',
+                        resumo_valor=formatar_numero_brasileiro(len(df_evo), 0),
+                        resumo_aux=titulo_filtros if titulo_filtros != 'Todos os Filtros' else 'Sem filtros adicionais aplicados.',
+                        legenda_2025='2025 (Real)',
+                        legenda_2026='2026 (Real/Tend Mês)',
+                        legenda_orc='2026 (Orç)'
+                    ),
+                    unsafe_allow_html=True
+                )
                 
-                # Exibir gráfico
-                apply_standard_title_style(fig_linhas_pedidos)
-                st.plotly_chart(fig_linhas_pedidos, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
+                # Exibir gráficos
+                apply_standard_title_style(fig_linhas_pedidos, size=15)
+                col_evolucao_ped, col_resumo_ped = st.columns([2.25, 0.68], gap='small')
+                with col_evolucao_ped:
+                    st.plotly_chart(fig_linhas_pedidos, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
+                with col_resumo_ped:
+                    st.plotly_chart(fig_bar_resumo_pedidos, width='stretch', config={'displayModeBar': True, 'displaylogo': False})
 
 # =========================
 # ABA 4: LIGAÇÕES - VERSÃO CORRIGIDA
@@ -9215,6 +10307,53 @@ with tab4:
     
     # Nota: Não vamos mais combinar os dados com as metas no início
     # Em vez disso, vamos calcular as metas dinamicamente quando necessário
+
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def preparar_agregados_ligacoes_mensais(df_ligacoes: pd.DataFrame) -> pd.DataFrame:
+        """Pré-agrega ligações por mês/regional para reduzir groupbys repetidos na aba."""
+        colunas_saida = [
+            'REGIONAL', 'mes_ano', 'ANO', 'MES_NUM',
+            'TOTAL_QTD', 'FIXA_QTD', 'CONTA_QTD', 'CTC_QTD'
+        ]
+        if df_ligacoes is None or df_ligacoes.empty:
+            return pd.DataFrame(columns=colunas_saida)
+
+        df_work = df_ligacoes.copy()
+        df_work['REGIONAL'] = df_work['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
+        df_work['mes_ano'] = df_work['mes_ano'].astype(str).str.strip()
+        df_work['QTDE'] = pd.to_numeric(df_work.get('QTDE', 0), errors='coerce').fillna(0.0)
+        df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work.get('DAT_MOVIMENTO2'), errors='coerce')
+        df_work = df_work[df_work['DAT_MOVIMENTO2'].notna()].copy()
+        if df_work.empty:
+            return pd.DataFrame(columns=colunas_saida)
+
+        cabeado_norm = df_work['CABEADO'].astype(str).str.strip().str.upper()
+        tipo_chamada_norm = df_work['TIPO_CHAMADA'].astype(str).str.strip()
+        df_work['ANO'] = df_work['DAT_MOVIMENTO2'].dt.year.astype(int)
+        df_work['MES_NUM'] = df_work['DAT_MOVIMENTO2'].dt.month.astype(int)
+        df_work['TOTAL_QTD'] = df_work['QTDE']
+        df_work['FIXA_QTD'] = np.where(
+            cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'}),
+            df_work['QTDE'],
+            0.0
+        )
+        df_work['CONTA_QTD'] = np.where(tipo_chamada_norm.eq('DEMAIS'), df_work['QTDE'], 0.0)
+        df_work['CTC_QTD'] = np.where(tipo_chamada_norm.eq('Click to Call'), df_work['QTDE'], 0.0)
+
+        agg_reg = (
+            df_work.groupby(['REGIONAL', 'mes_ano', 'ANO', 'MES_NUM'], as_index=False, observed=True)[
+                ['TOTAL_QTD', 'FIXA_QTD', 'CONTA_QTD', 'CTC_QTD']
+            ].sum()
+        )
+        agg_total = (
+            agg_reg.groupby(['mes_ano', 'ANO', 'MES_NUM'], as_index=False, observed=True)[
+                ['TOTAL_QTD', 'FIXA_QTD', 'CONTA_QTD', 'CTC_QTD']
+            ].sum()
+        )
+        agg_total['REGIONAL'] = 'Todas'
+        return pd.concat([agg_reg, agg_total], ignore_index=True)[colunas_saida]
+
+    df_lig_agregado = preparar_agregados_ligacoes_mensais(df_lig)
     
     # =========================
     # FUNÇÕES AUXILIARES PARA LIGAÇÕES - CORRIGIDAS
@@ -9294,6 +10433,62 @@ with tab4:
     def calcular_meta_conta(df_metas, mes, regional_filtro=None):
         """Calcula meta CONTA para um mês específico usando a função corrigida"""
         return calcular_meta_correta(df_metas, mes, regional_filtro, 'CONTA')
+
+    def obter_fator_total_ligacoes_por_conta(df_reais, mes_ref, regional_filtro=None):
+        """Obtém fator Total/Conta com fallback para o último mês válido do mesmo recorte."""
+        if df_reais is None or df_reais.empty:
+            return 1.0
+
+        df_base = df_reais.copy()
+        if regional_filtro and regional_filtro != "Todas":
+            df_base = df_base[df_base['REGIONAL'] == regional_filtro]
+        if df_base.empty or 'mes_ano' not in df_base.columns:
+            return 1.0
+
+        meses_validos = sorted(
+            df_base['mes_ano'].dropna().astype(str).unique().tolist(),
+            key=ordenar_meses
+        )
+        if not meses_validos:
+            return 1.0
+
+        meses_busca = []
+        if mes_ref in meses_validos:
+            idx_ref = meses_validos.index(mes_ref)
+            meses_busca.extend(reversed(meses_validos[:idx_ref + 1]))
+            meses_busca.extend(reversed(meses_validos[idx_ref + 1:]))
+        else:
+            meses_busca = list(reversed(meses_validos))
+
+        vistos = set()
+        for mes_busca in meses_busca:
+            if mes_busca in vistos:
+                continue
+            vistos.add(mes_busca)
+            total_real = float(calcular_total_ligacoes(df_base, mes_busca))
+            conta_real = float(calcular_ligacoes_conta(df_base, mes_busca))
+            if total_real > 0 and conta_real > 0:
+                return total_real / conta_real
+
+        return 1.0
+
+    def calcular_tendencia_total_projetada_ligacoes(df_reais, df_metas, mes, regional_filtro=None):
+        """Projeta a tendência do total de ligações a partir da tendência de CONTA."""
+        tend_total_direta = float(calcular_tendencia_ligacoes(df_metas, mes, regional_filtro))
+        tend_conta = float(calcular_tendencia_ligacoes(df_metas, mes, regional_filtro, 'CONTA'))
+        fator_total = obter_fator_total_ligacoes_por_conta(df_reais, mes, regional_filtro)
+        if tend_conta > 0 and fator_total > 0:
+            return tend_conta * fator_total
+        return tend_total_direta
+
+    def calcular_meta_total_projetada_ligacoes(df_reais, df_metas, mes, regional_filtro=None):
+        """Projeta o Orç do total de ligações a partir do Orç de CONTA."""
+        meta_total_direta = float(calcular_meta_correta(df_metas, mes, regional_filtro))
+        meta_conta = float(calcular_meta_correta(df_metas, mes, regional_filtro, 'CONTA'))
+        fator_total = obter_fator_total_ligacoes_por_conta(df_reais, mes, regional_filtro)
+        if meta_conta > 0 and fator_total > 0:
+            return meta_conta * fator_total
+        return meta_total_direta
     
     # =========================
     # SELEÇÃO DO MÊS
@@ -9412,31 +10607,22 @@ with tab4:
         )
         
         # Pré-agregação KPI por mês para reduzir custo de filtros repetidos.
-        if regional_selecionada != "Todas":
-            df_lig_kpi = df_lig[df_lig['REGIONAL'] == regional_selecionada].copy()
-        else:
-            df_lig_kpi = df_lig
-
+        regional_ref_kpi = regional_selecionada if regional_selecionada != "Todas" else "Todas"
+        df_lig_kpi = df_lig_agregado[df_lig_agregado['REGIONAL'] == regional_ref_kpi].copy()
         serie_total_mes = (
-            df_lig_kpi.groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            df_lig_kpi.set_index('mes_ano')['TOTAL_QTD'].to_dict()
             if not df_lig_kpi.empty else {}
         )
         serie_fixa_mes = (
-            df_lig_kpi.loc[
-                df_lig_kpi['CABEADO'].astype(str).str.upper().eq('SIM')
-            ].groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            df_lig_kpi.set_index('mes_ano')['FIXA_QTD'].to_dict()
             if not df_lig_kpi.empty else {}
         )
         serie_conta_mes = (
-            df_lig_kpi.loc[
-                df_lig_kpi['TIPO_CHAMADA'].eq('DEMAIS')
-            ].groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            df_lig_kpi.set_index('mes_ano')['CONTA_QTD'].to_dict()
             if not df_lig_kpi.empty else {}
         )
         serie_ctc_mes = (
-            df_lig_kpi.loc[
-                df_lig_kpi['TIPO_CHAMADA'].eq('Click to Call')
-            ].groupby('mes_ano', observed=True)['QTDE'].sum().to_dict()
+            df_lig_kpi.set_index('mes_ano')['CTC_QTD'].to_dict()
             if not df_lig_kpi.empty else {}
         )
 
@@ -9455,7 +10641,12 @@ with tab4:
         mes_corrente_lig_ref = get_mes_atual_formatado().strip().lower()
         usar_tendencia_mes_lig = str(mes_selecionado).strip().lower() == mes_corrente_lig_ref
 
-        tend_total_atual = calcular_tendencia_ligacoes(df_metas_lig, mes_selecionado, regional_selecionada)
+        tend_total_atual = calcular_tendencia_total_projetada_ligacoes(
+            df_lig,
+            df_metas_lig,
+            mes_selecionado,
+            regional_selecionada
+        )
         tend_fixa_atual = calcular_tendencia_ligacoes(df_metas_lig, mes_selecionado, regional_selecionada, 'FIXA')
         tend_conta_atual = calcular_tendencia_ligacoes(df_metas_lig, mes_selecionado, regional_selecionada, 'CONTA')
 
@@ -9536,13 +10727,13 @@ with tab4:
             card_total_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">TOTAL LIGAÇÕES</div>'
-                f'<div style="text-align: center; padding: 5px 0;">'
+                f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{total_atual_fmt}</div>{tendencia_icon_total}</div>'
                 f'{real_hint_total}'
-                f'<div class="kpi-meta-line" style="margin: 4px 0;">'
+                f'<div class="kpi-meta-line" style="margin: 3px 0;">'
                 f'{build_kpi_meta_line(total_anterior_fmt, mes_anterior_ref=mes_anterior)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 4px;">'
                 f'<div class="kpi-variacao-item {classe_total}" style="font-size: 10px !important;">'
                 f'{variacao_total:+.0f}% MoM'
                 f'</div>'
@@ -9559,13 +10750,13 @@ with tab4:
             card_fixa_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">LIGAÇÕES FIXA</div>'
-                f'<div style="text-align: center; padding: 5px 0;">'
+                f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{fixa_atual_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
-                f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 3px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(fixa_anterior_fmt, meta_fixa_fmt, mes_anterior, mes_selecionado, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 4px;">'
                 f'<div class="kpi-variacao-item {classe_fixa}" style="font-size: 10px !important;">'
                 f'{variacao_fixa:+.0f}% MoM'
                 f'</div>'
@@ -9583,13 +10774,13 @@ with tab4:
             card_conta_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">LIGAÇÕES CONTA</div>'
-                f'<div style="text-align: center; padding: 5px 0;">'
+                f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{conta_atual_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
-                f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
+                f'<div class="kpi-meta-line" style="margin: 3px 0; white-space: nowrap;">'
                 f'{build_kpi_meta_line(conta_anterior_fmt, meta_conta_fmt, mes_anterior, mes_selecionado, break_line=False)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 4px;">'
                 f'<div class="kpi-variacao-item {classe_conta}" style="font-size: 10px !important;">'
                 f'{variacao_conta:+.0f}% MoM'
                 f'</div>'
@@ -9607,12 +10798,12 @@ with tab4:
             card_ctc_html = (
                 f'<div class="kpi-card-dinamico animate-fade-in-up">'
                 f'<div class="kpi-title-dinamico">CLICK TO CALL</div>'
-                f'<div style="text-align: center; padding: 5px 0;">'
+                f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-dinamico">{clicktocall_atual_fmt}</div>'
-                f'<div class="kpi-meta-line" style="margin: 4px 0;">'
+                f'<div class="kpi-meta-line" style="margin: 3px 0;">'
                 f'{build_kpi_meta_line(clicktocall_anterior_fmt, mes_anterior_ref=mes_anterior)}'
                 f'</div>'
-                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 5px;">'
+                f'<div style="display: flex; justify-content: center; gap: 8px; margin-top: 4px;">'
                 f'<div class="kpi-variacao-item {classe_clicktocall}" style="font-size: 10px !important;">'
                 f'{variacao_clicktocall:+.0f}% MoM'
                 f'</div>'
@@ -9636,7 +10827,7 @@ with tab4:
 
         # Container para filtros
         with st.container():
-            col_filtro_lig1, col_filtro_lig2, col_filtro_lig3 = st.columns(3)
+            col_filtro_lig1, col_filtro_lig2 = st.columns(2)
             
             with col_filtro_lig1:
                 render_filter_label("PRODUTO")
@@ -9646,17 +10837,9 @@ with tab4:
                     key="filtro_plataforma_linha_lig",
                     label_visibility="collapsed"
                 )
+            tipo_chamada_linha = "Todos"
             
             with col_filtro_lig2:
-                render_filter_label("TIPO DE CHAMADA")
-                tipo_chamada_linha = st.selectbox(
-                    "Selecione o Tipo de Chamada",
-                    options=["Todos"] + sorted(df_lig['TIPO_CHAMADA'].dropna().unique().tolist()),
-                    key="filtro_tipo_chamada_linha_lig",
-                    label_visibility="collapsed"
-                )
-            
-            with col_filtro_lig3:
                 render_filter_label("REGIONAL")
                 regional_linha = st.selectbox(
                     "Selecione a Regional",
@@ -9681,18 +10864,11 @@ with tab4:
         def create_line_chart_data_ligacoes_otimizado(
             df_lig_reais,
             df_metas_lig,
+            df_lig_agregado,
             plataforma="Todas",
             tipo_chamada="Todos",
             regional="Todas"
         ):
-            df_filtrado = aplicar_filtro_plataforma(df_lig_reais, plataforma)
-
-            if tipo_chamada != "Todos":
-                df_filtrado = df_filtrado[df_filtrado["TIPO_CHAMADA"] == tipo_chamada]
-
-            if regional != "Todas":
-                df_filtrado = df_filtrado[df_filtrado["REGIONAL"] == regional]
-
             meses_pt = {
                 1: "jan", 2: "fev", 3: "mar", 4: "abr", 5: "mai", 6: "jun",
                 7: "jul", 8: "ago", 9: "set", 10: "out", 11: "nov", 12: "dez"
@@ -9702,15 +10878,16 @@ with tab4:
 
             dados_grafico = []
 
-            # Agregação única de realizado por ano/mês para evitar 24 filtros por recorte.
-            if not df_filtrado.empty:
-                df_real_mes = df_filtrado.copy()
-                df_real_mes['ANO'] = df_real_mes['DAT_MOVIMENTO2'].dt.year
-                df_real_mes['MES_NUM'] = df_real_mes['DAT_MOVIMENTO2'].dt.month
-                serie_realizado = df_real_mes.groupby(
-                    ['ANO', 'MES_NUM'],
-                    observed=True
-                )['QTDE'].sum()
+            regional_ref = regional if regional != "Todas" else "Todas"
+            df_real_mes = df_lig_agregado[df_lig_agregado['REGIONAL'] == regional_ref].copy()
+            coluna_real = 'TOTAL_QTD'
+            if str(plataforma).strip().upper() == "FIXA":
+                coluna_real = 'FIXA_QTD'
+            elif str(plataforma).strip().upper() == "CONTA":
+                coluna_real = 'CONTA_QTD'
+
+            if not df_real_mes.empty:
+                serie_realizado = df_real_mes.set_index(['ANO', 'MES_NUM'])[coluna_real]
             else:
                 serie_realizado = pd.Series(dtype='float64')
 
@@ -9735,14 +10912,24 @@ with tab4:
                 valor_tend_2026 = 0.0
                 if (ano_corrente == 2026) and (mes_num == mes_corrente) and (tipo_chamada == "Todos"):
                     plataforma_tend = plataforma.upper() if str(plataforma).strip().upper() in {"FIXA", "CONTA"} else None
-                    valor_tend_2026 = float(
-                        calcular_tendencia_ligacoes(
-                            df_metas_lig,
-                            mes_ano_str,
-                            regional if regional != "Todas" else None,
-                            plataforma_tend
-                        ) or 0.0
-                    )
+                    if plataforma_tend is None:
+                        valor_tend_2026 = float(
+                            calcular_tendencia_total_projetada_ligacoes(
+                                df_lig_reais,
+                                df_metas_lig,
+                                mes_ano_str,
+                                regional if regional != "Todas" else None
+                            ) or 0.0
+                        )
+                    else:
+                        valor_tend_2026 = float(
+                            calcular_tendencia_ligacoes(
+                                df_metas_lig,
+                                mes_ano_str,
+                                regional if regional != "Todas" else None,
+                                plataforma_tend
+                            ) or 0.0
+                        )
                 dados_grafico.append({
                     "Ano": "2026 Real/Tend",
                     "Mês": mes_str,
@@ -9777,7 +10964,12 @@ with tab4:
                     elif plataforma.upper() == "CONTA":
                         valor_meta = meta_conta
                     else:
-                        valor_meta = meta_fixa + meta_conta
+                        valor_meta = calcular_meta_total_projetada_ligacoes(
+                            df_lig_reais,
+                            df_metas_lig,
+                            mes_ano_str,
+                            regional if regional != "Todas" else None
+                        )
 
                 dados_grafico.append({
                     "Ano": "2026",
@@ -9801,22 +10993,21 @@ with tab4:
         # =========================
         with st.spinner('📊 Gerando gráfico de evolução...'):
             # Criar dados para o gráfico
-            df_linhas_lig = create_line_chart_data_ligacoes_otimizado(
+            df_linhas_lig_base = create_line_chart_data_ligacoes_otimizado(
                 df_lig_reais=df_lig,
                 df_metas_lig=df_metas_lig,
+                df_lig_agregado=df_lig_agregado,
                 plataforma=plataforma_linha,
                 tipo_chamada=tipo_chamada_linha,
                 regional=regional_linha
             )
-            df_linhas_lig = aplicar_regra_sem_zeros_e_fallback_orc(df_linhas_lig)
+            df_linhas_lig = aplicar_regra_sem_zeros_e_fallback_orc(df_linhas_lig_base)
 
         if not df_linhas_lig.empty:
             # Criar título dinâmico
             filtros_ativos = []
             if plataforma_linha != "Todas":
                 filtros_ativos.append(f"Produto: {plataforma_linha}")
-            if tipo_chamada_linha != "Todos":
-                filtros_ativos.append(f"Tipo: {tipo_chamada_linha}")
             if regional_linha != "Todas":
                 filtros_ativos.append(f"Regional: {regional_linha}")
             
@@ -9835,7 +11026,7 @@ with tab4:
                 x='Mês',
                 y='Valor',
                 color='Ano',
-                title=f'<b>EVOLUÇÃO MENSAL DE LIGAÇÕES</b><br><span style="font-size: 14px; color: #666666;">{titulo_filtros}</span>',
+                title=f'<b>EVOLUÇÃO MENSAL DE LIGAÇÕES</b><br><span style="font-size: 13px; color: #666666;">{titulo_filtros}</span>',
                 labels={'Valor': 'Volume de Ligações', 'Mês': ''},
                 markers=True,
                 line_shape='spline',
@@ -9845,46 +11036,39 @@ with tab4:
             apply_standard_line_layout(fig_linhas_lig, 'VOLUME DE LIGAÇÕES', height=480)
             apply_standard_line_traces(fig_linhas_lig, cores_personalizadas, valor_label='Realizado', meta_year='2026')
             ocultar_rotulo_orc_sobreposto(fig_linhas_lig)
+            aplicar_estilo_visual_evolucao_mensal(fig_linhas_lig, altura=480)
+            fig_bar_resumo_lig = criar_grafico_barras_resumo_evolucao_mensal(
+                df_linhas_lig_base,
+                altura=480
+            )
             
-            # Container de informações
-            st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #FFFFFF, #F8F9FA); 
-                            padding: 15px 20px; 
-                            border-radius: 12px; 
-                            border: 2px solid #E9ECEF;
-                            margin: 15px 0 20px 0;
-                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                        <div style="font-size: 14px; color: #333333; font-weight: 700;">
-                            <span>📊 Filtros Ativos:</span>
-                            <span style="color: #FF2800; margin-left: 8px;">{titulo_filtros}</span>
-                        </div>
-                        <div style="font-size: 13px; color: #666666; display: flex; gap: 20px; flex-wrap: wrap;">
-                            <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                <div style="width: 12px; height: 12px; background: #790E09; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                <span style="font-weight: 600;">2025 (Realizado)</span>
-                            </span>
-                            <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                <div style="width: 12px; height: 12px; background: #FF2800; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                <span style="font-weight: 600;">2026 (Real/Tend Mês)</span>
-                            </span>
-                            <span style="display: inline-flex; align-items: center; gap: 8px;">
-                                <div style="width: 12px; height: 12px; background: #5A6268; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
-                                <span style="font-weight: 600;">2026 (Orç)</span>
-                                <span style="color: #5A6268; margin-left: 4px;">— —</span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                build_painel_contexto_evolucao_mensal(
+                    resumo_label='Filtros Ativos',
+                    resumo_valor=titulo_filtros,
+                    resumo_aux='O gráfico lateral acompanha exatamente este mesmo recorte.',
+                    legenda_2025='2025 (Realizado)',
+                    legenda_2026='2026 (Real/Tend Mês)',
+                    legenda_orc='2026 (Orç)'
+                ),
+                unsafe_allow_html=True
+            )
             
-            # EXIBIR GRÁFICO COM LARGURA COMPLETA
-            apply_standard_title_style(fig_linhas_lig)
-            st.plotly_chart(fig_linhas_lig, use_container_width=True, config={
-                'displayModeBar': True, 
-                'displaylogo': False,
-                'responsive': True
-            })
+            # EXIBIR GRÁFICOS
+            apply_standard_title_style(fig_linhas_lig, size=15)
+            col_evolucao_lig, col_resumo_lig = st.columns([2.25, 0.68], gap='small')
+            with col_evolucao_lig:
+                st.plotly_chart(fig_linhas_lig, width='stretch', config={
+                    'displayModeBar': True,
+                    'displaylogo': False,
+                    'responsive': True
+                })
+            with col_resumo_lig:
+                st.plotly_chart(fig_bar_resumo_lig, width='stretch', config={
+                    'displayModeBar': True,
+                    'displaylogo': False,
+                    'responsive': True
+                })
             
             # =========================
             # DETALHES DOS DADOS
@@ -9953,7 +11137,7 @@ with tab4:
         # =========================
         st.markdown("---")
         st.markdown(
-            '<div class="section-title"><span class="section-icon">📋</span> TABELA DINÂMICA POR REGIONAL - LIGAÇÕES</div>',
+            '<div class="section-title"><span class="section-icon">📋</span> PERFORMANCE POR REGIONAL - LIGAÇÕES</div>',
             unsafe_allow_html=True
         )
 
@@ -10052,14 +11236,16 @@ with tab4:
                     # 4. AGRUPAR DADOS POR REGIONAL E MÊS
                     pivot_data = []
                     regionais_unicas = sorted(df_filtrado['REGIONAL'].dropna().unique())
+                    mapa_regional_mes = (
+                        df_filtrado.groupby(['REGIONAL', 'mes_ano'], observed=True)['QTDE'].sum().to_dict()
+                        if not df_filtrado.empty else {}
+                    )
                     
                     for regional in regionais_unicas:
-                        df_regional = df_filtrado[df_filtrado['REGIONAL'] == regional].copy()
-                        
                         # Calcular valores mensais
                         valores_mensais = {}
                         for mes_ano in meses_para_tabela:
-                            valor = df_regional[df_regional['mes_ano'] == mes_ano]['QTDE'].sum()
+                            valor = float(mapa_regional_mes.get((regional, mes_ano), 0.0))
                             valores_mensais[mes_ano] = valor
                         
                         # Calcular total 2025 (soma de todos os meses de 2025)
@@ -10067,7 +11253,7 @@ with tab4:
                         total_2025 = sum([valores_mensais.get(m, 0) for m in meses_2025])
                         
                         # Calcular REAL do mês foco
-                        real_mes_foco = df_regional[df_regional['mes_ano'] == mes_foco]['QTDE'].sum()
+                        real_mes_foco = float(mapa_regional_mes.get((regional, mes_foco), 0.0))
                         
                         # 5. CALCULAR META DO MÊS FOCO (usando regional da linha)
                         if not df_metas_lig.empty:
@@ -10079,7 +11265,12 @@ with tab4:
                             elif "Todas" not in plataforma_filtro and "FIXA" in plataforma_filtro and "CONTA" not in plataforma_filtro:
                                 meta_mes_foco = meta_fixa
                             else:
-                                meta_mes_foco = meta_fixa + meta_conta
+                                meta_mes_foco = calcular_meta_total_projetada_ligacoes(
+                                    df_lig_reais,
+                                    df_metas_lig,
+                                    mes_foco,
+                                    regional
+                                )
                         else:
                             meta_mes_foco = 0
                         
@@ -10087,7 +11278,7 @@ with tab4:
                         alcance_meta = ((real_mes_foco / meta_mes_foco) * 100) if meta_mes_foco > 0 else 0
                         
                         mes_anterior = get_mes_anterior(mes_foco)
-                        real_mes_anterior = df_regional[df_regional['mes_ano'] == mes_anterior]['QTDE'].sum()
+                        real_mes_anterior = float(mapa_regional_mes.get((regional, mes_anterior), 0.0))
                         variacao_mom = ((real_mes_foco - real_mes_anterior) / real_mes_anterior * 100) if real_mes_anterior > 0 else 0
                         
                         linha = {
@@ -10763,6 +11954,7 @@ with tab5:
         except Exception:
             return mes_ref
 
+    @st.cache_data(ttl=3600, show_spinner=False)
     def preparar_base_analitica(df_in: pd.DataFrame) -> pd.DataFrame:
         """Normaliza campos de uso recorrente para acelerar filtros/consultas no analítico."""
         if df_in is None or df_in.empty:
@@ -10773,8 +11965,48 @@ with tab5:
                 df_work[coluna] = df_work[coluna].astype(str).str.strip()
         if 'COD_PLATAFORMA' in df_work.columns:
             df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+        if 'DAT_MOVIMENTO2' in df_work.columns and not pd.api.types.is_datetime64_any_dtype(df_work['DAT_MOVIMENTO2']):
+            df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work['DAT_MOVIMENTO2'], errors='coerce')
+        elif 'DAT_MOVIMENTO2' not in df_work.columns:
+            df_work['DAT_MOVIMENTO2'] = pd.NaT
+        for coluna_num in ['QTDE', 'DESAFIO_QTD', 'TEND_QTD']:
+            if coluna_num in df_work.columns:
+                df_work[coluna_num] = pd.to_numeric(df_work[coluna_num], errors='coerce').fillna(0.0)
+            else:
+                df_work[coluna_num] = 0.0
         df_work['DSC_IND_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave) if 'DSC_INDICADOR' in df_work.columns else ""
         return df_work
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def preparar_contexto_evolucao_semanal_analitico(df_base: pd.DataFrame):
+        """Prepara a base e os metadados recorrentes usados na evolução semanal/resumo."""
+        if df_base is None or df_base.empty:
+            return pd.DataFrame(), [], ["Todos"], ['CONTA', 'FIXA'], ["Todas"]
+
+        df_sem_base = df_base.copy()
+        if 'DAT_MOVIMENTO2' in df_sem_base.columns and not pd.api.types.is_datetime64_any_dtype(df_sem_base['DAT_MOVIMENTO2']):
+            df_sem_base['DAT_MOVIMENTO2'] = pd.to_datetime(df_sem_base['DAT_MOVIMENTO2'], errors='coerce')
+        elif 'DAT_MOVIMENTO2' not in df_sem_base.columns:
+            df_sem_base['DAT_MOVIMENTO2'] = pd.NaT
+
+        if 'DSC_IND_NORM' not in df_sem_base.columns:
+            df_sem_base['DSC_IND_NORM'] = df_sem_base['DSC_INDICADOR'].apply(normalizar_texto_chave)
+
+        df_sem_base['COD_PLATAFORMA'] = df_sem_base['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+        df_sem_base['QTDE'] = pd.to_numeric(df_sem_base.get('QTDE', 0), errors='coerce').fillna(0.0)
+        df_sem_base['DESAFIO_QTD'] = pd.to_numeric(df_sem_base.get('DESAFIO_QTD', 0), errors='coerce').fillna(0.0)
+        df_sem_base['TEND_QTD'] = pd.to_numeric(df_sem_base.get('TEND_QTD', 0), errors='coerce').fillna(0.0)
+
+        meses_disp_sem = sorted(
+            df_sem_base['dat_tratada'].dropna().unique().tolist(),
+            key=mes_ano_para_data
+        )
+        canais_disp_sem = ["Todos"] + sorted(df_sem_base['CANAL_PLAN'].dropna().unique().tolist())
+        produtos_disp_sem = ['CONTA', 'FIXA']
+        regionais_disp_sem = ["Todas"] + sorted(
+            df_sem_base['REGIONAL'].dropna().astype(str).str.strip().unique().tolist()
+        )
+        return df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem
 
     @st.cache_data(ttl=3600)
     def load_ligacoes_para_performance():
@@ -10839,6 +12071,7 @@ with tab5:
         except Exception:
             return pd.DataFrame(columns=colunas_saida)
 
+    @st.cache_data(ttl=3600, show_spinner=False)
     def preparar_base_performance(df_base):
         colunas_saida = [
             'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
@@ -11822,26 +13055,8 @@ with tab5:
     if base_analitica.empty:
         st.info("Nao ha dados para montar a evolucao semanal.")
     else:
-        df_sem_base = base_analitica.copy()
-        if 'DAT_MOVIMENTO2' in df_sem_base.columns:
-            df_sem_base['DAT_MOVIMENTO2'] = pd.to_datetime(df_sem_base['DAT_MOVIMENTO2'], errors='coerce')
-        else:
-            df_sem_base['DAT_MOVIMENTO2'] = pd.NaT
-        if 'DSC_IND_NORM' not in df_sem_base.columns:
-            df_sem_base['DSC_IND_NORM'] = df_sem_base['DSC_INDICADOR'].apply(normalizar_texto_chave)
-        df_sem_base['COD_PLATAFORMA'] = df_sem_base['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
-        df_sem_base['QTDE'] = pd.to_numeric(df_sem_base.get('QTDE', 0), errors='coerce').fillna(0.0)
-        df_sem_base['DESAFIO_QTD'] = pd.to_numeric(df_sem_base.get('DESAFIO_QTD', 0), errors='coerce').fillna(0.0)
-        df_sem_base['TEND_QTD'] = pd.to_numeric(df_sem_base.get('TEND_QTD', 0), errors='coerce').fillna(0.0)
-
-        meses_disp_sem = sorted(
-            df_sem_base['dat_tratada'].dropna().unique().tolist(),
-            key=mes_ano_para_data
-        )
-        canais_disp_sem = ["Todos"] + sorted(df_sem_base['CANAL_PLAN'].dropna().unique().tolist())
-        produtos_disp_sem = ['CONTA', 'FIXA']
-        regionais_disp_sem = ["Todas"] + sorted(
-            df_sem_base['REGIONAL'].dropna().astype(str).str.strip().unique().tolist()
+        df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(
+            base_analitica
         )
 
         if not meses_disp_sem:
@@ -11914,6 +13129,7 @@ with tab5:
                 aliases_real_norm = {normalizar_texto_chave(a) for a in aliases_real}
                 aliases_meta_norm = {normalizar_texto_chave(a) for a in aliases_meta}
 
+                df_real_hist = df_sem[df_sem['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
                 df_mes_atual = df_sem[df_sem['dat_tratada'] == mes_sem_sel].copy()
                 df_mes_anterior = df_sem[df_sem['dat_tratada'] == mes_sem_m1].copy()
                 df_real_atual = df_mes_atual[df_mes_atual['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
@@ -11981,6 +13197,11 @@ with tab5:
                     serie_m1_base.groupby('DIA_SEMANA', observed=True)['VALOR_DIA'].mean()
                     if not serie_m1_base.empty else pd.Series(dtype='float64')
                 )
+                ctx_peso_proj = _montar_contexto_pesos_projecao_semana_dia(
+                    df_real_hist,
+                    mes_sem_sel,
+                    valor_col='QTDE'
+                )
 
                 serie_atual['VALOR_FINAL'] = pd.to_numeric(
                     serie_atual.get('VALOR_DIA', 0), errors='coerce'
@@ -12032,11 +13253,11 @@ with tab5:
                                 for idx_row in idx_restantes:
                                     semana_idx = int(serie_atual.at[idx_row, 'SEMANA_IDX'])
                                     dia_semana = int(serie_atual.at[idx_row, 'DIA_SEMANA'])
-                                    peso = prev_lookup.get((semana_idx, dia_semana), np.nan)
-                                    if pd.isna(peso) or float(peso) <= 0:
-                                        peso = prev_wd_media.get(dia_semana, np.nan)
-                                    if pd.isna(peso) or float(peso) <= 0:
-                                        peso = 1.0
+                                    peso = _obter_peso_projecao_semana_dia(
+                                        ctx_peso_proj,
+                                        semana_idx,
+                                        dia_semana
+                                    )
                                     pesos_tend.append(max(float(peso), 0.0))
 
                                 soma_pesos_tend = float(np.sum(pesos_tend))
@@ -12066,13 +13287,13 @@ with tab5:
                 for row in serie_atual.itertuples(index=False):
                     semana_idx = int(row.SEMANA_IDX)
                     dia_semana = int(row.DIA_SEMANA)
-                    # Regra: usa o dia equivalente (semana+dow) do M-1.
-                    # Se nao existir, usa a media do mesmo dia da semana no M-1.
-                    peso = prev_lookup.get((semana_idx, dia_semana), np.nan)
-                    if pd.isna(peso) or float(peso) <= 0:
-                        peso = prev_wd_media.get(dia_semana, np.nan)
-                    if pd.isna(peso) or float(peso) <= 0:
-                        peso = 1.0
+                    # Orçamento diário: usa a mesma referência semanal da projeção,
+                    # priorizando o último mês anterior com 5 semanas.
+                    peso = _obter_peso_projecao_semana_dia(
+                        ctx_peso_proj,
+                        semana_idx,
+                        dia_semana
+                    )
                     pesos_meta.append(max(float(peso), 0.0))
 
                 soma_pesos = float(np.sum(pesos_meta))
@@ -12164,56 +13385,16 @@ with tab5:
                         ),
                         title_x=0.5,
                         title_y=0.96,
-                        plot_bgcolor='#FFFFFF',
-                        paper_bgcolor='#FCFCFD',
-                        font=dict(family='Segoe UI', size=14, color='#2F3747'),
-                        margin=dict(l=44, r=44, t=96, b=52),
-                        xaxis=dict(
-                            title='',
-                            type='multicategory',
-                            tickfont=dict(size=11, color='#5B6578'),
-                            showgrid=False,
-                            linecolor='#E6ECF4',
-                            linewidth=1.5,
-                            mirror=True,
-                            showline=True,
-                            zeroline=False
-                        ),
-                        yaxis=dict(
-                            title='',
-                            tickfont=dict(size=12, color='#5B6578'),
-                            showgrid=False,
-                            linecolor='#E6ECF4',
-                            linewidth=1.5,
-                            mirror=True,
-                            showline=True,
-                            zeroline=False,
-                            rangemode='tozero'
-                        ),
-                        hovermode='x unified',
-                        hoverlabel=dict(
-                            bgcolor='white',
-                            font_size=12,
-                            font_family='Segoe UI',
-                            bordercolor='#E6ECF4',
-                            font_color='#2F3747'
-                        ),
-                        legend=dict(
-                            orientation='h',
-                            yanchor='bottom',
-                            y=1.01,
-                            xanchor='center',
-                            x=0.5,
-                            bgcolor='rgba(255,255,255,0.92)',
-                            bordercolor='#E6ECF4',
-                            borderwidth=1.2,
-                            font=dict(size=12, color='#2F3747'),
-                            title=dict(text='')
-                        ),
                         height=460,
                         showlegend=True
                     )
                     apply_standard_title_style(fig_semanal)
+                    aplicar_estilo_visual_evolucao_semanal(
+                        fig_semanal,
+                        rotulo_mes_foco=str(mes_sem_sel).upper(),
+                        nome_serie_real=nome_trace_real,
+                        altura=460
+                    )
 
                     total_real_mes = float(pd.to_numeric(serie_atual['VALOR_FINAL'], errors='coerce').fillna(0).sum())
                     total_mes_anterior = float(pd.to_numeric(serie_atual['REAL_M1_DIA'], errors='coerce').fillna(0).sum())
@@ -12221,131 +13402,16 @@ with tab5:
 
                     categorias_totais = ['M-0', 'M-1', 'ORÇ']
                     valores_totais = [total_real_mes, total_mes_anterior, total_meta_mes]
-                    posicoes_x = list(range(len(categorias_totais)))
                     cores_totais = [
                         cores_evolucao_semanal['REAL_ATUAL'],
                         cores_evolucao_semanal['REAL_M1'],
                         cores_evolucao_semanal['META']
                     ]
-                    textos_totais = [formatar_numero_brasileiro(v, 0) for v in valores_totais]
-
-                    fig_totais_sem = go.Figure()
-                    fig_totais_sem.add_trace(go.Bar(
-                        x=posicoes_x,
-                        y=valores_totais,
-                        width=[0.34, 0.34, 0.34],
-                        marker=dict(color=cores_totais, line=dict(color='white', width=1.2)),
-                        text=textos_totais,
-                        textposition='outside',
-                        textfont=dict(size=12, color='#2F3747'),
-                        customdata=categorias_totais,
-                        hovertemplate="<b>%{customdata}</b><br><b>Total:</b> %{y:,.0f}<extra></extra>",
-                        cliponaxis=False
-                    ))
-
-                    max_val_totais = float(max(valores_totais)) if valores_totais else 0.0
-                    offset_seta = max((max_val_totais * 0.10), 1.0)
-                    cor_seta = '#6B7280'
-
-                    def formatar_variacao_seta(valor_origem: float, valor_destino: float) -> tuple[str, str]:
-                        if not np.isfinite(valor_origem) or float(valor_origem) == 0.0:
-                            return ("N/A", '#6B7280')
-                        variacao = ((float(valor_destino) - float(valor_origem)) / float(valor_origem)) * 100.0
-                        if variacao > 0:
-                            cor_var = '#2E7D32'
-                        elif variacao < 0:
-                            cor_var = '#C62828'
-                        else:
-                            cor_var = '#475569'
-                        return (f"{variacao:+.1f}%".replace('.', ','), cor_var)
-
-                    comparacoes_setas = [
-                        {'origem': 1, 'destino': 0},  # M-0 vs M-1
-                        {'origem': 2, 'destino': 0},  # M-0 vs META
-                    ]
-
-                    for idx_seta, cfg_seta in enumerate(comparacoes_setas):
-                        idx_origem = int(cfg_seta['origem'])
-                        idx_destino = int(cfg_seta['destino'])
-                        valor_origem = float(valores_totais[idx_origem])
-                        valor_destino = float(valores_totais[idx_destino])
-                        y_linha = max(valor_origem, valor_destino) + (offset_seta * (1.0 + (idx_seta * 0.9)))
-                        x0 = float(posicoes_x[idx_origem])
-                        x1 = float(posicoes_x[idx_destino])
-
-                        # Duas annotations sobrepostas para simular seta dupla (<->).
-                        fig_totais_sem.add_annotation(
-                            x=x1, y=y_linha, ax=x0, ay=y_linha,
-                            xref='x', yref='y', axref='x', ayref='y',
-                            text='',
-                            showarrow=True,
-                            arrowhead=2,
-                            arrowsize=1.1,
-                            arrowwidth=1.8,
-                            arrowcolor=cor_seta
-                        )
-                        fig_totais_sem.add_annotation(
-                            x=x0, y=y_linha, ax=x1, ay=y_linha,
-                            xref='x', yref='y', axref='x', ayref='y',
-                            text='',
-                            showarrow=True,
-                            arrowhead=2,
-                            arrowsize=1.1,
-                            arrowwidth=1.8,
-                            arrowcolor=cor_seta
-                        )
-
-                        texto_var, cor_texto_var = formatar_variacao_seta(valor_origem, valor_destino)
-                        fig_totais_sem.add_annotation(
-                            x=(x0 + x1) / 2.0,
-                            y=y_linha + (offset_seta * 0.16),
-                            xref='x',
-                            yref='y',
-                            text=f"<b>{texto_var}</b>",
-                            showarrow=False,
-                            font=dict(size=11, color=cor_texto_var),
-                            bgcolor='white',
-                            bordercolor=cor_seta,
-                            borderwidth=1.4,
-                            borderpad=4
-                        )
-
-                    y_top = (max_val_totais + (offset_seta * 3.1)) if max_val_totais > 0 else 5.0
-                    fig_totais_sem.update_layout(
-                        plot_bgcolor='#FFFFFF',
-                        paper_bgcolor='#FCFCFD',
-                        font=dict(family='Segoe UI', size=13, color='#2F3747'),
-                        margin=dict(l=20, r=16, t=96, b=52),
-                        xaxis=dict(
-                            title='',
-                            tickmode='array',
-                            tickvals=posicoes_x,
-                            ticktext=categorias_totais,
-                            tickfont=dict(size=11, color='#5B6578'),
-                            showgrid=False,
-                            linecolor='#E6ECF4',
-                            linewidth=1.2,
-                            showline=True,
-                            zeroline=False
-                        ),
-                        yaxis=dict(
-                            title='',
-                            tickfont=dict(size=11, color='#5B6578'),
-                            showticklabels=False,
-                            ticks='',
-                            showgrid=False,
-                            gridcolor='rgba(0,0,0,0)',
-                            linecolor='#E6ECF4',
-                            linewidth=1.2,
-                            showline=True,
-                            zeroline=False,
-                            rangemode='tozero',
-                            range=[0, y_top]
-                        ),
-                        bargap=0.48,
-                        bargroupgap=0.0,
-                        height=460,
-                        showlegend=False
+                    fig_totais_sem = criar_grafico_barras_resumo_evolucao_semanal(
+                        categorias_totais=categorias_totais,
+                        valores_totais=valores_totais,
+                        cores_totais=cores_totais,
+                        altura=460
                     )
 
                     col_evol_linha, col_evol_coluna = st.columns([2.2, 0.7], gap='medium')
@@ -12509,6 +13575,23 @@ with tab5:
                         df_prod_m1 = df_mes_m1_ref[
                             df_mes_m1_ref['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_ref)
                         ].copy()
+                        df_prod_hist = df_sem_base[
+                            df_sem_base['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_ref)
+                        ].copy()
+                        df_prod_hist['DATA_DIA'] = pd.to_datetime(
+                            df_prod_hist.get('DAT_MOVIMENTO2'),
+                            errors='coerce'
+                        ).dt.normalize()
+                        df_prod_hist = df_prod_hist[df_prod_hist['DATA_DIA'].notna()].copy()
+                        df_prod_hist['QTDE'] = pd.to_numeric(df_prod_hist.get('QTDE', 0), errors='coerce').fillna(0.0)
+                        df_prod_hist['DESAFIO_QTD'] = pd.to_numeric(df_prod_hist.get('DESAFIO_QTD', 0), errors='coerce').fillna(0.0)
+                        df_prod_hist['TEND_QTD'] = pd.to_numeric(df_prod_hist.get('TEND_QTD', 0), errors='coerce').fillna(0.0)
+                        df_prod_hist['CANAL_RESUMO'] = df_prod_hist['CANAL_PLAN'].apply(normalizar_canal_resumo_sem)
+                        if str(regional_sem_sel).strip() != 'Todas':
+                            df_prod_hist = df_prod_hist[
+                                df_prod_hist['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
+                            ].copy()
+                        df_prod_hist = df_prod_hist[df_prod_hist['CANAL_RESUMO'].isin(canais_base)].copy()
                         df_ped = df_prod[df_prod['DSC_IND_NORM'].isin(aliases_ped)].copy()
                         df_lig = df_prod[df_prod['DSC_IND_NORM'].isin(aliases_lig)].copy()
                         df_vb = df_prod[df_prod['DSC_IND_NORM'].isin(aliases_vb)].copy()
@@ -12518,6 +13601,10 @@ with tab5:
                         df_lig_m1 = df_prod_m1[df_prod_m1['DSC_IND_NORM'].isin(aliases_lig)].copy()
                         df_vb_m1 = df_prod_m1[df_prod_m1['DSC_IND_NORM'].isin(aliases_vb)].copy()
                         df_ativ_m1 = df_prod_m1[df_prod_m1['DSC_IND_NORM'].isin(aliases_ativ)].copy()
+                        df_ped_hist = df_prod_hist[df_prod_hist['DSC_IND_NORM'].isin(aliases_ped)].copy()
+                        df_lig_hist = df_prod_hist[df_prod_hist['DSC_IND_NORM'].isin(aliases_lig)].copy()
+                        df_vb_hist = df_prod_hist[df_prod_hist['DSC_IND_NORM'].isin(aliases_vb)].copy()
+                        df_ativ_hist = df_prod_hist[df_prod_hist['DSC_IND_NORM'].isin(aliases_ativ)].copy()
                         dias_tend_header: set[tuple[int, str]] = set()
                         if usar_tendencia_resumo:
                             df_header_ref = df_prod.copy()
@@ -12773,6 +13860,7 @@ with tab5:
                         def montar_lookup_projetado(
                             df_atual_ref: pd.DataFrame,
                             df_m1_ref: pd.DataFrame,
+                            df_hist_full_ref: pd.DataFrame,
                             canais_ref: list[str],
                             tipo_linha: str
                         ) -> dict[tuple[str, int, str], float]:
@@ -12781,10 +13869,19 @@ with tab5:
                             lookup_out: dict[tuple[str, int, str], float] = {}
                             for canal_ref in canais_ref:
                                 serie_atual_c = montar_serie_diaria_canal(df_atual_ref, canal_ref, cal_resumo_atual)
-                                serie_m1_c = montar_serie_diaria_canal(df_m1_ref, canal_ref, cal_resumo_m1)
                                 serie_atual_c['VALOR_FINAL'] = pd.to_numeric(
                                     serie_atual_c.get('VALOR_DIA', 0), errors='coerce'
                                 ).fillna(0.0)
+                                df_hist_canal = (
+                                    df_hist_full_ref[df_hist_full_ref['CANAL_RESUMO'].eq(canal_ref)].copy()
+                                    if df_hist_full_ref is not None and not df_hist_full_ref.empty and 'CANAL_RESUMO' in df_hist_full_ref.columns
+                                    else pd.DataFrame()
+                                )
+                                ctx_peso_proj = _montar_contexto_pesos_projecao_semana_dia(
+                                    df_hist_canal,
+                                    mes_sem_sel,
+                                    valor_col='QTDE'
+                                )
 
                                 if aplicar_proj_tendencia and not serie_atual_c.empty:
                                     tend_mes, _, _ = calcular_resumo_mensal(canal_ref, tipo_linha)
@@ -12831,24 +13928,16 @@ with tab5:
                                             serie_atual_c['DATA_DIA'], errors='coerce'
                                         ) > data_corte
                                         if bool(mask_restante.any()):
-                                            prev_lookup = (
-                                                serie_m1_c.set_index(['SEMANA_IDX', 'DIA_SEMANA'])['VALOR_DIA']
-                                                if not serie_m1_c.empty else pd.Series(dtype='float64')
-                                            )
-                                            prev_wd_media = (
-                                                serie_m1_c.groupby('DIA_SEMANA', observed=True)['VALOR_DIA'].mean()
-                                                if not serie_m1_c.empty else pd.Series(dtype='float64')
-                                            )
                                             idx_restantes = list(serie_atual_c.index[mask_restante])
                                             pesos = []
                                             for idx_row in idx_restantes:
                                                 semana_idx = int(serie_atual_c.at[idx_row, 'SEMANA_IDX'])
                                                 dia_semana = int(serie_atual_c.at[idx_row, 'DIA_SEMANA'])
-                                                peso = prev_lookup.get((semana_idx, dia_semana), np.nan)
-                                                if pd.isna(peso) or float(peso) <= 0:
-                                                    peso = prev_wd_media.get(dia_semana, np.nan)
-                                                if pd.isna(peso) or float(peso) <= 0:
-                                                    peso = 1.0
+                                                peso = _obter_peso_projecao_semana_dia(
+                                                    ctx_peso_proj,
+                                                    semana_idx,
+                                                    dia_semana
+                                                )
                                                 pesos.append(max(float(peso), 0.0))
                                             soma_pesos = float(np.sum(pesos))
                                             if soma_pesos <= 0:
@@ -12872,17 +13961,40 @@ with tab5:
                             return lookup_out
 
                         tipo_demanda_lig = 'CONTA' if produto_ref == 'CONTA' else 'FIXA'
+                        df_lig_demanda_hist = (
+                            df_lig_demanda_base.copy()
+                            if df_lig_demanda_base is not None and not df_lig_demanda_base.empty
+                            else pd.DataFrame()
+                        )
+                        if not df_lig_demanda_hist.empty:
+                            if str(regional_sem_sel).strip() != 'Todas':
+                                df_lig_demanda_hist = df_lig_demanda_hist[
+                                    df_lig_demanda_hist['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
+                                ].copy()
+                            df_lig_demanda_hist['CANAL_RESUMO'] = 'Televendas Receptivo'
                         df_lig_prod = df_lig_demanda_sem[
                             df_lig_demanda_sem['TIPO_DEMANDA'].eq(tipo_demanda_lig)
                         ].copy()
                         df_lig_prod_m1 = df_lig_demanda_sem_m1[
                             df_lig_demanda_sem_m1['TIPO_DEMANDA'].eq(tipo_demanda_lig)
                         ].copy()
+                        if not df_lig_demanda_hist.empty:
+                            if tipo_demanda_lig == 'CONTA':
+                                df_lig_prod_hist = df_lig_demanda_hist[
+                                    df_lig_demanda_hist['TIPO_CHAMADA'].eq('DEMAIS')
+                                ].copy()
+                            else:
+                                df_lig_prod_hist = df_lig_demanda_hist[
+                                    df_lig_demanda_hist['FLAG_FIXA'].astype(bool)
+                                ].copy()
+                        else:
+                            df_lig_prod_hist = pd.DataFrame()
                         lk_demanda = {}
                         lk_demanda.update(
                             montar_lookup_projetado(
                                 df_ped[df_ped['CANAL_RESUMO'].eq('E-Commerce')].copy(),
                                 df_ped_m1[df_ped_m1['CANAL_RESUMO'].eq('E-Commerce')].copy(),
+                                df_ped_hist[df_ped_hist['CANAL_RESUMO'].eq('E-Commerce')].copy(),
                                 ['E-Commerce'],
                                 'DEMANDA_PED'
                             )
@@ -12891,12 +14003,13 @@ with tab5:
                             montar_lookup_projetado(
                                 df_lig_prod,
                                 df_lig_prod_m1,
+                                df_lig_prod_hist,
                                 ['Televendas Receptivo'],
                                 'DEMANDA_LIG'
                             )
                         )
-                        lk_vb = montar_lookup_projetado(df_vb, df_vb_m1, canais_base, 'VB')
-                        lk_ativ = montar_lookup_projetado(df_ativ, df_ativ_m1, canais_base, 'ATIV')
+                        lk_vb = montar_lookup_projetado(df_vb, df_vb_m1, df_vb_hist, canais_base, 'VB')
+                        lk_ativ = montar_lookup_projetado(df_ativ, df_ativ_m1, df_ativ_hist, canais_base, 'ATIV')
 
                         colunas_export = ['CANAL']
                         for sem_exp in semanas_fixas:
