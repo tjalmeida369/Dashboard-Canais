@@ -751,13 +751,18 @@ st.markdown("""
         :root {
             --ds-primary: #790E09;
             --ds-primary-soft: #A23B36;
+            --ds-primary-deep: #4A0704;
             --ds-bg: #F7F8FA;
             --ds-surface: #FFFFFF;
             --ds-surface-soft: #FAFBFC;
+            --ds-ivory: #FFFCF8;
             --ds-text: #1F2937;
             --ds-text-muted: #4B5563;
             --ds-border: #E5E7EB;
             --ds-border-strong: #D1D5DB;
+            --ds-gold: #C8A86C;
+            --ds-gold-soft: #E6D5B2;
+            --ds-gold-wash: rgba(200, 168, 108, 0.18);
             --ds-positive: #1B5E20;
             --ds-negative: #C62828;
         }
@@ -811,41 +816,63 @@ st.markdown("""
         .kpi-block-dinamico,
         [data-testid="stMetric"] {
             background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.99) 100%),
-                linear-gradient(135deg, rgba(162, 59, 54, 0.03) 0%, rgba(162, 59, 54, 0.00) 42%) !important;
-            border: 1px solid #E5EBF2 !important;
-            border-radius: 20px !important;
+                radial-gradient(circle at 16% 10%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0) 28%),
+                radial-gradient(circle at top right, rgba(200, 168, 108, 0.14) 0%, rgba(200, 168, 108, 0) 30%),
+                linear-gradient(180deg, rgba(255, 252, 248, 0.995) 0%, rgba(248, 250, 252, 0.988) 72%, rgba(244, 247, 250, 0.982) 100%),
+                linear-gradient(135deg, rgba(162, 59, 54, 0.05) 0%, rgba(162, 59, 54, 0.00) 46%) !important;
+            border: 1px solid rgba(200, 168, 108, 0.20) !important;
+            border-radius: 18px !important;
             box-shadow:
                 0 1px 2px rgba(16, 24, 40, 0.04),
-                0 14px 32px rgba(16, 24, 40, 0.08),
+                0 14px 28px rgba(16, 24, 40, 0.075),
+                0 4px 12px rgba(90, 10, 6, 0.05),
                 inset 0 1px 0 rgba(255, 255, 255, 0.96),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.55) !important;
+                inset 0 0 0 1px rgba(255, 255, 255, 0.58) !important;
             position: relative;
+            isolation: isolate;
         }
 
         .kpi-card-dinamico {
             overflow: hidden;
-            min-height: 68px !important;
-            padding: 6px !important;
-            margin: 4px 0 !important;
+            min-height: 64px !important;
+            padding: 5px !important;
+            margin: 3px 0 !important;
+            outline: 1px solid rgba(255, 255, 255, 0.62);
+            outline-offset: -1px;
+        }
+
+        .kpi-card-stack-soft-left {
+            left: -6px;
+        }
+
+        .kpi-card-stack-soft-right {
+            left: 6px;
+        }
+
+        .kpi-card-dinamico > * {
+            position: relative;
+            z-index: 1;
         }
 
         .kpi-block-dinamico {
-            border-radius: 16px !important;
-            padding: 8px 7px !important;
+            border-radius: 14px !important;
+            padding: 7px 6px !important;
             min-height: 100%;
             background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%) !important;
+                radial-gradient(circle at top center, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0) 52%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.985) 0%, rgba(248, 250, 252, 0.97) 100%) !important;
             border-color: rgba(226, 232, 240, 0.92) !important;
             box-shadow:
-                0 8px 18px rgba(15, 23, 42, 0.05),
+                0 6px 14px rgba(15, 23, 42, 0.05),
                 inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
+            outline: 1px solid rgba(255, 255, 255, 0.56);
+            outline-offset: -1px;
         }
 
         .kpi-card-dinamico::before,
         .kpi-block-dinamico::before {
-            height: 3px;
-            background: linear-gradient(90deg, #D96A5F 0%, var(--ds-primary) 40%, #6B0D09 100%);
+            height: 2px;
+            background: linear-gradient(90deg, rgba(200, 168, 108, 0.95) 0%, #D96A5F 16%, var(--ds-primary) 44%, #6B0D09 82%, rgba(200, 168, 108, 0.95) 100%);
             opacity: 1;
         }
 
@@ -854,52 +881,79 @@ st.markdown("""
             position: absolute;
             top: 0;
             right: 0;
-            width: 54%;
+            width: 48%;
             height: 100%;
             background:
-                radial-gradient(circle at top right, rgba(162, 59, 54, 0.12), rgba(162, 59, 54, 0.00) 60%),
-                linear-gradient(135deg, rgba(162, 59, 54, 0.04), rgba(162, 59, 54, 0.00) 52%),
-                repeating-linear-gradient(135deg, rgba(162, 59, 54, 0.018) 0 8px, rgba(162, 59, 54, 0.00) 8px 16px);
+                radial-gradient(circle at top right, rgba(200, 168, 108, 0.18), rgba(200, 168, 108, 0.00) 44%),
+                radial-gradient(circle at 88% 18%, rgba(162, 59, 54, 0.10), rgba(162, 59, 54, 0.00) 50%),
+                linear-gradient(135deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.00) 42%),
+                repeating-linear-gradient(135deg, rgba(200, 168, 108, 0.032) 0 7px, rgba(200, 168, 108, 0.00) 7px 14px);
             pointer-events: none;
+            z-index: 0;
+        }
+
+        .kpi-block-dinamico::after {
+            content: "";
+            position: absolute;
+            inset: 1px;
+            border-radius: 13px;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0) 42%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
+                linear-gradient(135deg, rgba(200, 168, 108, 0.045), rgba(200, 168, 108, 0));
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .kpi-block-dinamico > * {
+            position: relative;
+            z-index: 1;
         }
 
         .kpi-card-dinamico:hover,
         .kpi-block-dinamico:hover {
             transform: translateY(-2px);
-            border-color: #D5DEE8 !important;
+            border-color: rgba(200, 168, 108, 0.32) !important;
             box-shadow:
                 0 4px 10px rgba(16, 24, 40, 0.06),
-                0 18px 34px rgba(16, 24, 40, 0.12) !important;
+                0 16px 26px rgba(16, 24, 40, 0.10),
+                0 0 0 1px rgba(200, 168, 108, 0.08) !important;
         }
 
         .kpi-title-dinamico {
-            background: none !important;
-            color: #7A1E19 !important;
-            -webkit-text-fill-color: #7A1E19 !important;
-            font-size: 12px !important;
+            background: linear-gradient(180deg, #7A1E19 0%, #5A0A06 100%) !important;
+            color: #6B1A14 !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            font-size: 11px !important;
             font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
             font-weight: 800 !important;
-            letter-spacing: 1.2px;
-            margin-bottom: 8px !important;
+            letter-spacing: 1.35px;
+            margin-bottom: 7px !important;
             text-transform: uppercase;
             text-align: center;
+            padding-bottom: 7px;
+            line-height: 1.15;
         }
 
         .kpi-title-dinamico::after {
             height: 2px;
-            width: 30px;
-            background: linear-gradient(90deg, rgba(162, 59, 54, 0.10), var(--ds-primary), rgba(162, 59, 54, 0.10));
+            width: 24px;
+            background: linear-gradient(90deg, rgba(200, 168, 108, 0.10), var(--ds-gold), var(--ds-primary), rgba(200, 168, 108, 0.10));
         }
 
         .kpi-value-dinamico {
-            font-size: 24px !important;
-            color: var(--ds-text) !important;
-            background: none !important;
-            -webkit-text-fill-color: var(--ds-text) !important;
+            font-size: 23px !important;
+            color: #1F2937 !important;
+            background: linear-gradient(135deg, #243041 0%, #1E293B 56%, #5A0A06 100%) !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
             font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
             font-weight: 900 !important;
             text-shadow: none;
-            letter-spacing: -0.55px;
+            letter-spacing: -0.65px;
             line-height: 1;
             font-variant-numeric: tabular-nums;
         }
@@ -913,8 +967,8 @@ st.markdown("""
             white-space: nowrap;
             border-radius: 999px;
             border: 1px solid #DCE3EC !important;
-            min-height: 24px;
-            padding: 4px 11px !important;
+            min-height: 23px;
+            padding: 3px 9px !important;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
             font-weight: 700 !important;
             letter-spacing: 0.2px;
@@ -940,11 +994,11 @@ st.markdown("""
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
-            gap: 5px;
-            font-size: 11.5px;
+            gap: 4px;
+            font-size: 11px;
             color: #64748B;
-            margin: 5px 0 4px 0;
-            line-height: 1.35;
+            margin: 4px 0 3px 0;
+            line-height: 1.25;
             font-weight: 600;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
         }
@@ -980,12 +1034,15 @@ st.markdown("""
         .kpi-meta-chip {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            min-height: 25px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            border: 1px solid #E2E8F0;
-            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+            gap: 5px;
+            min-height: 23px;
+            padding: 3px 9px;
+            border-radius: 11px;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0) 48%),
+                linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%),
+                linear-gradient(135deg, rgba(200, 168, 108, 0.032), rgba(200, 168, 108, 0));
             box-shadow:
                 inset 0 1px 0 rgba(255, 255, 255, 0.92),
                 0 3px 8px rgba(15, 23, 42, 0.04);
@@ -993,13 +1050,17 @@ st.markdown("""
         }
 
         .kpi-meta-chip-anterior {
-            border-color: rgba(100, 116, 139, 0.22);
-            background: linear-gradient(180deg, #FFFFFF 0%, #F5F8FC 100%);
+            border-color: rgba(100, 116, 139, 0.20);
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0) 48%),
+                linear-gradient(180deg, #FFFFFF 0%, #F5F8FC 100%);
         }
 
         .kpi-meta-chip-orc {
-            border-color: rgba(162, 59, 54, 0.18);
-            background: linear-gradient(180deg, #FFF9F8 0%, #FFEFEA 100%);
+            border-color: rgba(200, 168, 108, 0.28);
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0) 48%),
+                linear-gradient(180deg, #FFFBF6 0%, #FBEFDB 100%);
         }
 
         .kpi-meta-chip-silentes {
@@ -1008,7 +1069,7 @@ st.markdown("""
         }
 
         .kpi-meta-value {
-            font-size: 11.5px;
+            font-size: 11px;
             font-weight: 800;
             color: #0F172A;
             font-variant-numeric: tabular-nums;
@@ -1020,17 +1081,18 @@ st.markdown("""
             justify-content: center;
             gap: 6px;
             width: fit-content;
-            min-height: 20px;
-            padding: 2px 9px;
+            min-height: 18px;
+            padding: 2px 8px;
             border-radius: 999px;
             border: 1px solid rgba(162, 59, 54, 0.16);
             background: linear-gradient(180deg, #FFF9F8 0%, #FFF2EF 100%);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-            font-size: 10px;
+            font-size: 9.5px;
             color: #7A1E19;
             font-weight: 800;
             margin: 0 auto;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            backdrop-filter: blur(6px) saturate(1.04);
         }
 
         .kpi-parcial-note::before {
@@ -1051,16 +1113,19 @@ st.markdown("""
             width: fit-content;
             line-height: 1;
             overflow: visible;
-            padding: 5px 11px;
-            border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, 0.14);
+            padding: 4px 10px;
+            border-radius: 14px;
+            border: 1px solid rgba(200, 168, 108, 0.18);
             background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%),
-                linear-gradient(135deg, rgba(162, 59, 54, 0.02), rgba(162, 59, 54, 0.00));
+                radial-gradient(circle at top center, rgba(255, 255, 255, 0.80) 0%, rgba(255, 255, 255, 0) 58%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.985) 0%, rgba(250, 251, 253, 0.965) 100%),
+                linear-gradient(135deg, rgba(200, 168, 108, 0.04), rgba(200, 168, 108, 0.00));
             box-shadow:
                 inset 0 1px 0 rgba(255, 255, 255, 0.95),
-                0 6px 16px rgba(15, 23, 42, 0.06);
-            margin: 0 auto 4px auto;
+                0 5px 12px rgba(15, 23, 42, 0.05),
+                0 1px 0 rgba(200, 168, 108, 0.04);
+            margin: 0 auto 3px auto;
+            backdrop-filter: blur(7px) saturate(1.06);
         }
 
         .kpi-value-wrap .kpi-value-dinamico {
@@ -1068,33 +1133,61 @@ st.markdown("""
             text-align: center;
         }
 
+        .kpi-value-wrap > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .kpi-value-wrap::before {
+            content: "";
+            position: absolute;
+            inset: 1px;
+            border-radius: 13px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.60), rgba(255, 255, 255, 0.02));
+            pointer-events: none;
+        }
+
+        .kpi-value-wrap::after {
+            content: "";
+            position: absolute;
+            left: 14%;
+            right: 14%;
+            top: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(200, 168, 108, 0.45), transparent);
+            pointer-events: none;
+        }
+
         .kpi-tooltip {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 34px;
-            height: 18px;
-            padding: 0 7px;
+            min-width: 31px;
+            height: 17px;
+            padding: 0 6px;
             border-radius: 999px;
-            font-size: 8px;
+            font-size: 7.5px;
             font-weight: 900;
             letter-spacing: 0.8px;
             white-space: nowrap;
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
             background: linear-gradient(135deg, #B63A33 0%, #790E09 100%) !important;
-            border: 1px solid rgba(255, 255, 255, 0.9);
-            box-shadow: 0 4px 10px rgba(121, 14, 9, 0.25);
+            border: 1px solid rgba(230, 213, 178, 0.72);
+            box-shadow:
+                0 4px 10px rgba(121, 14, 9, 0.25),
+                0 0 0 1px rgba(200, 168, 108, 0.10);
             cursor: help;
             line-height: 1;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            text-shadow: 0 1px 0 rgba(61, 7, 4, 0.22);
         }
 
         .kpi-tooltip-inline {
             position: absolute;
             left: 100%;
-            top: 4px;
-            transform: translate(10px, 0);
+            top: 3px;
+            transform: translate(8px, 0);
             z-index: 3;
         }
 
@@ -1103,17 +1196,34 @@ st.markdown("""
             align-items: center;
             justify-content: center;
             width: fit-content;
-            min-height: 21px;
-            padding: 3px 9px;
+            min-height: 19px;
+            padding: 2px 8px;
             border-radius: 999px;
-            background: linear-gradient(180deg, rgba(162, 59, 54, 0.09) 0%, rgba(162, 59, 54, 0.04) 100%);
-            border: 1px solid rgba(162, 59, 54, 0.14);
+            gap: 5px;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0) 46%),
+                linear-gradient(180deg, rgba(255, 252, 248, 0.98) 0%, rgba(255, 247, 240, 0.94) 100%),
+                linear-gradient(135deg, rgba(200, 168, 108, 0.10), rgba(162, 59, 54, 0.04));
+            border: 1px solid rgba(200, 168, 108, 0.20);
             color: #7A1E19;
-            font-size: 10px;
+            font-size: 9.5px;
             font-weight: 800;
-            letter-spacing: 0.9px;
+            letter-spacing: 0.75px;
             text-transform: uppercase;
-            margin: 0 auto 6px auto;
+            margin: 0 auto 5px auto;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.88),
+                0 2px 5px rgba(15, 23, 42, 0.04);
+        }
+
+        .kpi-block-label::before {
+            content: "";
+            width: 5px;
+            height: 5px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--ds-gold) 0%, #D96A5F 38%, #790E09 100%);
+            box-shadow: 0 0 0 2px rgba(200, 168, 108, 0.14);
+            flex: 0 0 auto;
         }
 
         .variacao-positiva {
@@ -1701,7 +1811,12 @@ st.markdown("""
             }
 
             .kpi-card-dinamico {
-                min-height: 52px;
+                min-height: 48px;
+            }
+
+            .kpi-card-stack-soft-left,
+            .kpi-card-stack-soft-right {
+                left: 0;
             }
 
             .analitico-corte-info {
@@ -1717,21 +1832,27 @@ if KPI_PILL_VARIANT == "clean":
     kpi_pill_style = """
     <style>
         .kpi-variacao-item {
-            border-radius: 12px !important;
+            border-radius: 999px !important;
             border-width: 1px !important;
-            min-height: 26px !important;
-            padding: 4px 10px !important;
-            background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFD 100%) !important;
+            min-height: 24px !important;
+            padding: 3px 9px !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0) 46%),
+                linear-gradient(180deg, #FFFCF8 0%, #F7FAFD 100%) !important;
             color: #475569 !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94), 0 3px 8px rgba(15, 23, 42, 0.06) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.94),
+                0 3px 8px rgba(15, 23, 42, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.42) !important;
             transition: transform 0.18s ease, box-shadow 0.18s ease !important;
             font-weight: 800 !important;
             letter-spacing: 0.25px !important;
+            border-color: rgba(200, 168, 108, 0.16) !important;
         }
         .kpi-variacao-item::before {
             content: "" !important;
-            width: 7px !important;
-            height: 7px !important;
+            width: 6px !important;
+            height: 6px !important;
             border-radius: 999px !important;
             background: #94A3B8 !important;
             box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20) !important;
@@ -1739,11 +1860,16 @@ if KPI_PILL_VARIANT == "clean":
         }
         .kpi-variacao-item:hover {
             transform: translateY(-1px);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.97), 0 5px 12px rgba(15, 23, 42, 0.10) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.97),
+                0 5px 12px rgba(15, 23, 42, 0.10),
+                0 0 0 1px rgba(162, 59, 54, 0.04) !important;
         }
         .variacao-positiva {
             color: #166534 !important;
-            background: linear-gradient(180deg, #F6FCF7 0%, #E8F5ED 100%) !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0) 45%),
+                linear-gradient(180deg, #F8FDF9 0%, #E8F5ED 100%) !important;
             border-color: rgba(22, 101, 52, 0.28) !important;
         }
         .variacao-positiva::before {
@@ -1752,7 +1878,9 @@ if KPI_PILL_VARIANT == "clean":
         }
         .variacao-negativa {
             color: #B42318 !important;
-            background: linear-gradient(180deg, #FFF8F7 0%, #FDE8E6 100%) !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0) 45%),
+                linear-gradient(180deg, #FFFAF8 0%, #FDE8E6 100%) !important;
             border-color: rgba(180, 35, 24, 0.30) !important;
         }
         .variacao-negativa::before {
@@ -1761,8 +1889,10 @@ if KPI_PILL_VARIANT == "clean":
         }
         .variacao-neutra {
             color: #475569 !important;
-            background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F7 100%) !important;
-            border-color: rgba(71, 85, 105, 0.25) !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0) 45%),
+                linear-gradient(180deg, #FCFCFB 0%, #EEF2F7 100%) !important;
+            border-color: rgba(200, 168, 108, 0.18) !important;
         }
         .variacao-neutra::before {
             background: #94A3B8 !important;
@@ -1774,21 +1904,27 @@ else:
     kpi_pill_style = """
     <style>
         .kpi-variacao-item {
-            border-radius: 12px !important;
+            border-radius: 999px !important;
             border-width: 1px !important;
-            min-height: 26px !important;
-            padding: 4px 10px !important;
-            background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFD 100%) !important;
+            min-height: 24px !important;
+            padding: 3px 9px !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0) 46%),
+                linear-gradient(180deg, #FFFCF8 0%, #F7FAFD 100%) !important;
             color: #475569 !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 3px 8px rgba(15, 23, 42, 0.09) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                0 3px 8px rgba(15, 23, 42, 0.09),
+                0 0 0 1px rgba(255, 255, 255, 0.46) !important;
             transition: transform 0.18s ease, box-shadow 0.18s ease !important;
             font-weight: 800 !important;
             letter-spacing: 0.25px !important;
+            border-color: rgba(200, 168, 108, 0.18) !important;
         }
         .kpi-variacao-item::before {
             content: "" !important;
-            width: 7px !important;
-            height: 7px !important;
+            width: 6px !important;
+            height: 6px !important;
             border-radius: 999px !important;
             background: #94A3B8 !important;
             box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.20) !important;
@@ -1796,11 +1932,16 @@ else:
         }
         .kpi-variacao-item:hover {
             transform: translateY(-1px);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.97), 0 5px 14px rgba(15, 23, 42, 0.12) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.97),
+                0 5px 14px rgba(15, 23, 42, 0.12),
+                0 0 0 1px rgba(162, 59, 54, 0.05) !important;
         }
         .variacao-positiva {
             color: #14532D !important;
-            background: linear-gradient(180deg, #EDF9F1 0%, #D8F0E1 100%) !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0) 46%),
+                linear-gradient(180deg, #F2FBF4 0%, #D8F0E1 100%) !important;
             border-color: rgba(22, 101, 52, 0.38) !important;
         }
         .variacao-positiva::before {
@@ -1809,7 +1950,9 @@ else:
         }
         .variacao-negativa {
             color: #991B1B !important;
-            background: linear-gradient(180deg, #FEF1F1 0%, #FCD8D6 100%) !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0) 46%),
+                linear-gradient(180deg, #FFF5F4 0%, #FCD8D6 100%) !important;
             border-color: rgba(185, 28, 28, 0.42) !important;
         }
         .variacao-negativa::before {
@@ -1818,8 +1961,10 @@ else:
         }
         .variacao-neutra {
             color: #334155 !important;
-            background: linear-gradient(180deg, #F1F5F9 0%, #E5EBF2 100%) !important;
-            border-color: rgba(71, 85, 105, 0.30) !important;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0) 46%),
+                linear-gradient(180deg, #FAFBFB 0%, #E5EBF2 100%) !important;
+            border-color: rgba(200, 168, 108, 0.22) !important;
         }
         .variacao-neutra::before {
             background: #64748B !important;
@@ -1881,6 +2026,75 @@ def load_excel_cached(path: str, file_mtime: float | None = None) -> pd.DataFram
     """Leitura de Excel com cache invalidado por data de modificação."""
     _ = file_mtime
     return pd.read_excel(path)
+
+LIGACOES_FILE_PATH = "televendas_ligacoes2.xlsx"
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega e normaliza a base bruta de ligações uma única vez para reaproveitamento no app."""
+    _ = file_mtime
+    if not Path(path).exists():
+        return pd.DataFrame()
+
+    ligacoes_mtime = file_mtime if file_mtime is not None else Path(path).stat().st_mtime
+    df_lig = load_excel_cached(path, ligacoes_mtime)
+    if df_lig is None or df_lig.empty:
+        return pd.DataFrame()
+
+    req_cols = {'QTD', 'CABEADO'}
+    if not req_cols.issubset(set(df_lig.columns)):
+        return pd.DataFrame()
+
+    coluna_data = next((c for c in ['PERIODO', 'DATA_MOVIMENTO', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO2'] if c in df_lig.columns), None)
+    if coluna_data is None:
+        return pd.DataFrame()
+
+    df_work = df_lig.copy()
+    df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work[coluna_data], errors='coerce')
+    df_work = df_work[df_work['DAT_MOVIMENTO2'].notna()].copy()
+    if df_work.empty:
+        return pd.DataFrame()
+
+    meses_pt = {
+        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+    }
+    df_work['mes_ano'] = df_work['DAT_MOVIMENTO2'].apply(
+        lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
+    )
+    df_work['dat_tratada'] = df_work['mes_ano']
+
+    col_reg = next((c for c in ['DSC_REGIONAL_CMV', 'REGIONAL'] if c in df_work.columns), None)
+    if col_reg is not None:
+        df_work['REGIONAL'] = df_work[col_reg].astype(str).str.strip().str[:3].str.upper()
+    else:
+        df_work['REGIONAL'] = ''
+
+    df_work['QTDE'] = pd.to_numeric(df_work['QTD'], errors='coerce').fillna(0.0)
+    telefone_ref = df_work['TELEFONE'].astype(str) if 'TELEFONE' in df_work.columns else pd.Series('', index=df_work.index)
+    df_work['TIPO_CHAMADA'] = np.where(
+        telefone_ref.str.contains('0960|8449', regex=True, na=False),
+        'Click to Call',
+        'DEMAIS'
+    )
+
+    cabeado_norm = df_work['CABEADO'].astype(str).str.strip().str.upper()
+    mask_fixa = cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
+    df_work['FLAG_FIXA'] = mask_fixa
+    df_work['COD_PLATAFORMA'] = np.where(mask_fixa, 'FIXA', 'CONTA')
+    df_work['CANAL_PLAN'] = 'Televendas Receptivo'
+    df_work['DSC_INDICADOR'] = 'LIGACOES'
+    df_work['DESAFIO_QTD'] = 0.0
+    if 'TELEFONE' not in df_work.columns:
+        df_work['TELEFONE'] = ''
+    df_work['DATA_DIA'] = pd.to_datetime(df_work['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
+
+    colunas_saida = [
+        'DAT_MOVIMENTO2', 'DATA_DIA', 'mes_ano', 'dat_tratada', 'REGIONAL',
+        'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'QTDE', 'DESAFIO_QTD',
+        'CABEADO', 'TIPO_CHAMADA', 'TELEFONE', 'FLAG_FIXA'
+    ]
+    return df_work[[c for c in colunas_saida if c in df_work.columns]].copy()
 
 def export_excel(df: pd.DataFrame) -> BytesIO:
     """Exporta DataFrame para Excel"""
@@ -7374,101 +7588,174 @@ with tab1:
         with st.expander("🔍 Ver dados para análise detalhada", expanded=False):
             df_analise = pd.DataFrame([linha_total] + pivot_data_ordenada)
             df_analise = df_analise[colunas_ordenadas]
-            
-            st.write("**Principais Insights:**")
             df_crescimento = pd.DataFrame(pivot_data_ordenada)
-            
-            col_insight1, col_insight2, col_insight3, col_insight4 = st.columns(4)
-            
-            with col_insight1:
-                if not df_crescimento.empty and len(df_crescimento) > 0:
-                    melhor_alcance_idx = df_crescimento['TEND vs ORÇ'].idxmax()
-                    melhor_alcance = df_crescimento.loc[melhor_alcance_idx]
-                    st.metric(
-                        "Maior TEND vs ORÇ",
-                        melhor_alcance['Regional'],
-                        f"{melhor_alcance['TEND vs ORÇ']:+.1f}%"
+
+            st.write("**Principais Insights:**")
+            if df_crescimento.empty:
+                st.info("Sem dados suficientes para gerar insights detalhados.")
+            else:
+                col_tend_ref = next((c for c in df_crescimento.columns if str(c).startswith('Tend ')), None)
+                col_real_ref = next((c for c in df_crescimento.columns if str(c).startswith('Real ')), None)
+                col_orc_ref = next((c for c in df_crescimento.columns if str(c).startswith('Orç ')), None)
+
+                df_crescimento['TEND vs ORÇ'] = pd.to_numeric(df_crescimento['TEND vs ORÇ'], errors='coerce').fillna(0.0)
+                df_crescimento['MOM'] = pd.to_numeric(df_crescimento['MOM'], errors='coerce').fillna(0.0)
+                df_crescimento['Total 2025'] = pd.to_numeric(df_crescimento['Total 2025'], errors='coerce').fillna(0.0)
+                df_crescimento['STATUS_ORC'] = np.where(
+                    df_crescimento['TEND vs ORÇ'] >= 0,
+                    'Acima do Orç',
+                    'Abaixo do Orç'
+                )
+                df_crescimento['MOM_ABS'] = df_crescimento['MOM'].abs().clip(lower=0.1)
+
+                melhor_alcance = df_crescimento.loc[df_crescimento['TEND vs ORÇ'].idxmax()]
+                pior_alcance = df_crescimento.loc[df_crescimento['TEND vs ORÇ'].idxmin()]
+                maior_volume = df_crescimento.loc[df_crescimento['Total 2025'].idxmax()]
+                maior_alta_mom = df_crescimento.loc[df_crescimento['MOM'].idxmax()]
+                maior_queda_mom = df_crescimento.loc[df_crescimento['MOM'].idxmin()]
+                media_alcance = float(df_crescimento['TEND vs ORÇ'].mean())
+                media_mom = float(df_crescimento['MOM'].mean())
+                qtd_acima_orc = int(df_crescimento['TEND vs ORÇ'].ge(0).sum())
+                qtd_abaixo_orc = int(df_crescimento['TEND vs ORÇ'].lt(0).sum())
+                share_top3 = (
+                    float(df_crescimento.nlargest(3, 'Total 2025')['Total 2025'].sum()) / float(df_crescimento['Total 2025'].sum()) * 100
+                    if float(df_crescimento['Total 2025'].sum()) > 0 else 0.0
+                )
+
+                col_insight1, col_insight2, col_insight3, col_insight4 = st.columns(4)
+                with col_insight1:
+                    st.metric("Maior TEND vs ORÇ", melhor_alcance['Regional'], f"{melhor_alcance['TEND vs ORÇ']:+.1f}%")
+                with col_insight2:
+                    st.metric("Pior TEND vs ORÇ", pior_alcance['Regional'], f"{pior_alcance['TEND vs ORÇ']:+.1f}%")
+                with col_insight3:
+                    st.metric("Maior Volume 2025", maior_volume['Regional'], f"{formatar_numero(maior_volume['Total 2025'])}")
+                with col_insight4:
+                    st.metric("Média TEND vs ORÇ", f"{media_alcance:+.1f}%", None)
+
+                col_insight5, col_insight6, col_insight7, col_insight8 = st.columns(4)
+                with col_insight5:
+                    st.metric("Maior Alta MoM", maior_alta_mom['Regional'], f"{maior_alta_mom['MOM']:+.1f}%")
+                with col_insight6:
+                    st.metric("Maior Queda MoM", maior_queda_mom['Regional'], f"{maior_queda_mom['MOM']:+.1f}%")
+                with col_insight7:
+                    st.metric("Regionais acima do Orç", f"{qtd_acima_orc}", f"{qtd_abaixo_orc} abaixo")
+                with col_insight8:
+                    st.metric("Concentração Top 3", f"{share_top3:.1f}%", f"MOM médio {media_mom:+.1f}%")
+
+                col_analise_1, col_analise_2 = st.columns([1.25, 1.0], gap="medium")
+
+                with col_analise_1:
+                    st.write("**Mapa de Prioridades: Volume x TEND vs ORÇ**")
+                    fig_mapa = px.scatter(
+                        df_crescimento,
+                        x='Total 2025',
+                        y='TEND vs ORÇ',
+                        color='STATUS_ORC',
+                        size='MOM_ABS',
+                        text='Regional',
+                        custom_data=['MOM'],
+                        color_discrete_map={
+                            'Acima do Orç': '#2E7D32',
+                            'Abaixo do Orç': '#C62828'
+                        },
+                        hover_data={'MOM': ':.1f', 'MOM_ABS': False}
                     )
-            
-            with col_insight2:
-                if not df_crescimento.empty and len(df_crescimento) > 0:
-                    maior_volume_idx = df_crescimento['Total 2025'].idxmax()
-                    maior_volume = df_crescimento.loc[maior_volume_idx]
-                    st.metric("Maior Volume 2025", 
-                             maior_volume['Regional'], 
-                             f"{formatar_numero(maior_volume['Total 2025'])}")
-            
-            with col_insight3:
-                if not df_crescimento.empty and len(df_crescimento) > 0:
-                    media_alcance = df_crescimento['TEND vs ORÇ'].mean()
-                    st.metric("Média TEND vs ORÇ", 
-                             f"{media_alcance:.1f}%", 
-                             None)
-            
-            with col_insight4:
-                if not df_crescimento.empty and len(df_crescimento) > 0:
-                    media_mom = df_crescimento['MOM'].mean()
-                    st.metric("MOM Médio", f"{media_mom:+.1f}%", None)
-            
-            # Gráfico comparativo
-            st.write("**Comparativo entre Regionais (Top 10 por Volume 2025):**")
-            
-            if not df_crescimento.empty and len(df_crescimento) > 0:
-                df_top10 = df_crescimento.nlargest(10, 'Total 2025')
-                
-                fig_comparativo = px.bar(
-                    df_top10,
-                    y='Regional',
-                    x='Total 2025',
-                    orientation='h',
-                    title='Top 10 Regionais por Volume 2025',
-                    color='Total 2025',
-                    color_continuous_scale=['#F9D6D3', '#D26D64', '#8D1A12'],
-                    text='Total 2025'
-                )
-                
-                fig_comparativo.update_traces(
-                    texttemplate='%{x:,.0f}',
-                    textposition='outside',
-                    marker_line_color='white',
-                    marker_line_width=1.1,
-                    hovertemplate='<b>Regional:</b> %{y}<br><b>Total 2025:</b> %{x:,.0f}<extra></extra>'
-                )
-                
-                fig_comparativo.update_layout(
-                    height=430,
-                    showlegend=False,
-                    xaxis_title='',
-                    yaxis_title="",
-                    coloraxis_showscale=False,
-                    plot_bgcolor='white',
-                    paper_bgcolor='#FCFCFD',
-                    font=dict(family='Segoe UI', size=13, color='#2F3747'),
-                    margin=dict(l=16, r=16, t=44, b=16),
-                    xaxis=dict(
-                        gridcolor='rgba(230, 236, 244, 0.85)',
-                        showgrid=False,
-                        zeroline=False,
-                        linecolor='#E6ECF4',
-                        linewidth=1.4,
-                        tickfont=dict(size=12, color='#5B6578')
-                    ),
-                    yaxis=dict(
-                        categoryorder='total ascending',
-                        showgrid=False,
-                        linecolor='#E6ECF4',
-                        linewidth=1.4,
-                        tickfont=dict(size=12, color='#5B6578')
-                    ),
-                    title=dict(
-                        x=0.01,
-                        xanchor='left',
-                        font=dict(size=15, color='#2F3747')
+                    fig_mapa.update_traces(
+                        textposition='top center',
+                        marker=dict(line=dict(color='white', width=1.1), opacity=0.88),
+                        hovertemplate=(
+                            "<b>Regional:</b> %{text}<br>"
+                            "<b>Total 2025:</b> %{x:,.0f}<br>"
+                            "<b>TEND vs ORÇ:</b> %{y:.1f}%<br>"
+                            "<b>MOM:</b> %{customdata[0]:.1f}%<extra></extra>"
+                        )
                     )
-                )
-                
-                apply_standard_title_style(fig_comparativo)
-                st.plotly_chart(fig_comparativo, width='stretch')
+                    fig_mapa.add_hline(y=0, line_dash='dot', line_color='rgba(107,114,128,0.8)')
+                    fig_mapa.update_layout(
+                        height=420,
+                        showlegend=True,
+                        legend_title_text='Status',
+                        xaxis_title='',
+                        yaxis_title='',
+                        plot_bgcolor='white',
+                        paper_bgcolor='#FCFCFD',
+                        font=dict(family='Segoe UI', size=13, color='#2F3747'),
+                        margin=dict(l=16, r=16, t=34, b=16),
+                        xaxis=dict(showgrid=False, zeroline=False, linecolor='#E6ECF4', linewidth=1.4, tickfont=dict(size=12, color='#5B6578')),
+                        yaxis=dict(showgrid=True, gridcolor='rgba(230, 236, 244, 0.85)', zeroline=False, linecolor='#E6ECF4', linewidth=1.4, tickfont=dict(size=12, color='#5B6578'))
+                    )
+                    st.plotly_chart(fig_mapa, width='stretch')
+
+                with col_analise_2:
+                    st.write("**Top 10 Regionais por Volume 2025**")
+                    df_top10 = df_crescimento.nlargest(10, 'Total 2025')
+                    fig_comparativo = px.bar(
+                        df_top10,
+                        y='Regional',
+                        x='Total 2025',
+                        orientation='h',
+                        color='Total 2025',
+                        color_continuous_scale=['#F9D6D3', '#D26D64', '#8D1A12'],
+                        text='Total 2025'
+                    )
+                    fig_comparativo.update_traces(
+                        texttemplate='%{x:,.0f}',
+                        textposition='outside',
+                        marker_line_color='white',
+                        marker_line_width=1.1,
+                        hovertemplate='<b>Regional:</b> %{y}<br><b>Total 2025:</b> %{x:,.0f}<extra></extra>'
+                    )
+                    fig_comparativo.update_layout(
+                        height=420,
+                        showlegend=False,
+                        xaxis_title='',
+                        yaxis_title="",
+                        coloraxis_showscale=False,
+                        plot_bgcolor='white',
+                        paper_bgcolor='#FCFCFD',
+                        font=dict(family='Segoe UI', size=13, color='#2F3747'),
+                        margin=dict(l=16, r=16, t=34, b=16),
+                        xaxis=dict(showgrid=False, zeroline=False, linecolor='#E6ECF4', linewidth=1.4, tickfont=dict(size=12, color='#5B6578')),
+                        yaxis=dict(categoryorder='total ascending', showgrid=False, linecolor='#E6ECF4', linewidth=1.4, tickfont=dict(size=12, color='#5B6578'))
+                    )
+                    st.plotly_chart(fig_comparativo, width='stretch')
+
+                col_rank1, col_rank2 = st.columns(2, gap="medium")
+                colunas_rank = [c for c in ['Regional', 'Total 2025', col_tend_ref, col_real_ref, col_orc_ref, 'TEND vs ORÇ', 'MOM'] if c and c in df_crescimento.columns]
+
+                def formatar_df_insight(df_in: pd.DataFrame) -> pd.DataFrame:
+                    df_out = df_in.copy()
+                    for col in df_out.columns:
+                        if col == 'Regional':
+                            continue
+                        serie_num = pd.to_numeric(df_out[col], errors='coerce')
+                        if col in {'TEND vs ORÇ', 'MOM'}:
+                            df_out[col] = serie_num.apply(lambda x: formatar_percentual(x) if pd.notna(x) else '-')
+                        else:
+                            df_out[col] = serie_num.apply(lambda x: formatar_numero(x) if pd.notna(x) else '-')
+                    return df_out
+
+                with col_rank1:
+                    st.write("**Top 5 por TEND vs ORÇ**")
+                    df_top_rank = df_crescimento.nlargest(5, 'TEND vs ORÇ')[colunas_rank]
+                    st.dataframe(formatar_df_insight(df_top_rank), use_container_width=True, hide_index=True, height=230)
+
+                with col_rank2:
+                    st.write("**Top 5 críticos por TEND vs ORÇ**")
+                    df_bottom_rank = df_crescimento.nsmallest(5, 'TEND vs ORÇ')[colunas_rank]
+                    st.dataframe(formatar_df_insight(df_bottom_rank), use_container_width=True, hide_index=True, height=230)
+
+                st.write("**Base completa para análise**")
+                df_base_completa = df_analise.copy()
+                for col in df_base_completa.columns:
+                    if col == 'Regional':
+                        continue
+                    serie_num = pd.to_numeric(df_base_completa[col], errors='coerce')
+                    if col in {'TEND vs ORÇ', 'MOM'}:
+                        df_base_completa[col] = serie_num.apply(lambda x: formatar_percentual(x) if pd.notna(x) else '-')
+                    else:
+                        df_base_completa[col] = serie_num.apply(lambda x: formatar_numero(x) if pd.notna(x) else '-')
+                st.dataframe(df_base_completa, use_container_width=True, hide_index=True, height=360)
     else:
         st.warning("Não há dados disponíveis para exibir a tabela dinâmica com os filtros atuais.")
 
@@ -8783,6 +9070,39 @@ with tab3:
         st.warning("⚠️ Não há dados de pedidos disponíveis para E-Commerce com os filtros atuais.")
         st.info("Verifique se os filtros gerais incluem 'PEDIDOS' no indicador e 'E-Commerce' no canal.")
     else:
+        def _normalizar_coluna_id_afiliado(valor):
+            if pd.isna(valor):
+                return ""
+            texto = str(valor).strip()
+            if not texto or texto.upper() in {"NAN", "NONE", "NULL"}:
+                return ""
+            if re.fullmatch(r"-?\d+\.0+", texto):
+                texto = texto.split(".")[0]
+            return texto
+
+        coluna_id_afiliado_pedidos = next(
+            (
+                col for col in df_pedidos.columns
+                if unicodedata.normalize("NFKD", str(col))
+                .encode("ASCII", "ignore")
+                .decode("ASCII")
+                .strip()
+                .upper()
+                .replace(" ", "_") in {"ID_AFILIADO", "ID_AFILIADOS"}
+            ),
+            None
+        )
+
+        if coluna_id_afiliado_pedidos is not None:
+            df_pedidos['ID_AFILIADO_FILTRO'] = df_pedidos[coluna_id_afiliado_pedidos].apply(_normalizar_coluna_id_afiliado)
+            ids_afiliado_pedidos = sorted(
+                [valor for valor in df_pedidos['ID_AFILIADO_FILTRO'].dropna().unique().tolist() if str(valor).strip()],
+                key=lambda valor: (0, int(valor)) if str(valor).isdigit() else (1, str(valor))
+            )
+        else:
+            df_pedidos['ID_AFILIADO_FILTRO'] = ""
+            ids_afiliado_pedidos = []
+
         # =========================
         # CONTAINER PARA FILTRO DE MÊS COMPARTILHADO
         # =========================
@@ -8826,10 +9146,11 @@ with tab3:
             else:
                 idx_padrao_pedidos = len(meses_ordenados_pedidos) - 1
             
-            # Selectbox para seleção do mês
-            col_filtro_pedidos1, col_filtro_pedidos2 = st.columns([1, 3])
+            # Selectboxes para seleção do mês e ID_AFILIADOS
+            col_filtro_pedidos1, col_filtro_pedidos2, col_filtro_pedidos3 = st.columns([0.95, 1.15, 2.10], gap="medium")
             
             with col_filtro_pedidos1:
+                render_filter_label("Mês")
                 mes_selecionado_pedidos = st.selectbox(
                     "Selecione o mês para análise",
                     options=meses_ordenados_pedidos,
@@ -8837,6 +9158,26 @@ with tab3:
                     key="mes_compartilhado_pedidos",
                     label_visibility="collapsed"
                 )
+
+            with col_filtro_pedidos2:
+                render_filter_label("ID_AFILIADOS")
+                if coluna_id_afiliado_pedidos is not None and ids_afiliado_pedidos:
+                    id_afiliado_selecionado_pedidos = st.selectbox(
+                        "Selecione o ID_AFILIADOS",
+                        options=["Todos"] + ids_afiliado_pedidos,
+                        index=0,
+                        key="id_afiliado_pedidos",
+                        help="Digite para pesquisar o ID_AFILIADOS desejado.",
+                        label_visibility="collapsed"
+                    )
+                else:
+                    id_afiliado_selecionado_pedidos = "Todos"
+                    st.text_input(
+                        "ID_AFILIADOS indisponível",
+                        value="Coluna não disponível na base",
+                        disabled=True,
+                        label_visibility="collapsed"
+                    )
             
             # Encontrar o mês anterior cronologicamente
             if len(meses_ordenados_pedidos) > 1:
@@ -8849,7 +9190,7 @@ with tab3:
                 mes_anterior_pedidos = mes_selecionado_pedidos
             
             # Container informativo
-            with col_filtro_pedidos2:
+            with col_filtro_pedidos3:
                 st.markdown(f"""
                     <div class="info-box" style="margin: 0; padding: 12px 15px;">
                         <div style="display: flex; align-items: center; gap: 15px; flex-wrap: nowrap; height: 100%;">
@@ -8878,6 +9219,14 @@ with tab3:
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+
+        if coluna_id_afiliado_pedidos is not None and id_afiliado_selecionado_pedidos != "Todos":
+            df_pedidos = df_pedidos[
+                df_pedidos['ID_AFILIADO_FILTRO'].astype(str).str.strip() == str(id_afiliado_selecionado_pedidos).strip()
+            ].copy()
+
+        if df_pedidos.empty:
+            st.info("Sem dados de pedidos para a combinação de mês e ID_AFILIADOS selecionada.")
         
         # =========================
         # FUNÇÃO PARA CALCULAR MÉTRICAS DE PEDIDOS
@@ -8987,14 +9336,36 @@ with tab3:
         else:
             meta_html_fixa = '<div class="kpi-variacao-item variacao-neutra" style="font-size: 10px !important;">Orç N/A</div>'
         
-        # Layout: coluna esquerda com cards (mais larga) + coluna direita com donut
-        col_cards, col_donut = st.columns([0.62, 1.10])
+        pedido_card_style = (
+            "margin: 0 auto 12px auto; max-width: 430px; min-height: 156px !important; "
+            "padding: 9px 10px !important;"
+        )
+        pedido_card_inner_style = (
+            "text-align: center; padding: 5px 0; min-height: 128px; display: flex; "
+            "flex-direction: column; justify-content: space-between;"
+        )
+
+        coluna_origem_afiliados_pedidos = next(
+            (
+                col for col in df_pedidos.columns
+                if unicodedata.normalize("NFKD", str(col))
+                .encode("ASCII", "ignore")
+                .decode("ASCII")
+                .strip()
+                .upper()
+                .replace(" ", "_") in {"ORIGEM_AFILIADOS", "ORIGEM_AFILIADO"}
+            ),
+            None
+        )
+
+        # Layout: cards | barras por origem | donut
+        col_cards, col_bar_origem_pedidos, col_donut = st.columns([0.72, 1.50, 0.70], gap="small")
         
         with col_cards:
             card_conta_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 10px auto; max-width: 430px; min-height: 58px !important; padding: 6px 7px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="{pedido_card_style}">'
                 f'<div class="kpi-title-dinamico">PEDIDOS CONTA</div>'
-                f'<div style="text-align: center; padding: 3px 0;">'
+                f'<div style="{pedido_card_inner_style}">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_conta_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
                 f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
@@ -9012,9 +9383,9 @@ with tab3:
             st.markdown(card_conta_html, unsafe_allow_html=True)
 
             card_fixa_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto; max-width: 430px; min-height: 58px !important; padding: 6px 7px !important;">'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="{pedido_card_style}">'
                 f'<div class="kpi-title-dinamico">PEDIDOS FIXA</div>'
-                f'<div style="text-align: center; padding: 3px 0;">'
+                f'<div style="{pedido_card_inner_style}">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_fixa_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
                 f'<div class="kpi-meta-line" style="margin: 4px 0; white-space: nowrap;">'
@@ -9031,6 +9402,219 @@ with tab3:
             )
             st.markdown(card_fixa_html, unsafe_allow_html=True)
         
+        with col_bar_origem_pedidos:
+            df_origem_pedidos = df_pedidos[df_pedidos['dat_tratada'] == mes_selecionado_pedidos].copy()
+
+            if coluna_origem_afiliados_pedidos and not df_origem_pedidos.empty:
+                df_origem_pedidos['ORIGEM_AFILIADOS_PLOT'] = (
+                    df_origem_pedidos[coluna_origem_afiliados_pedidos]
+                    .astype(str)
+                    .str.strip()
+                    .replace({'': 'N/D', 'nan': 'N/D', 'None': 'N/D', 'NONE': 'N/D'})
+                )
+                df_origem_pedidos['ORIGEM_AFILIADOS_PLOT'] = df_origem_pedidos['ORIGEM_AFILIADOS_PLOT'].fillna('N/D')
+                df_origem_pedidos = df_origem_pedidos[
+                    ~df_origem_pedidos['ORIGEM_AFILIADOS_PLOT'].astype(str).str.strip().isin(['-'])
+                ].copy()
+                df_origem_pedidos['COD_PLATAFORMA_PLOT'] = df_origem_pedidos['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+                df_origem_pedidos['VALOR_PLOT'] = pd.to_numeric(df_origem_pedidos['QTDE'], errors='coerce').fillna(0.0)
+
+                agrup_origem = (
+                    df_origem_pedidos.groupby(
+                        ['ORIGEM_AFILIADOS_PLOT', 'COD_PLATAFORMA_PLOT'],
+                        as_index=False,
+                        observed=True
+                    )['VALOR_PLOT'].sum()
+                )
+
+                origem_totals = (
+                    agrup_origem.groupby('ORIGEM_AFILIADOS_PLOT', observed=True)['VALOR_PLOT']
+                    .sum()
+                    .sort_values(ascending=False)
+                )
+                origem_totals = origem_totals.head(10)
+
+                agrup_origem = agrup_origem[
+                    agrup_origem['ORIGEM_AFILIADOS_PLOT'].isin(origem_totals.index)
+                ].copy()
+
+                produtos_disponiveis_origem = sorted(agrup_origem['COD_PLATAFORMA_PLOT'].dropna().unique().tolist())
+                produtos_prioridade_origem = ['CONTA', 'FIXA']
+                produtos_ordenados_origem = [
+                    p for p in produtos_prioridade_origem if p in produtos_disponiveis_origem
+                ] + [
+                    p for p in produtos_disponiveis_origem if p not in produtos_prioridade_origem
+                ]
+
+                color_map_origem = {
+                    'CONTA': '#D64B3F',
+                    'FIXA': '#8D1A12',
+                    'N/D': '#9CA3AF'
+                }
+                cores_adicionais_origem = ['#D64B3F', '#8D1A12', '#B23A31', '#6C0C08']
+                for i, produto in enumerate(produtos_ordenados_origem):
+                    if produto not in color_map_origem:
+                        color_map_origem[produto] = cores_adicionais_origem[i % len(cores_adicionais_origem)]
+
+                df_stack_origem = (
+                    agrup_origem.pivot_table(
+                        index='ORIGEM_AFILIADOS_PLOT',
+                        columns='COD_PLATAFORMA_PLOT',
+                        values='VALOR_PLOT',
+                        aggfunc='sum',
+                        observed=True
+                    )
+                    .reindex(origem_totals.index)
+                    .fillna(0)
+                )
+
+                origens_plot = origem_totals.index.tolist()
+                max_total_origem = float(origem_totals.max()) if not origem_totals.empty else 0.0
+                total_geral_origem = float(origem_totals.sum()) if not origem_totals.empty else 0.0
+                limite_texto_segmento_origem = max_total_origem * 0.22 if max_total_origem > 0 else 0.0
+
+                fig_bar_origem_pedidos = go.Figure()
+                for produto in produtos_ordenados_origem:
+                    if produto not in df_stack_origem.columns:
+                        continue
+
+                    valores_x = df_stack_origem[produto].astype(float).tolist()
+                    textos_segmento = []
+                    customdata = []
+                    for origem_nome, valor_seg in zip(origens_plot, valores_x):
+                        total_origem = float(origem_totals.get(origem_nome, 0) or 0)
+                        participacao = (valor_seg / total_origem * 100) if total_origem > 0 else 0
+                        customdata.append([total_origem, participacao])
+                        textos_segmento.append(
+                            formatar_numero_brasileiro(valor_seg, 0) if valor_seg >= limite_texto_segmento_origem else ''
+                        )
+
+                    fig_bar_origem_pedidos.add_trace(go.Bar(
+                        y=origens_plot,
+                        x=valores_x,
+                        name=produto,
+                        orientation='h',
+                        marker=dict(
+                            color=color_map_origem.get(produto, '#6C757D'),
+                            line=dict(color='rgba(255,255,255,0.94)', width=1.0)
+                        ),
+                        text=textos_segmento,
+                        textposition='inside',
+                        insidetextanchor='middle',
+                        textfont=dict(size=9, color='white'),
+                        customdata=customdata,
+                        hovertemplate=(
+                            "<b>Origem:</b> %{y}<br>"
+                            f"<b>Produto:</b> {produto}<br>"
+                            "<b>Pedidos:</b> %{x:,.0f}<br>"
+                            "<b>Participação na origem:</b> %{customdata[1]:.1f}%<br>"
+                            "<extra></extra>"
+                        )
+                    ))
+
+                deslocamento_rotulo_origem = max_total_origem * 0.035 if max_total_origem > 0 else 1.0
+                for origem_nome in origens_plot:
+                    total_origem = float(origem_totals.get(origem_nome, 0) or 0)
+                    percentual_origem = (total_origem / total_geral_origem * 100) if total_geral_origem > 0 else 0
+                    fig_bar_origem_pedidos.add_annotation(
+                        x=total_origem + deslocamento_rotulo_origem,
+                        y=origem_nome,
+                        text=(
+                            f"<b>{formatar_numero_brasileiro(total_origem, 0)}</b>"
+                            f" <span style='font-size:10px;color:#6B7280;'>({str(round(percentual_origem, 1)).replace('.', ',')}%)</span>"
+                        ),
+                        showarrow=False,
+                        xanchor='left',
+                        yanchor='middle',
+                        align='left',
+                        bgcolor='rgba(255,255,255,0.92)',
+                        bordercolor='#E9ECEF',
+                        borderwidth=1,
+                        borderpad=4,
+                        font=dict(size=10, color='#2F3747')
+                    )
+
+                eixo_x_max_origem = max_total_origem * 1.34 if max_total_origem > 0 else 1
+                altura_bar_origem = 362
+
+                fig_bar_origem_pedidos.update_layout(
+                    barmode='stack',
+                    plot_bgcolor='#FFFFFF',
+                    paper_bgcolor='#FCFCFD',
+                    font=dict(family='Manrope', size=12, color='#2F3747'),
+                    margin=dict(l=12, r=144, t=52, b=10),
+                    height=altura_bar_origem,
+                    xaxis=dict(
+                        title='',
+                        showgrid=False,
+                        showline=True,
+                        linecolor='#E9ECEF',
+                        linewidth=1.2,
+                        zeroline=False,
+                        showticklabels=False,
+                        range=[0, eixo_x_max_origem]
+                    ),
+                    yaxis=dict(
+                        title='',
+                        showgrid=False,
+                        tickfont=dict(size=9, color='#4B5563'),
+                        ticksuffix='  ',
+                        categoryorder='array',
+                        categoryarray=origens_plot[::-1]
+                    ),
+                    legend=dict(
+                        title=dict(text='<b>PRODUTO</b>', font=dict(size=11, color='#2F3747')),
+                        orientation='v',
+                        yanchor='middle',
+                        y=0.5,
+                        xanchor='left',
+                        x=1.01,
+                        bgcolor='rgba(255,255,255,0.92)',
+                        bordercolor='#E9ECEF',
+                        borderwidth=1,
+                        font=dict(size=9, color='#2F3747'),
+                        traceorder='normal'
+                    ),
+                    title=dict(
+                        text=(
+                            "<b>PEDIDOS POR ORIGEM_AFILIADOS</b>"
+                            f"<br><span style='font-size:12px;color:#6B7280;'>Empilhado por produto | {mes_selecionado_pedidos}</span>"
+                        ),
+                        x=0.01,
+                        xanchor='left',
+                        y=0.97,
+                        yanchor='top'
+                    ),
+                    hovermode='y unified',
+                    hoverlabel=dict(
+                        bgcolor='white',
+                        bordercolor='#E9ECEF',
+                        font_size=12,
+                        font_family='Segoe UI',
+                        font_color='#2F3747'
+                    ),
+                    bargap=0.18,
+                    bargroupgap=0.08,
+                    uniformtext_minsize=9,
+                    uniformtext_mode='hide'
+                )
+
+                apply_standard_title_style(fig_bar_origem_pedidos)
+                st.plotly_chart(
+                    fig_bar_origem_pedidos,
+                    use_container_width=True,
+                    config={'displayModeBar': False, 'displaylogo': False}
+                )
+            else:
+                st.markdown("""
+                    <div class="info-box" style="margin: 0; min-height: 362px; display:flex; align-items:center; justify-content:center; text-align:center;">
+                        <div>
+                            <div style="font-size:15px; font-weight:800; color:#790E09; margin-bottom:8px;">ORIGEM_AFILIADOS</div>
+                            <div style="font-size:13px; color:#64748B;">Sem dados suficientes para montar o gráfico empilhado.</div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
         with col_donut:
             # Mes atual: usa tendencia (atual). Demais meses: usa realizado.
             total_conta = float(metricas_conta['atual']) if pd.notna(metricas_conta['atual']) and np.isfinite(metricas_conta['atual']) else 0.0
@@ -9084,11 +9668,11 @@ with tab3:
             )
 
             fig_donut.update_layout(
-                height=344,
+                height=318,
                 plot_bgcolor='white',
                 paper_bgcolor='#FCFCFD',
                 font=dict(family='Segoe UI', size=13, color='#2F3747'),
-                margin=dict(l=8, r=170, t=18, b=10),
+                margin=dict(l=4, r=92, t=14, b=6),
                 showlegend=True,
                 legend=dict(
                     title=dict(text='<b>PRODUTO</b>', font=dict(size=12, color='#2F3747')),
@@ -9096,11 +9680,11 @@ with tab3:
                     yanchor='middle',
                     y=0.5,
                     xanchor='left',
-                    x=1.03,
+                    x=0.98,
                     bgcolor='rgba(255,255,255,0.92)',
                     bordercolor='#E6ECF4',
                     borderwidth=1.2,
-                    font=dict(size=11, color='#2F3747')
+                    font=dict(size=10, color='#2F3747')
                 ),
                 uniformtext_minsize=10,
                 uniformtext_mode='hide'
@@ -10075,96 +10659,17 @@ with tab4:
     def load_ligacoes_base():
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
-            
-            # Carregar dados
-            ligacoes_mtime = Path(ligacoes_path).stat().st_mtime if Path(ligacoes_path).exists() else None
-            df_ligacoes = load_excel_cached(ligacoes_path, ligacoes_mtime)
-            
-            # Verificar se as colunas necessárias existem
-            colunas_necessarias = ['PERIODO', 'CABEADO', 'TELEFONE', 'DSC_REGIONAL_CMV', 'QTD']
-            colunas_faltantes = [col for col in colunas_necessarias if col not in df_ligacoes.columns]
-            
-            if colunas_faltantes:
-                st.error(f"❌ **Colunas faltantes no arquivo de ligações:** {colunas_faltantes}")
-                st.write("**Colunas disponíveis:**", list(df_ligacoes.columns))
+            ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+            df_ligacoes = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
+            if df_ligacoes.empty:
                 return pd.DataFrame()
-            
-            # 1. Tratar PERIODO - converter para datetime
-            df_ligacoes['DAT_MOVIMENTO2'] = pd.to_datetime(df_ligacoes['PERIODO'], errors='coerce')
-            
-            # 2. Criar coluna TIPO_CHAMADA baseada na regra da coluna TELEFONE
-            def classificar_tipo_chamada(telefone):
-                if pd.isna(telefone):
-                    return "DEMAIS"
-                
-                telefone_str = str(telefone)
-                
-                # Verificar se contém os números especificados
-                if '0960' in telefone_str or '8449' in telefone_str:
-                    return "Click to Call"
-                else:
-                    return "DEMAIS"
-            
-            df_ligacoes['TIPO_CHAMADA'] = df_ligacoes['TELEFONE'].apply(classificar_tipo_chamada)
-            
-            # 3. Tratar DSC_REGIONAL_CMV - CORREÇÃO: usar apenas os 3 primeiros caracteres e garantir que seja string
-            df_ligacoes['REGIONAL'] = df_ligacoes['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
-            
-            # 4. Renomear QTD para QTDE
-            df_ligacoes['QTDE'] = pd.to_numeric(df_ligacoes['QTD'], errors='coerce').fillna(0)
-            
-            # 5. Criar coluna COD_PLATAFORMA baseada em CABEADO
-            def mapear_cabeado(valor):
-                valor_str = str(valor).upper().strip()
-                if valor_str in ['SIM', 'S', 'TRUE', '1', 'FIXA']:
-                    return 'FIXA'
-                elif valor_str in ['NÃO', 'NAO', 'N', 'FALSE', '0', 'CONTA']:
-                    return 'CONTA'
-                else:
-                    return 'OUTROS'
-            
-            df_ligacoes['COD_PLATAFORMA'] = df_ligacoes['CABEADO'].apply(mapear_cabeado)
-            
-            # 6. Criar coluna CANAL_PLAN
-            df_ligacoes['CANAL_PLAN'] = 'Televendas Receptivo'
-            
-            # 7. Criar coluna DSC_INDICADOR
-            df_ligacoes['DSC_INDICADOR'] = 'LIGACOES'
-            
-            # 8. Criar coluna mes_ano no formato 'mmm/aa'
-            def formatar_mes_ano(dt):
-                try:
-                    meses_pt = {
-                        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
-                        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
-                    }
-                    mes = meses_pt.get(dt.month, 'jan')
-                    ano = dt.strftime('%y')
-                    return f"{mes}/{ano}"
-                except:
-                    return "n/a"
-            
-            df_ligacoes['mes_ano'] = df_ligacoes['DAT_MOVIMENTO2'].apply(formatar_mes_ano)
-            
-            # 9. Criar coluna dat_tratada (igual a mes_ano)
-            df_ligacoes['dat_tratada'] = df_ligacoes['mes_ano']
-            
-            # 10. Criar coluna DESAFIO_QTD vazia (será preenchida com metas depois)
-            df_ligacoes['DESAFIO_QTD'] = 0
-            
-            # Manter apenas colunas necessárias para otimização
+
             colunas_manter = [
                 'DAT_MOVIMENTO2', 'mes_ano', 'dat_tratada', 'REGIONAL',
                 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 
                 'QTDE', 'DESAFIO_QTD', 'CABEADO', 'TIPO_CHAMADA', 'TELEFONE'
             ]
-            
-            # Filtrar apenas colunas que existem
-            colunas_finais = [col for col in colunas_manter if col in df_ligacoes.columns]
-            df_ligacoes = df_ligacoes[colunas_finais]
-            
-            return df_ligacoes
+            return df_ligacoes[[col for col in colunas_manter if col in df_ligacoes.columns]].copy()
             
         except Exception as e:
             st.error(f"❌ **Erro ao carregar dados de ligações:** {str(e)}")
@@ -12015,49 +12520,14 @@ with tab5:
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_path = "televendas_ligacoes2.xlsx"
-            if not Path(ligacoes_path).exists():
-                return pd.DataFrame(columns=colunas_saida)
-
-            ligacoes_mtime = Path(ligacoes_path).stat().st_mtime
-            df_lig = load_excel_cached(ligacoes_path, ligacoes_mtime)
-            colunas_min = ['PERIODO', 'CABEADO', 'QTD', 'DSC_REGIONAL_CMV']
-            if any(col not in df_lig.columns for col in colunas_min):
-                return pd.DataFrame(columns=colunas_saida)
-
-            df_lig['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig['PERIODO'], errors='coerce')
-            df_lig = df_lig[df_lig['DAT_MOVIMENTO2'].notna()].copy()
+            ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+            df_lig = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
             if df_lig.empty:
                 return pd.DataFrame(columns=colunas_saida)
-
-            meses_pt = {
-                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
-                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
-            }
-
-            df_lig['dat_tratada'] = df_lig['DAT_MOVIMENTO2'].apply(
-                lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
-            )
-            df_lig['REGIONAL'] = (
-                df_lig['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
-            )
-            df_lig['QTDE'] = pd.to_numeric(df_lig['QTD'], errors='coerce').fillna(0)
-            df_lig['DESAFIO_QTD'] = 0
+            df_lig = df_lig.copy()
             df_lig['TEND_QTD'] = df_lig['QTDE']
-            df_lig['CANAL_PLAN'] = 'Televendas Receptivo'
-            df_lig['DSC_INDICADOR'] = 'LIGACOES'
 
-            # Replicar a mesma regra dos KPIs da aba Ligações:
-            # FIXA = CABEADO == SIM | CONTA = TIPO_CHAMADA == DEMAIS
-            if 'TELEFONE' in df_lig.columns:
-                telefone_str = df_lig['TELEFONE'].astype(str)
-                is_click_to_call = telefone_str.str.contains('0960|8449', regex=True, na=False)
-                df_lig['TIPO_CHAMADA'] = np.where(is_click_to_call, 'Click to Call', 'DEMAIS')
-            else:
-                df_lig['TIPO_CHAMADA'] = 'DEMAIS'
-
-            cabeado_norm = df_lig['CABEADO'].astype(str).str.strip().str.upper()
-            mask_fixa = cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
+            mask_fixa = df_lig['FLAG_FIXA'].astype(bool)
             mask_conta = df_lig['TIPO_CHAMADA'].eq('DEMAIS')
 
             df_lig_fixa = df_lig[mask_fixa].copy()
@@ -14527,51 +14997,10 @@ with tab5:
                     @st.cache_data(ttl=1800)
                     def load_ligacoes_demanda_diaria() -> pd.DataFrame:
                         try:
-                            path_lig = "televendas_ligacoes2.xlsx"
-                            if not Path(path_lig).exists():
-                                return pd.DataFrame()
-                            lig_mtime = Path(path_lig).stat().st_mtime
-                            df_lig_raw = load_excel_cached(path_lig, lig_mtime)
+                            lig_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+                            df_lig_raw = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, lig_mtime)
                             if df_lig_raw.empty:
                                 return pd.DataFrame()
-                            req_cols = {'QTD', 'CABEADO'}
-                            if not req_cols.issubset(set(df_lig_raw.columns)):
-                                return pd.DataFrame()
-
-                            coluna_data_lig = None
-                            for c_data in ['DATA_MOVIMENTO', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO2', 'PERIODO']:
-                                if c_data in df_lig_raw.columns:
-                                    coluna_data_lig = c_data
-                                    break
-                            if coluna_data_lig is None:
-                                return pd.DataFrame()
-
-                            df_lig_raw['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig_raw[coluna_data_lig], errors='coerce')
-                            df_lig_raw = df_lig_raw[df_lig_raw['DAT_MOVIMENTO2'].notna()].copy()
-                            if df_lig_raw.empty:
-                                return pd.DataFrame()
-
-                            df_lig_raw['QTDE'] = pd.to_numeric(df_lig_raw['QTD'], errors='coerce').fillna(0.0)
-                            telefone_ref = df_lig_raw['TELEFONE'].astype(str) if 'TELEFONE' in df_lig_raw.columns else pd.Series('', index=df_lig_raw.index)
-                            df_lig_raw['TIPO_CHAMADA'] = np.where(
-                                telefone_ref.str.contains('0960|8449', regex=True, na=False),
-                                'Click to Call',
-                                'DEMAIS'
-                            )
-                            cabeado_norm = df_lig_raw['CABEADO'].astype(str).str.strip().str.upper()
-                            df_lig_raw['FLAG_FIXA'] = cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
-                            df_lig_raw['DATA_DIA'] = pd.to_datetime(df_lig_raw['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
-                            col_reg = None
-                            for c_reg in ['DSC_REGIONAL_CMV', 'REGIONAL']:
-                                if c_reg in df_lig_raw.columns:
-                                    col_reg = c_reg
-                                    break
-                            if col_reg is not None:
-                                df_lig_raw['REGIONAL'] = (
-                                    df_lig_raw[col_reg].astype(str).str.strip().str[:3].str.upper()
-                                )
-                            else:
-                                df_lig_raw['REGIONAL'] = ''
                             return df_lig_raw[['DATA_DIA', 'QTDE', 'TIPO_CHAMADA', 'FLAG_FIXA', 'REGIONAL']]
                         except Exception:
                             return pd.DataFrame()
@@ -14738,43 +15167,10 @@ with tab5:
         def load_ligacoes_resumo():
             """Carrega ligações reais (televendas_ligacoes2.xlsx) já tratadas para REGIONAL/mes/plataforma."""
             try:
-                path = "televendas_ligacoes2.xlsx"
-                if not Path(path).exists():
-                    return pd.DataFrame()
-                ligacoes_mtime = Path(path).stat().st_mtime
-                df_lig = load_excel_cached(path, ligacoes_mtime)
+                ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+                df_lig = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
                 if df_lig.empty:
                     return pd.DataFrame()
-                df_lig['DAT_MOVIMENTO2'] = pd.to_datetime(df_lig['PERIODO'], errors='coerce')
-                df_lig = df_lig[df_lig['DAT_MOVIMENTO2'].notna()].copy()
-                meses_pt = {1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
-                            7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'}
-                df_lig['dat_tratada'] = df_lig['DAT_MOVIMENTO2'].apply(
-                    lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
-                )
-                df_lig['REGIONAL'] = df_lig['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
-
-                def classificar_tipo_chamada(telefone):
-                    if pd.isna(telefone):
-                        return "DEMAIS"
-                    telefone_str = str(telefone)
-                    if '0960' in telefone_str or '8449' in telefone_str:
-                        return "Click to Call"
-                    return "DEMAIS"
-
-                df_lig['TIPO_CHAMADA'] = df_lig['TELEFONE'].apply(classificar_tipo_chamada) if 'TELEFONE' in df_lig.columns else 'DEMAIS'
-
-                def mapear_cabeado(valor):
-                    valor_str = str(valor).upper().strip()
-                    if valor_str in ['SIM', 'S', 'TRUE', '1', 'FIXA']:
-                        return 'FIXA'
-                    if valor_str in ['NÃO', 'NAO', 'N', 'FALSE', '0', 'CONTA']:
-                        return 'CONTA'
-                    return 'OUTROS'
-
-                df_lig['COD_PLATAFORMA'] = df_lig['CABEADO'].apply(mapear_cabeado)
-                df_lig['CANAL_PLAN'] = 'Televendas Receptivo'
-                df_lig['QTDE'] = pd.to_numeric(df_lig.get('QTD', 0), errors='coerce').fillna(0)
                 return df_lig[['REGIONAL', 'dat_tratada', 'COD_PLATAFORMA', 'CANAL_PLAN', 'QTDE', 'CABEADO', 'TIPO_CHAMADA']]
             except Exception:
                 return pd.DataFrame()
