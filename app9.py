@@ -3478,16 +3478,16 @@ st.markdown(
     }
 
     .kpi-title-icon {
-        width: 2rem !important;
-        height: 2rem !important;
-        border-radius: 0.75rem !important;
+        width: 1.84rem !important;
+        height: 1.84rem !important;
+        border-radius: 0.68rem !important;
         background: linear-gradient(135deg, #FF2800 0%, #790E09 100%) !important;
         color: #FFFFFF !important;
     }
 
     .kpi-title-icon svg {
-        width: 1.05rem !important;
-        height: 1.05rem !important;
+        width: 0.96rem !important;
+        height: 0.96rem !important;
     }
 
     .kpi-block-label,
@@ -3537,14 +3537,14 @@ st.markdown(
         }
 
         .kpi-title-icon {
-            width: 1.55rem !important;
-            height: 1.55rem !important;
-            border-radius: 0.55rem !important;
+            width: 1.42rem !important;
+            height: 1.42rem !important;
+            border-radius: 0.5rem !important;
         }
 
         .kpi-title-icon svg {
-            width: 0.84rem !important;
-            height: 0.84rem !important;
+            width: 0.76rem !important;
+            height: 0.76rem !important;
         }
 
         .kpi-value-dinamico {
@@ -3555,6 +3555,257 @@ st.markdown(
         .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) .kpi-value-dinamico {
             font-size: 1.6rem !important;
         }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Executive harmony pass for KPI cards and metric tiles.
+st.markdown(
+    """
+    <style>
+    .kpi-card-dinamico,
+    .kpi-block-dinamico,
+    [data-testid="stMetric"] {
+        position: relative !important;
+        overflow: hidden !important;
+        border: 1px solid rgba(90, 10, 6, 0.14) !important;
+        background:
+            radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.00) 30%),
+            linear-gradient(180deg, #FFFFFF 0%, #FCFCFD 62%, #F6F7F9 100%) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.98),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.48) !important;
+        transition:
+            transform 0.24s ease,
+            box-shadow 0.24s ease,
+            border-color 0.24s ease !important;
+        backdrop-filter: none !important;
+        outline: none !important;
+    }
+
+    .kpi-card-dinamico::before,
+    .kpi-block-dinamico::before,
+    [data-testid="stMetric"]::before {
+        content: "" !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0.58rem !important;
+        right: 0.58rem !important;
+        height: 3px !important;
+        border-radius: 999px !important;
+        background: linear-gradient(
+            90deg,
+            rgba(90, 10, 6, 0.94) 0%,
+            rgba(121, 14, 9, 0.98) 26%,
+            rgba(255, 40, 0, 1) 52%,
+            rgba(121, 14, 9, 0.98) 78%,
+            rgba(90, 10, 6, 0.94) 100%
+        ) !important;
+        opacity: 1 !important;
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.70),
+            0 2px 6px rgba(121, 14, 9, 0.16) !important;
+        pointer-events: none !important;
+        z-index: 0 !important;
+    }
+
+    .kpi-card-dinamico::after,
+    .kpi-block-dinamico::after,
+    [data-testid="stMetric"]::after {
+        content: none !important;
+        display: none !important;
+        background: none !important;
+        pointer-events: none !important;
+    }
+
+    .kpi-card-dinamico:hover,
+    .kpi-block-dinamico:hover,
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-2px) !important;
+        border-color: rgba(121, 14, 9, 0.22) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.98),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.48) !important;
+    }
+
+    .kpi-title-dinamico {
+        position: relative !important;
+        gap: 0.72rem !important;
+        margin-top: 0.08rem !important;
+        margin-bottom: 0.42rem !important;
+        padding-top: 0.14rem !important;
+        padding-bottom: 0.44rem !important;
+        min-height: 2rem !important;
+    }
+
+    .kpi-title-text {
+        letter-spacing: 0.085em !important;
+        text-shadow: none !important;
+    }
+
+    .kpi-title-dinamico::after {
+        bottom: 0.04rem !important;
+    }
+
+    .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) {
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        background:
+            radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.00) 32%),
+            linear-gradient(180deg, #FFFFFF 0%, #FCFCFD 60%, #F5F6F8 100%) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.98),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.48) !important;
+        transform: none !important;
+    }
+
+    .kpi-title-icon {
+        position: relative !important;
+        top: 0.01rem !important;
+        flex-shrink: 0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        background:
+            radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.00) 42%),
+            linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+    }
+
+    .kpi-block-label {
+        min-height: 1.4rem !important;
+        padding: 0.2rem 0.6rem !important;
+        border-radius: 999px !important;
+        border: 1px solid rgba(121, 14, 9, 0.12) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94) !important;
+    }
+
+    .kpi-block-icon {
+        width: 1.05rem !important;
+        height: 1.05rem !important;
+        background:
+            radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.00) 46%),
+            linear-gradient(135deg, rgba(121, 14, 9, 0.12), rgba(90, 10, 6, 0.22)) !important;
+        color: #790E09 !important;
+        border: 1px solid rgba(121, 14, 9, 0.12) !important;
+    }
+
+    .kpi-value-wrap {
+        padding: 0.42rem 0.88rem !important;
+        border-radius: 1rem !important;
+        border: 1px solid rgba(121, 14, 9, 0.12) !important;
+        background:
+            radial-gradient(circle at top center, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.00) 56%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(250, 251, 253, 0.98) 100%) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.96),
+            0 1px 0 rgba(255, 255, 255, 0.65) !important;
+    }
+
+    .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) .kpi-value-wrap {
+        border-color: rgba(121, 14, 9, 0.16) !important;
+        background:
+            radial-gradient(circle at top center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.00) 58%),
+            linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.96),
+            0 1px 0 rgba(255, 255, 255, 0.68) !important;
+    }
+
+    .kpi-value-wrap::after {
+        left: 16% !important;
+        right: 16% !important;
+        background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(121, 14, 9, 0.20),
+            transparent
+        ) !important;
+    }
+
+    .kpi-value-dinamico {
+        letter-spacing: -0.04em !important;
+    }
+
+    .kpi-meta-line {
+        gap: 0.36rem !important;
+        margin: 0.36rem 0 0.24rem 0 !important;
+    }
+
+    .kpi-meta-chip,
+    .kpi-variacao-item,
+    .kpi-parcial-note {
+        border-radius: 999px !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+    }
+
+    .kpi-meta-chip {
+        min-height: 1.5rem !important;
+        padding: 0.18rem 0.6rem !important;
+        border-color: rgba(121, 14, 9, 0.10) !important;
+    }
+
+    .kpi-meta-chip-orc {
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%) !important;
+    }
+
+    .kpi-meta-chip-silentes {
+        border-color: rgba(121, 14, 9, 0.16) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%) !important;
+    }
+
+    .kpi-variacao-item {
+        min-height: 1.45rem !important;
+        padding: 0.18rem 0.62rem !important;
+    }
+
+    .kpi-parcial-note {
+        min-height: 1.15rem !important;
+        padding: 0.12rem 0.6rem !important;
+        border-color: rgba(121, 14, 9, 0.14) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%) !important;
+    }
+
+    [data-testid="stMetric"] {
+        padding: 1rem 1.08rem 0.95rem 1.08rem !important;
+        min-height: 6.4rem !important;
+    }
+
+    [data-testid="stMetric"] > div {
+        position: relative;
+        z-index: 1;
+    }
+
+    [data-testid="stMetricLabel"] {
+        margin-bottom: 0.28rem !important;
+    }
+
+    [data-testid="stMetricLabel"] p {
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        font-size: 0.72rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.09em !important;
+        text-transform: uppercase !important;
+        color: #790E09 !important;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        font-weight: 900 !important;
+        letter-spacing: -0.04em !important;
+        line-height: 1.04 !important;
+        color: #243041 !important;
+        background: linear-gradient(135deg, #243041 0%, #5A0A06 100%) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+    }
+
+    [data-testid="stMetricDelta"] {
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.01em !important;
     }
     </style>
     """,
@@ -4502,153 +4753,233 @@ def aplicar_estilo_visual_evolucao_semanal(
         traces_atuais = list(fig.data)
         fig.data = tuple(traces_atuais[-qtd_glow:] + traces_atuais[:-qtd_glow])
 
-def criar_grafico_barras_resumo_evolucao_semanal(
-    categorias_totais: list[str],
-    valores_totais: list[float],
-    cores_totais: list[str],
-    altura: int = 460
-) -> go.Figure:
-    """Cria o grafico lateral semanal no mesmo padrao visual dos resumos mensais."""
-    def _hex_to_rgba(cor_hex: str, alpha: float) -> str:
-        cor_limpa = str(cor_hex).strip().lstrip('#')
-        if len(cor_limpa) != 6:
-            return f'rgba(90, 98, 104, {alpha})'
-        r = int(cor_limpa[0:2], 16)
-        g = int(cor_limpa[2:4], 16)
-        b = int(cor_limpa[4:6], 16)
-        return f'rgba({r}, {g}, {b}, {alpha})'
+def _hex_to_rgba_resumo_barras(cor_hex: str, alpha: float) -> str:
+    """Converte cores hex em rgba para os efeitos visuais dos resumos laterais."""
+    cor_limpa = str(cor_hex).strip().lstrip('#')
+    if len(cor_limpa) != 6:
+        return f'rgba(90, 98, 104, {alpha})'
+    r = int(cor_limpa[0:2], 16)
+    g = int(cor_limpa[2:4], 16)
+    b = int(cor_limpa[4:6], 16)
+    return f'rgba({r}, {g}, {b}, {alpha})'
 
+def _formatar_variacao_resumo_barras(valor_origem: float, valor_destino: float) -> tuple[str, str]:
+    """Calcula a variacao percentual exibida nos conectores entre barras."""
+    if not np.isfinite(valor_origem) or float(valor_origem) == 0.0:
+        return ("N/A", '#6B7280')
+    variacao = ((float(valor_destino) - float(valor_origem)) / float(valor_origem)) * 100.0
+    if variacao > 0:
+        cor_var = '#2E7D32'
+    elif variacao < 0:
+        cor_var = '#C62828'
+    else:
+        cor_var = '#475569'
+    return (f"{variacao:+.1f}%".replace('.', ','), cor_var)
+
+def _criar_grafico_barras_resumo_comparativo(
+    categorias: list[str],
+    valores: list[float],
+    cores: list[str],
+    altura: int = 460,
+    comparacoes: list[dict[str, int]] | None = None
+) -> go.Figure:
+    """Cria o grafico lateral premium com barras mais densas e conectores estilo ponte."""
     fig = go.Figure()
-    posicoes_x = list(range(len(categorias_totais)))
-    textos_totais = [formatar_numero_brasileiro(v, 0) for v in valores_totais]
+    if not categorias or not valores or not cores:
+        return fig
+
+    total_itens = min(len(categorias), len(valores), len(cores))
+    categorias = [str(cat) for cat in categorias[:total_itens]]
+    cores = [str(cor) for cor in cores[:total_itens]]
+
+    def _coagir_float(valor) -> float:
+        try:
+            if pd.isna(valor):
+                return 0.0
+            return float(valor)
+        except Exception:
+            return 0.0
+
+    valores = [_coagir_float(v) for v in valores[:total_itens]]
+    textos = [formatar_numero_brasileiro(v, 0) for v in valores]
+    posicoes_x = list(range(total_itens))
+    max_val = float(max(valores)) if valores else 0.0
+    largura_barra = 0.54 if total_itens <= 3 else 0.46
+    offset_conector = max((max_val * 0.115), 2.0)
+    base_destaque = max((max_val * 0.018), 1.0)
+    cor_conector = 'rgba(90, 98, 104, 0.82)'
+
+    if comparacoes is None and total_itens >= 3:
+        comparacoes = [
+            {'origem': 1, 'destino': 0},
+            {'origem': 2, 'destino': 0},
+        ]
+    comparacoes = comparacoes or []
+
     fig.add_trace(go.Bar(
         x=posicoes_x,
-        y=valores_totais,
-        width=[0.42] * len(posicoes_x),
-        marker=dict(color=cores_totais, line=dict(color='white', width=1.4)),
-        text=[''] * len(posicoes_x),
-        textposition='outside',
-        textfont=dict(size=12, color='#2F3747'),
-        customdata=categorias_totais,
+        y=valores,
+        width=[largura_barra] * total_itens,
+        marker=dict(
+            color=cores,
+            line=dict(color='rgba(255,255,255,0.94)', width=1.6)
+        ),
+        text=[texto if float(valor) > 0 else '' for texto, valor in zip(textos, valores)],
+        texttemplate='<b>%{text}</b>',
+        textposition='inside',
+        insidetextanchor='middle',
+        insidetextfont=dict(
+            family='Segoe UI Semibold',
+            size=12,
+            color='#FFF8F7'
+        ),
+        textangle=0,
+        customdata=categorias,
         hovertemplate="<b>%{customdata}</b><br><b>Total:</b> %{y:,.0f}<extra></extra>",
         cliponaxis=False
     ))
 
-    max_val = float(max(valores_totais)) if valores_totais else 0.0
-    offset_rotulo = max((max_val * 0.055), 1.0)
-    offset_seta = max((max_val * 0.19), 1.0)
-    cor_seta = '#6B7280'
+    for pos_x, valor_barra, cor_barra in zip(posicoes_x, valores, cores):
+        x0 = float(pos_x) - (largura_barra / 2.0) - 0.05
+        x1 = float(pos_x) + (largura_barra / 2.0) + 0.05
+        y1_barra = max(float(valor_barra) + base_destaque, base_destaque)
 
-    base_destaque = max((max_val * 0.012), 1.0)
-    for pos_x, valor_barra, cor_barra in zip(posicoes_x, valores_totais, cores_totais):
         fig.add_shape(
             type='rect',
             xref='x',
             yref='y',
-            x0=float(pos_x) - 0.31,
-            x1=float(pos_x) + 0.31,
+            x0=x0 + 0.035,
+            x1=x1 + 0.035,
             y0=0,
-            y1=max(float(valor_barra) + base_destaque, base_destaque),
-            line=dict(color=_hex_to_rgba(cor_barra, 0.18), width=1.0),
-            fillcolor=_hex_to_rgba(cor_barra, 0.07),
+            y1=max(float(valor_barra), base_destaque),
+            line=dict(width=0),
+            fillcolor=_hex_to_rgba_resumo_barras(cor_barra, 0.05),
             layer='below'
         )
-
-    for pos_x, valor_barra, texto_barra, cor_barra in zip(posicoes_x, valores_totais, textos_totais, cores_totais):
-        fig.add_annotation(
-            x=pos_x,
-            y=float(valor_barra) + offset_rotulo,
+        fig.add_shape(
+            type='rect',
             xref='x',
             yref='y',
-            text=f"<b>{texto_barra}</b>",
-            showarrow=False,
-            font=dict(size=11, color=cor_barra),
-            bgcolor='rgba(255,255,255,0.96)',
-            bordercolor=cor_barra,
-            borderwidth=1.1,
-            borderpad=5
+            x0=x0,
+            x1=x1,
+            y0=0,
+            y1=y1_barra,
+            line=dict(color=_hex_to_rgba_resumo_barras(cor_barra, 0.18), width=1.05),
+            fillcolor=_hex_to_rgba_resumo_barras(cor_barra, 0.08),
+            layer='below'
         )
-
-    def _formatar_variacao(valor_origem: float, valor_destino: float) -> tuple[str, str]:
-        if not np.isfinite(valor_origem) or float(valor_origem) == 0.0:
-            return ("N/A", '#6B7280')
-        variacao = ((float(valor_destino) - float(valor_origem)) / float(valor_origem)) * 100.0
-        if variacao > 0:
-            cor_var = '#2E7D32'
-        elif variacao < 0:
-            cor_var = '#C62828'
-        else:
-            cor_var = '#475569'
-        return (f"{variacao:+.1f}%".replace('.', ','), cor_var)
-
-    comparacoes = [
-        {'origem': 1, 'destino': 0},
-        {'origem': 2, 'destino': 0},
-    ]
+        fig.add_shape(
+            type='line',
+            xref='x',
+            yref='y',
+            x0=float(pos_x) - (largura_barra * 0.34),
+            x1=float(pos_x) + (largura_barra * 0.34),
+            y0=float(valor_barra),
+            y1=float(valor_barra),
+            line=dict(color='rgba(255,255,255,0.80)', width=2.2),
+            layer='above'
+        )
 
     for idx_seta, cfg in enumerate(comparacoes):
-        idx_origem = int(cfg['origem'])
-        idx_destino = int(cfg['destino'])
-        valor_origem = float(valores_totais[idx_origem])
-        valor_destino = float(valores_totais[idx_destino])
-        y_linha = max(valor_origem, valor_destino) + (offset_seta * (1.0 + (idx_seta * 1.0)))
+        idx_origem = int(cfg.get('origem', -1))
+        idx_destino = int(cfg.get('destino', -1))
+        if (
+            idx_origem < 0 or idx_destino < 0 or
+            idx_origem >= total_itens or idx_destino >= total_itens
+        ):
+            continue
+
+        valor_origem = float(valores[idx_origem])
+        valor_destino = float(valores[idx_destino])
         x0 = float(posicoes_x[idx_origem])
         x1 = float(posicoes_x[idx_destino])
+        y_conector = max(valor_origem, valor_destino) + (offset_conector * (0.92 + (idx_seta * 0.92)))
 
-        fig.add_annotation(
-            x=x1, y=y_linha, ax=x0, ay=y_linha,
-            xref='x', yref='y', axref='x', ayref='y',
-            text='',
-            showarrow=True,
-            arrowhead=2,
-            arrowsize=1.1,
-            arrowwidth=1.8,
-            arrowcolor=cor_seta
-        )
-        fig.add_annotation(
-            x=x0, y=y_linha, ax=x1, ay=y_linha,
-            xref='x', yref='y', axref='x', ayref='y',
-            text='',
-            showarrow=True,
-            arrowhead=2,
-            arrowsize=1.1,
-            arrowwidth=1.8,
-            arrowcolor=cor_seta
+        fig.add_shape(
+            type='line',
+            xref='x',
+            yref='y',
+            x0=min(x0, x1),
+            x1=max(x0, x1),
+            y0=y_conector,
+            y1=y_conector,
+            line=dict(color=cor_conector, width=1.65),
+            layer='above'
         )
 
-        texto_var, cor_texto = _formatar_variacao(valor_origem, valor_destino)
+        for x_barra, y_barra in ((x0, valor_origem), (x1, valor_destino)):
+            fig.add_annotation(
+                x=x_barra,
+                y=y_barra,
+                ax=x_barra,
+                ay=y_conector,
+                xref='x',
+                yref='y',
+                axref='x',
+                ayref='y',
+                text='',
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1.0,
+                arrowwidth=1.55,
+                arrowcolor=cor_conector,
+                standoff=0
+            )
+
+        texto_var, cor_texto = _formatar_variacao_resumo_barras(valor_origem, valor_destino)
+        borda_label = (
+            _hex_to_rgba_resumo_barras(cor_texto, 0.34)
+            if str(cor_texto).startswith('#')
+            else 'rgba(107, 114, 128, 0.36)'
+        )
         fig.add_annotation(
             x=(x0 + x1) / 2.0,
-            y=y_linha + (offset_seta * 0.16),
+            y=y_conector + (offset_conector * 0.16),
             xref='x',
             yref='y',
             text=f"<b>{texto_var}</b>",
             showarrow=False,
             font=dict(size=11, color=cor_texto),
-            bgcolor='rgba(255,255,255,0.97)',
-            bordercolor='rgba(107, 114, 128, 0.70)',
-            borderwidth=1.4,
+            bgcolor='rgba(255,255,255,0.98)',
+            bordercolor=borda_label,
+            borderwidth=1.2,
             borderpad=6
         )
 
-    y_top = (max_val + offset_rotulo + (offset_seta * 4.4)) if max_val > 0 else 5.0
+    y_top = (
+        max_val + (offset_conector * (len(comparacoes) + 1.75))
+        if max_val > 0 else 5.0
+    )
+
+    fig.add_shape(
+        type='line',
+        xref='x',
+        yref='y',
+        x0=-0.42,
+        x1=(total_itens - 1) + 0.42,
+        y0=0,
+        y1=0,
+        line=dict(color='rgba(226, 232, 240, 0.95)', width=1.25),
+        layer='below'
+    )
+
     fig.update_layout(
         plot_bgcolor='#FFFFFF',
         paper_bgcolor='#F4F7FB',
         font=dict(family='Segoe UI', size=13, color='#2F3747'),
-        margin=dict(l=20, r=16, t=64, b=52),
+        margin=dict(l=18, r=16, t=62, b=50),
         xaxis=dict(
             title='',
             tickmode='array',
             tickvals=posicoes_x,
-            ticktext=categorias_totais,
+            ticktext=categorias,
             tickfont=dict(size=11, color='#5B6578'),
             showgrid=False,
             linecolor='#E2E8F0',
-            linewidth=1.3,
-            showline=True,
+            linewidth=1.25,
+            showline=False,
             ticks='outside',
-            ticklen=5,
+            ticklen=0,
             zeroline=False
         ),
         yaxis=dict(
@@ -4657,22 +4988,38 @@ def criar_grafico_barras_resumo_evolucao_semanal(
             showticklabels=False,
             ticks='',
             showgrid=True,
-            gridcolor='rgba(226, 232, 240, 0.70)',
+            gridcolor='rgba(226, 232, 240, 0.66)',
             gridwidth=1,
             linecolor='#E2E8F0',
-            linewidth=1.3,
-            showline=True,
+            linewidth=1.2,
+            showline=False,
             zeroline=False,
             rangemode='tozero',
             range=[0, y_top]
         ),
-        bargap=0.38,
+        bargap=0.32,
         bargroupgap=0.0,
         height=altura,
+        hovermode='x',
+        uniformtext=dict(minsize=11, mode='hide'),
         showlegend=False
     )
 
     return fig
+
+def criar_grafico_barras_resumo_evolucao_semanal(
+    categorias_totais: list[str],
+    valores_totais: list[float],
+    cores_totais: list[str],
+    altura: int = 460
+) -> go.Figure:
+    """Cria o grafico lateral semanal no mesmo padrao visual dos resumos mensais."""
+    return _criar_grafico_barras_resumo_comparativo(
+        categorias=categorias_totais,
+        valores=valores_totais,
+        cores=cores_totais,
+        altura=altura
+    )
 
 def criar_grafico_barras_resumo_evolucao_mensal(
     df_linhas_base: pd.DataFrame,
@@ -4719,6 +5066,23 @@ def criar_grafico_barras_resumo_evolucao_mensal(
     valores = [valor_m0, valor_m1, valor_orc]
     posicoes_x = list(range(len(categorias)))
     cores = ['#FF2800', '#790E09', '#5A6268']
+    fig = _criar_grafico_barras_resumo_comparativo(
+        categorias=categorias,
+        valores=valores,
+        cores=cores,
+        altura=altura
+    )
+    fig.update_layout(
+        hoverlabel=dict(
+            bgcolor='white',
+            font_size=12,
+            font_family='Segoe UI',
+            bordercolor='#E2E8F0',
+            font_color='#2F3747'
+        )
+    )
+    return fig
+
     textos = [formatar_numero_brasileiro(v, 0) for v in valores]
 
     def _hex_to_rgba(cor_hex: str, alpha: float) -> str:
@@ -6671,9 +7035,9 @@ def criar_tabela_html_necessidade_diaria_produto(
         overflow-x: auto;
         border: 2px solid #790E09;
         border-radius: 12px;
-        box-shadow: 0 6px 18px rgba(121,14,9,0.16);
+        box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
         margin: 10px 0 6px 0;
-        background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+        background: #FFFFFF;
     }}
     table.{table_id} {{
         border-collapse: collapse;
@@ -6681,8 +7045,8 @@ def criar_tabela_html_necessidade_diaria_produto(
         min-width: 100%;
         max-width: 100%;
         table-layout: fixed;
-        font-size: clamp(9px, 0.72vw, 11px);
-        line-height: 1.0;
+        font-size: clamp(8.8px, 0.70vw, 10.4px);
+        line-height: 1.04;
     }}
     .{table_id} thead th {{
         background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
@@ -6723,7 +7087,7 @@ def criar_tabela_html_necessidade_diaria_produto(
         border-right: 1px solid #FFFFFF;
         color: #2F3747;
         font-weight: 400;
-        font-size: clamp(8.6px, 0.68vw, 10.5px);
+        font-size: clamp(8.5px, 0.66vw, 10px);
         vertical-align: bottom;
         white-space: nowrap;
     }}
@@ -6735,37 +7099,38 @@ def criar_tabela_html_necessidade_diaria_produto(
         position: sticky;
         left: 0;
         z-index: 5;
-        background: #FFFFFF !important;
+        background: transparent !important;
         white-space: nowrap;
     }}
     .{table_id} tbody td.col-dia {{
-        background: #FFFFFF !important;
+        background: transparent !important;
     }}
     .{table_id} tbody td.col-dia.week-start {{
         border-left: 1px solid #FFFFFF;
     }}
     .{table_id} tbody td.col-dia.dia-fds {{
-        background: #FFFFFF !important;
+        background: transparent !important;
     }}
     .{table_id} tbody td.col-dia.dia-util {{
-        background: #FFFFFF !important;
+        background: transparent !important;
     }}
     .{table_id} tbody td.col-dia.dia-futuro {{
-        background: #FFFFFF !important;
+        background: transparent !important;
     }}
     .{table_id} tbody td.col-total-sem {{
-        background: #F5E9E7 !important;
-        color: #5A0A06;
+        background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+        color: #1F2937;
         font-weight: 600;
     }}
     .{table_id} tbody td.col-total-mes {{
-        background: #F1DFDC !important;
-        color: #4A0704;
+        background: linear-gradient(180deg, rgba(47, 55, 71, 0.075) 0%, rgba(47, 55, 71, 0.03) 100%) !important;
+        color: #1F2937;
         font-weight: 700;
     }}
     .{table_id} tbody td.col-pct {{
         color: #374151;
         font-weight: 600;
+        background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
     }}
     .{table_id} tbody td.col-pct.pct-positivo {{
         color: #1B5E20 !important;
@@ -6787,18 +7152,40 @@ def criar_tabela_html_necessidade_diaria_produto(
         border-bottom: 1px solid #FFFFFF !important;
     }}
     .{table_id} tbody tr.linha-projecao td {{
-        background-color: #FFFFFF;
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-realizado td {{
-        background-color: #FFFFFF;
+        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
     }}
     .{table_id} tbody tr.linha-ating td {{
-        background-color: #FFFFFF;
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-projecao td.col-linha,
+    .{table_id} tbody tr.linha-projecao td.col-dia,
+    .{table_id} tbody tr.linha-projecao td.col-dia.dia-fds,
+    .{table_id} tbody tr.linha-projecao td.col-dia.dia-util,
+    .{table_id} tbody tr.linha-projecao td.col-dia.dia-futuro,
     .{table_id} tbody tr.linha-realizado td.col-linha,
+    .{table_id} tbody tr.linha-realizado td.col-dia,
+    .{table_id} tbody tr.linha-realizado td.col-dia.dia-fds,
+    .{table_id} tbody tr.linha-realizado td.col-dia.dia-util,
+    .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro,
     .{table_id} tbody tr.linha-ating td.col-linha {{
-        background: #FFFFFF !important;
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+    }}
+    .{table_id} tbody tr.linha-realizado td.col-linha,
+    .{table_id} tbody tr.linha-realizado td.col-dia,
+    .{table_id} tbody tr.linha-realizado td.col-dia.dia-fds,
+    .{table_id} tbody tr.linha-realizado td.col-dia.dia-util,
+    .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro {{
+        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+    }}
+    .{table_id} tbody tr.linha-ating td.col-linha,
+    .{table_id} tbody tr.linha-ating td.col-dia,
+    .{table_id} tbody tr.linha-ating td.col-dia.dia-fds,
+    .{table_id} tbody tr.linha-ating td.col-dia.dia-util,
+    .{table_id} tbody tr.linha-ating td.col-dia.dia-futuro {{
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     @media (max-width: 1600px) {{
         table.{table_id} {{ min-width: 100%; }}
@@ -6958,14 +7345,14 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             margin: 12px 0 18px 0;
-            background: white;
+            background: #FFFFFF;
         }}
         #{table_id} .tabela-analitico {{
             width: 100%;
             border-collapse: collapse;
             border-spacing: 0;
-            font-size: 10.6px;
-            line-height: 1.2;
+            font-size: 10px;
+            line-height: 1.14;
             table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
             min-width: 980px;
@@ -6979,7 +7366,7 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
             color: white !important;
             font-weight: 700;
-            padding: 6px 6px;
+            padding: 5px 5px;
             text-align: center;
             vertical-align: middle;
             border-bottom: 3px solid #5A0A06;
@@ -6990,7 +7377,7 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             text-transform: uppercase;
             letter-spacing: 0.3px;
             line-height: 1.2;
-            font-size: 10.3px;
+            font-size: 9px;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
         }}
         #{table_id} .tabela-analitico th.col-var {{
@@ -7003,7 +7390,7 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             background: linear-gradient(135deg, #6A7075 0%, #4B5258 100%) !important;
         }}
         #{table_id} .tabela-analitico td {{
-            padding: 7px 6px 3px 6px;
+            padding: 6px 5px 4px 5px;
             text-align: right;
             vertical-align: bottom !important;
             border-bottom: 1px solid #FFFFFF;
@@ -7012,8 +7399,8 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             font-variant-numeric: tabular-nums;
             color: #1F2937;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
-            font-size: 10.4px;
-            line-height: 1.18;
+            font-size: 10px;
+            line-height: 1.16;
             white-space: normal;
             overflow-wrap: break-word;
             word-break: normal;
@@ -7024,42 +7411,54 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
         }}
         #{table_id} .tabela-analitico td.col-canal {{
             text-align: left;
-            font-weight: 400;
+            font-weight: 600;
             color: #2F3747;
-            background: linear-gradient(90deg, #fef5f4 0%, #ffffff 100%) !important;
+            background: transparent !important;
             padding-left: 6px;
         }}
         #{table_id} .linha-canal-analitico:nth-child(even) {{
-            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+            background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
         }}
         #{table_id} .linha-canal-analitico:nth-child(odd) {{
-            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
         }}
         #{table_id} .linha-canal-analitico:hover {{
-            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-            box-shadow: inset 0 0 0 1px #F1CBC4;
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12);
         }}
         #{table_id} .tabela-analitico td.col-anterior {{
-            color: #475569;
+            background: transparent !important;
+            color: #2F3747;
+            border-left: 1px solid rgba(47, 55, 71, 0.04);
+            border-right: 1px solid rgba(47, 55, 71, 0.04);
         }}
         #{table_id} .tabela-analitico td.col-atual {{
-            color: #6B1F1A;
-            font-weight: 400;
+            background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+            color: #1F2937;
+            font-weight: 600;
+            border-left: 1px solid rgba(47, 55, 71, 0.08);
+            border-right: 1px solid rgba(47, 55, 71, 0.08);
         }}
         #{table_id} .tabela-analitico td.col-meta {{
-            color: #8C1D18;
-            font-weight: 400;
+            background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
+            color: #6B1F1A;
+            font-weight: 600;
+            border-left: 1px solid rgba(121, 14, 9, 0.08);
+            border-right: 1px solid rgba(121, 14, 9, 0.08);
         }}
         #{table_id} .tabela-analitico td.col-dia {{
-            color: #0F172A;
+            background: transparent !important;
+            color: #2F3747;
             font-weight: 400;
         }}
         #{table_id} .tabela-analitico td.col-var.status-gap {{
             color: #B71C1C !important;
-            font-weight: 400;
+            font-weight: 700;
             position: relative;
             padding-left: 13px !important;
-            background: rgba(183, 28, 28, 0.06) !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }}
         #{table_id} .tabela-analitico td.col-var.status-gap::before {{
             content: "▼";
@@ -7072,10 +7471,12 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
         }}
         #{table_id} .tabela-analitico td.col-var.status-superavit {{
             color: #1B5E20 !important;
-            font-weight: 400;
+            font-weight: 700;
             position: relative;
             padding-left: 13px !important;
-            background: rgba(27, 94, 32, 0.06) !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }}
         #{table_id} .tabela-analitico td.col-var.status-superavit::before {{
             content: "▲";
@@ -7087,8 +7488,11 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
             font-size: 8px;
         }}
         #{table_id} .tabela-analitico td.col-var.status-neutro {{
-            color: #475569 !important;
-            font-weight: 400;
+            color: #666666 !important;
+            font-weight: 500;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }}
         #{table_id} .linha-total-analitico {{
             position: sticky;
@@ -7099,9 +7503,9 @@ def criar_tabela_html_analitica(df_formatado: pd.DataFrame, df_numerico: pd.Data
         #{table_id} .linha-total-analitico td {{
             background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
             color: white !important;
-            font-weight: 400;
-            font-size: 10.4px;
-            padding: 7px 6px 3px 6px;
+            font-weight: 700;
+            font-size: 10px;
+            padding: 6px 5px 4px 5px;
             vertical-align: bottom !important;
             border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
         }}
@@ -7470,8 +7874,8 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             min-width: 100%;
             border-collapse: collapse;
             border-spacing: 0;
-            font-size: 10.6px;
-            line-height: 1.2;
+            font-size: 10px;
+            line-height: 1.14;
             table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
         }}
@@ -7484,7 +7888,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
             color: #FFFFFF !important;
             font-weight: 700;
-            padding: 6px 6px;
+            padding: 5px 5px;
             text-align: center;
             vertical-align: middle !important;
             border-bottom: 3px solid #5A0A06;
@@ -7497,7 +7901,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             text-transform: uppercase;
             letter-spacing: 0.3px;
             line-height: 1.2;
-            font-size: 10.3px;
+            font-size: 9px;
         }}
         #{table_id} .tabela-resultado-canais th.col-var {{
             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
@@ -7506,7 +7910,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais td {{
-            padding: 7px 6px 3px 6px;
+            padding: 6px 5px 4px 5px;
             text-align: right;
             vertical-align: bottom !important;
             border-bottom: 1px solid #FFFFFF;
@@ -7514,8 +7918,8 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             font-weight: 400;
             font-variant-numeric: tabular-nums;
             color: #1F2937;
-            font-size: 10.4px;
-            line-height: 1.18;
+            font-size: 10px;
+            line-height: 1.16;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -7530,7 +7934,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         #{table_id} .tabela-resultado-canais td.col-canal {{
             text-align: left;
             color: #2F3747;
-            background: linear-gradient(90deg, #FEF5F4 0%, #FFFFFF 100%) !important;
+            background: transparent !important;
             padding-left: 6px;
             white-space: normal;
             overflow-wrap: anywhere;
@@ -7539,30 +7943,38 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             text-overflow: clip;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par td {{
-            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+            background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-impar td {{
-            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par:hover,
         #{table_id} .linha-canal-resultado.linha-zebra-impar:hover {{
-            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-            box-shadow: inset 0 0 0 1px #F1CBC4;
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12);
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par:hover td,
         #{table_id} .linha-canal-resultado.linha-zebra-impar:hover td {{
-            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-meta {{
-            color: #8C1D18;
+            background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
+            color: #6B1F1A;
+            font-weight: 600;
+            border-left: 1px solid rgba(121, 14, 9, 0.08) !important;
+            border-right: 1px solid rgba(121, 14, 9, 0.08) !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-var {{
             position: relative;
             padding-left: 13px !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-positivo {{
             color: #1B5E20 !important;
-            background: rgba(27, 94, 32, 0.06) !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            font-weight: 700;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-positivo::before {{
             content: "▲";
@@ -7575,7 +7987,8 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-negativo {{
             color: #B71C1C !important;
-            background: rgba(183, 28, 28, 0.06) !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            font-weight: 700;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-negativo::before {{
             content: "▼";
@@ -7587,8 +8000,9 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             font-size: 8px;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-neutro {{
-            color: #475569 !important;
-            background: transparent !important;
+            color: #666666 !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            font-weight: 500;
         }}
         #{table_id} .linha-total-resultado {{
             position: sticky;
@@ -7606,10 +8020,10 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         #{table_id} .linha-total-resultado td {{
             background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
             color: #FFFFFF !important;
-            font-weight: 400;
+            font-weight: 700;
             border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
-            padding: 7px 6px 3px 6px !important;
-            font-size: 10.4px;
+            padding: 6px 5px 4px 5px !important;
+            font-size: 10px;
             vertical-align: bottom !important;
         }}
         #{table_id} .linha-total-resultado td.col-canal {{
@@ -8228,7 +8642,16 @@ with tab1:
                     f'<div class="kpi-parcial-note">Parcial: {real_atual_formatado}</div>'
                     if mostrar_parcial else ''
                 )
-                tendencia_icon_html = build_tendencia_icon_html(usa_tendencia)
+                # Mantem o selo TEND no card de Hospitality Conta no mes parcial,
+                # mesmo quando a projecao numerica estiver zerada, sem alterar o valor exibido.
+                exibir_selo_tendencia = (
+                    usa_tendencia or (
+                        mostrar_parcial
+                        and str(canal).strip().lower() == 'hospitality'
+                        and str(plataforma).strip().upper() == 'CONTA'
+                    )
+                )
+                tendencia_icon_html = build_tendencia_icon_html(exibir_selo_tendencia)
                 
                 if variacao_mom >= 0:
                     classe_mom = "variacao-positiva"
@@ -8807,9 +9230,26 @@ with tab1:
     # Função para criar tabela HTML estilizada
     def criar_tabela_html(df):
         total_colunas = max(len(df.columns), 1)
-        largura_col_pct = 100.0 / total_colunas
+        def _largura_coluna_tabela(coluna: str) -> str:
+            col_txt = str(coluna)
+            if col_txt == 'Regional':
+                return '110px'
+            if col_txt == 'Total 2025':
+                return '54px'
+            if '/25' in col_txt or '/26' in col_txt:
+                return '48px'
+            if 'Real' in col_txt:
+                return '54px'
+            if 'Tend' in col_txt:
+                return '54px'
+            if 'OrÃ§' in col_txt and col_txt != 'TEND vs ORÃ‡':
+                return '54px'
+            if col_txt in {'MOM', 'TEND vs ORÃ‡'} or 'Alcance' in col_txt or 'Var' in col_txt:
+                return '58px'
+            return '54px'
+
         colgroup_html = "<colgroup>" + "".join(
-            [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+            [f'<col style="width:{_largura_coluna_tabela(col)};">' for col in df.columns[:total_colunas]]
         ) + "</colgroup>"
         html = """
     <style>
@@ -8817,7 +9257,7 @@ with tab1:
             width: 100%;
             max-height: 650px;
             overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: auto;
             border: 2px solid #790E09;
             border-radius: 10px;
             box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
@@ -8827,12 +9267,13 @@ with tab1:
         }
         
         .tabela-melhorada {
-            width: 100%;
+            width: max-content;
+            min-width: 100%;
             border-collapse: collapse;
             border-spacing: 0;
-            font-size: 10px;
-            line-height: 1.1;
-            table-layout: fixed;
+            font-size: 9px;
+            line-height: 1.04;
+            table-layout: auto;
         }
         
         .tabela-melhorada thead {
@@ -8876,11 +9317,14 @@ with tab1:
         .tabela-melhorada th.col-total-anual {
             background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
         }
-        
-        .tabela-melhorada th.col-real-mes {
-            background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
+
+        .tabela-melhorada th.col-mes-2025,
+        .tabela-melhorada th.col-mes {
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
         }
         
+        .tabela-melhorada th.col-real-mes,
+        .tabela-melhorada th.col-tend,
         .tabela-melhorada th.col-meta {
             background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
         }
@@ -8891,15 +9335,17 @@ with tab1:
         }
         
         .tabela-melhorada td {
-            padding: 4px 4px; /* compact */
+            padding: 3px 4px; /* compact */
             text-align: center;
             border-bottom: 1px solid #FFFFFF;
             border-right: 1px solid #FFFFFF;
             font-weight: 400;
             transition: all 0.2s ease;
-            white-space: normal;
-            overflow-wrap: anywhere;
-            word-break: break-word;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            overflow-wrap: normal;
+            word-break: normal;
         }
         
         .tabela-melhorada tr:not(.linha-total-melhorada) td:first-child {
@@ -8909,6 +9355,9 @@ with tab1:
             color: #333;
             background: transparent !important;
             padding-left: 7px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .tabela-melhorada td:last-child {
@@ -8934,8 +9383,10 @@ with tab1:
         }
         
         .linha-total-melhorada td.col-total-anual,
+        .linha-total-melhorada td.col-mes-2025,
         .linha-total-melhorada td.col-mes,
         .linha-total-melhorada td.col-real-mes,
+        .linha-total-melhorada td.col-tend,
         .linha-total-melhorada td.col-meta,
         .linha-total-melhorada td.col-alcance,
         .linha-total-melhorada td.col-variacao {
@@ -8960,64 +9411,76 @@ with tab1:
         }
         
         .linha-regional-melhorada:nth-child(even) {
-            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+            background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
         }
         
         .linha-regional-melhorada:nth-child(odd) {
-            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
         }
         
         .linha-regional-melhorada:hover {
-            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-            box-shadow: inset 0 0 0 1px #F1CBC4;
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+            transform: none;
         }
         
         .linha-regional-melhorada td.col-total-anual {
-            background: transparent !important;
-            color: #790E09 !important;
+            background: linear-gradient(180deg, rgba(47, 55, 71, 0.045) 0%, rgba(47, 55, 71, 0.018) 100%) !important;
+            color: #1F2937 !important;
             font-weight: 600;
-            border-left: 1px solid #FFFFFF;
-            border-right: 1px solid #FFFFFF;
+            border-left: 1px solid rgba(47, 55, 71, 0.06);
+            border-right: 1px solid rgba(47, 55, 71, 0.06);
         }
-        
-        .linha-regional-melhorada td.col-mes {
+
+        .linha-regional-melhorada td.col-mes-2025 {
             background: transparent !important;
-            color: #333 !important;
-            border-left: 1px solid #FFFFFF;
-            border-right: 1px solid #FFFFFF;
+            color: #2F3747 !important;
+            font-weight: 600;
+            border-left: 1px solid rgba(47, 55, 71, 0.04);
+            border-right: 1px solid rgba(47, 55, 71, 0.04);
         }
-        
+
+        .linha-regional-melhorada td.col-mes,
         .linha-regional-melhorada td.col-real-mes {
-            background: transparent !important;
+            background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+            color: #1F2937 !important;
+            font-weight: 600;
+            border-left: 1px solid rgba(47, 55, 71, 0.08);
+            border-right: 1px solid rgba(47, 55, 71, 0.08);
+        }
+        
+        .linha-regional-melhorada td.col-tend {
+            background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+            color: #1F2937 !important;
+            font-weight: 600;
+            border-left: 1px solid rgba(47, 55, 71, 0.08);
+            border-right: 1px solid rgba(47, 55, 71, 0.08);
+        }
+
+        .linha-regional-melhorada td.col-meta {
+            background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
             color: #6B1F1A !important;
             font-weight: 600;
-            border-left: 1px solid #FFFFFF;
-            border-right: 1px solid #FFFFFF;
-        }
-        
-        .linha-regional-melhorada td.col-meta {
-            background: transparent !important;
-            color: #B71C1C !important;
-            font-weight: 600;
-            border-left: 1px solid #FFFFFF;
-            border-right: 1px solid #FFFFFF;
+            border-left: 1px solid rgba(121, 14, 9, 0.08);
+            border-right: 1px solid rgba(121, 14, 9, 0.08);
         }
         
         .linha-regional-melhorada td.col-alcance,
         .linha-regional-melhorada td.col-variacao {
-            background-color: transparent !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }
         
         .linha-regional-melhorada td.col-alcance.percentual-positivo,
         .linha-regional-melhorada td.col-variacao.percentual-positivo {
             color: #1B5E20 !important;
-            background: transparent !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
             font-weight: 700;
             position: relative;
             padding-left: 16px !important;
-            border-left: 1px solid #FFFFFF !important;
-            border-right: 1px solid #FFFFFF !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }
         
         .linha-regional-melhorada td.col-alcance.percentual-positivo::before,
@@ -9035,12 +9498,12 @@ with tab1:
         .linha-regional-melhorada td.col-alcance.percentual-negativo,
         .linha-regional-melhorada td.col-variacao.percentual-negativo {
             color: #C62828 !important;
-            background: transparent !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
             font-weight: 700;
             position: relative;
             padding-left: 16px !important;
-            border-left: 1px solid #FFFFFF !important;
-            border-right: 1px solid #FFFFFF !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }
         
         .linha-regional-melhorada td.col-alcance.percentual-negativo::before,
@@ -9058,15 +9521,15 @@ with tab1:
         .linha-regional-melhorada td.col-alcance.percentual-neutro,
         .linha-regional-melhorada td.col-variacao.percentual-neutro {
             color: #666666 !important;
-            background: transparent !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
             font-weight: 500;
         }
         
         .linha-regional-melhorada td:hover {
-            transform: scale(1.02);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            z-index: 10;
-            position: relative;
+            transform: none;
+            box-shadow: none;
+            z-index: auto;
+            position: static;
         }
         
         .linha-regional-melhorada td.performance-excelente {
@@ -9131,12 +9594,15 @@ with tab1:
         }
 
         .tabela-melhorada td {
-            padding: 4px 4px !important;
-            font-size: 9.5px !important;
-            line-height: 1.1 !important;
+            padding: 3.6px 4px !important;
+            font-size: 9.3px !important;
+            line-height: 1.12 !important;
             box-shadow: none !important;
             font-weight: 400 !important;
             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
         }
 
         .tabela-melhorada td:not(:first-child) {
@@ -9145,8 +9611,8 @@ with tab1:
         }
 
         .linha-regional-melhorada:hover {
-            background-color: #FFF2EF !important;
-            box-shadow: inset 0 0 0 1px #FFD9CF !important;
+            background-color: #FFF6F3 !important;
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
         }
 
         .linha-regional-melhorada td.performance-excelente,
@@ -9174,10 +9640,14 @@ with tab1:
                 classe = ""
             elif col == 'Total 2025':
                 classe = "col-total-anual"
-            elif '/25' in col or '/26' in col:
+            elif '/25' in col:
+                classe = "col-mes-2025"
+            elif '/26' in col:
                 classe = "col-mes"
-            elif 'Real' in col or 'Tend' in col:
+            elif 'Real' in col:
                 classe = "col-real-mes"
+            elif 'Tend' in col:
+                classe = "col-tend"
             elif 'Orç' in col and col != 'TEND vs ORÇ':
                 classe = "col-meta"
             elif 'Alcance' in col or col == 'TEND vs ORÇ':
@@ -9203,10 +9673,14 @@ with tab1:
                         classe_celula = ""
                     elif col == 'Total 2025':
                         classe_celula = "col-total-anual"
-                    elif '/25' in col or '/26' in col:
+                    elif '/25' in col:
+                        classe_celula = "col-mes-2025"
+                    elif '/26' in col:
                         classe_celula = "col-mes"
-                    elif 'Real' in col or 'Tend' in col:
+                    elif 'Real' in col:
                         classe_celula = "col-real-mes"
+                    elif 'Tend' in col:
+                        classe_celula = "col-tend"
                     elif 'Orç' in col and col != 'TEND vs ORÇ':
                         classe_celula = "col-meta"
                     elif 'Alcance' in col or col == 'TEND vs ORÇ':
@@ -9218,10 +9692,14 @@ with tab1:
                         classe_celula = ""
                     elif col == 'Total 2025':
                         classe_celula = "col-total-anual"
-                    elif '/25' in col or '/26' in col:
+                    elif '/25' in col:
+                        classe_celula = "col-mes-2025"
+                    elif '/26' in col:
                         classe_celula = "col-mes"
-                    elif 'Real' in col or 'Tend' in col:
+                    elif 'Real' in col:
                         classe_celula = "col-real-mes"
+                    elif 'Tend' in col:
+                        classe_celula = "col-tend"
                     elif 'Orç' in col and col != 'TEND vs ORÇ':
                         classe_celula = "col-meta"
                     elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'TEND vs ORÇ']:
@@ -10396,7 +10874,7 @@ with tab2:
                     z-index: 100;
                 }
                 
-            .tabela-desativados th {
+                .tabela-desativados th {
                     background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                     color: white !important;
                     font-weight: 600;
@@ -10411,6 +10889,11 @@ with tab2:
                     letter-spacing: 0.5px;
                     text-transform: uppercase;
                     position: relative;
+                    transition: all 0.2s ease;
+                }
+
+                .tabela-desativados th:hover {
+                    background: linear-gradient(135deg, #8A1F1A 0%, #6B0F0B 100%) !important;
                 }
                 
                 .tabela-desativados th:first-child {
@@ -10425,6 +10908,10 @@ with tab2:
 
                 .tabela-desativados th.col-total-anual-desativados {
                     background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+                }
+
+                .tabela-desativados th.col-mes-2025-desativados {
+                    background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                 }
 
                 .tabela-desativados th.col-real-mes-desativados {
@@ -10451,7 +10938,7 @@ with tab2:
                     text-align: left;
                     font-weight: 600;
                     color: #333;
-                    background: linear-gradient(90deg, #fef5f4 0%, white 100%) !important;
+                    background: transparent !important;
                     padding-left: 7px;
                 }
                 
@@ -10482,35 +10969,47 @@ with tab2:
                 }
                 
                 .linha-regional-desativados:nth-child(even) {
-                    background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+                    background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
                 }
                 
                 .linha-regional-desativados:nth-child(odd) {
-                    background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+                    background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
                 }
                 
                 .linha-regional-desativados:hover {
-                    background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
+                    background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                    box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+                    transform: none;
                 }
 
                 .linha-regional-desativados td.col-total-anual-desativados {
-                    color: #790E09 !important;
+                    background: linear-gradient(180deg, rgba(47, 55, 71, 0.045) 0%, rgba(47, 55, 71, 0.018) 100%) !important;
+                    color: #1F2937 !important;
                     font-weight: 600;
-                    border-left: 1px solid #FFFFFF;
-                    border-right: 1px solid #FFFFFF;
+                    border-left: 1px solid rgba(47, 55, 71, 0.06);
+                    border-right: 1px solid rgba(47, 55, 71, 0.06);
+                }
+
+                .linha-regional-desativados td.col-mes-2025-desativados {
                     background: transparent !important;
+                    color: #2F3747 !important;
+                    font-weight: 600;
+                    border-left: 1px solid rgba(47, 55, 71, 0.04);
+                    border-right: 1px solid rgba(47, 55, 71, 0.04);
                 }
 
                 .linha-regional-desativados td.col-real-mes-desativados {
-                    color: #6B1F1A !important;
+                    background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+                    color: #1F2937 !important;
                     font-weight: 600;
-                    border-left: 1px solid #FFFFFF;
-                    border-right: 1px solid #FFFFFF;
-                    background: transparent !important;
+                    border-left: 1px solid rgba(47, 55, 71, 0.08);
+                    border-right: 1px solid rgba(47, 55, 71, 0.08);
                 }
 
                 .linha-regional-desativados td.col-variacao-desativados {
-                    background: transparent !important;
+                    background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                    border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                    border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                 }
                 
                 .tabela-container-desativados::-webkit-scrollbar {
@@ -10538,9 +11037,9 @@ with tab2:
                 }
 
                 .tabela-desativados td {
-                    padding: 4px 4px !important;
-                    font-size: 9.5px !important;
-                    line-height: 1.1 !important;
+                    padding: 4.8px 4px !important;
+                    font-size: 10px !important;
+                    line-height: 1.18 !important;
                     box-shadow: none !important;
                     font-weight: 400 !important;
                     font-family: 'Manrope', 'Segoe UI', sans-serif !important;
@@ -10552,8 +11051,8 @@ with tab2:
                 }
 
                 .linha-regional-desativados:hover {
-                    background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                    box-shadow: inset 0 0 0 1px #F1CBC4 !important;
+                    background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                    box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
                 }
 
                 .tabela-desativados td.percentual-positivo-desativados {
@@ -10561,7 +11060,9 @@ with tab2:
                     font-weight: 700;
                     position: relative;
                     padding-left: 16px !important;
-                    background: transparent !important;
+                    background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                    border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                    border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                 }
 
                 .tabela-desativados td.percentual-positivo-desativados::before {
@@ -10575,10 +11076,16 @@ with tab2:
                     color: #2E7D32;
                 }
 
-                .tabela-desativados tr td:first-child,
-                .linha-total-desativados td,
-                .tabela-desativados td[class*="percentual-"] {
-                    font-weight: 400 !important;
+                .tabela-desativados tr:not(.linha-total-desativados) td:first-child {
+                    font-weight: 600 !important;
+                }
+
+                .linha-total-desativados td {
+                    font-weight: 700 !important;
+                }
+
+                .linha-total-desativados td:first-child {
+                    font-weight: 800 !important;
                 }
 
                 .tabela-desativados td.percentual-negativo-desativados {
@@ -10586,7 +11093,9 @@ with tab2:
                     font-weight: 700;
                     position: relative;
                     padding-left: 16px !important;
-                    background: transparent !important;
+                    background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                    border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                    border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                 }
 
                 .tabela-desativados td.percentual-negativo-desativados::before {
@@ -10602,8 +11111,10 @@ with tab2:
 
                 .tabela-desativados td.percentual-neutro-desativados {
                     color: #666666 !important;
-                    font-weight: 600;
-                    background: transparent !important;
+                    font-weight: 500;
+                    background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                    border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                    border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                 }
             </style>
             
@@ -10619,10 +11130,13 @@ with tab2:
                 classe_header = ""
                 if col_str in ['Total 2025', 'Silentes 2025']:
                     classe_header = "col-total-anual-desativados"
+                elif col_str in meses_2025:
+                    classe_header = "col-mes-2025-desativados"
                 elif col_str in ['Real Jan/26', 'Silentes Jan/26']:
                     classe_header = "col-real-mes-desativados"
                 elif col_str in ['Var MoM', '% Silentes'] or col_str.startswith('%') or 'Var' in col_str:
                     classe_header = "col-variacao-desativados"
+                
                 html += f'<th class="{classe_header}">{col}</th>'
             
             html += "</tr></thead><tbody>"
@@ -10638,6 +11152,8 @@ with tab2:
                     classes_celula = []
                     if col_str in ['Total 2025', 'Silentes 2025']:
                         classes_celula.append("col-total-anual-desativados")
+                    elif col_str in meses_2025:
+                        classes_celula.append("col-mes-2025-desativados")
                     elif col_str in ['Real Jan/26', 'Silentes Jan/26']:
                         classes_celula.append("col-real-mes-desativados")
                     elif col_str in ['Var MoM', '% Silentes'] or col_str.startswith('%') or 'Var' in col_str:
@@ -11746,10 +12262,12 @@ with tab3:
                         background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
                     }
                     
-                    .tabela-pedidos th.col-mes-pedidos {
+                    .tabela-pedidos th.col-mes-pedidos,
+                    .tabela-pedidos th.col-mes-2026-pedidos {
                         background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                     }
                     
+                    .tabela-pedidos th.col-tend-pedidos,
                     .tabela-pedidos th.col-real-jan26-pedidos {
                         background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
                     }
@@ -11833,64 +12351,76 @@ with tab3:
                     }
                     
                     .linha-regional-pedidos:nth-child(even) {
-                        background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+                        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
                     }
                     
                     .linha-regional-pedidos:nth-child(odd) {
-                        background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+                        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
                     }
                     
                     .linha-regional-pedidos:hover {
-                        background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                        box-shadow: inset 0 0 0 1px #F1CBC4;
-                        transform: translateY(-1px);
+                        background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                        box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+                        transform: none;
                     }
                     
                     .linha-regional-pedidos td.col-total-anual-pedidos {
-                        background: transparent !important;
-                        color: #790E09 !important;
+                        background: linear-gradient(180deg, rgba(47, 55, 71, 0.045) 0%, rgba(47, 55, 71, 0.018) 100%) !important;
+                        color: #1F2937 !important;
                         font-weight: 600;
-                        border-left: 1px solid #FFFFFF;
-                        border-right: 1px solid #FFFFFF;
+                        border-left: 1px solid rgba(47, 55, 71, 0.06);
+                        border-right: 1px solid rgba(47, 55, 71, 0.06);
                     }
                     
                     .linha-regional-pedidos td.col-mes-pedidos {
                         background: transparent !important;
-                        color: #333 !important;
-                        border-left: 1px solid #FFFFFF;
-                        border-right: 1px solid #FFFFFF;
+                        color: #2F3747 !important;
+                        font-weight: 600;
+                        border-left: 1px solid rgba(47, 55, 71, 0.04);
+                        border-right: 1px solid rgba(47, 55, 71, 0.04);
                     }
                     
+                    .linha-regional-pedidos td.col-mes-2026-pedidos,
                     .linha-regional-pedidos td.col-real-jan26-pedidos {
-                        background: transparent !important;
+                        background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+                        color: #1F2937 !important;
+                        font-weight: 600;
+                        border-left: 1px solid rgba(47, 55, 71, 0.08);
+                        border-right: 1px solid rgba(47, 55, 71, 0.08);
+                    }
+                    
+                    .linha-regional-pedidos td.col-tend-pedidos {
+                        background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+                        color: #1F2937 !important;
+                        font-weight: 600;
+                        border-left: 1px solid rgba(47, 55, 71, 0.08);
+                        border-right: 1px solid rgba(47, 55, 71, 0.08);
+                    }
+
+                    .linha-regional-pedidos td.col-meta-pedidos {
+                        background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
                         color: #6B1F1A !important;
                         font-weight: 600;
-                        border-left: 1px solid #FFFFFF;
-                        border-right: 1px solid #FFFFFF;
-                    }
-                    
-                    .linha-regional-pedidos td.col-meta-pedidos {
-                        background: transparent !important;
-                        color: #B71C1C !important;
-                        font-weight: 600;
-                        border-left: 1px solid #FFFFFF;
-                        border-right: 1px solid #FFFFFF;
+                        border-left: 1px solid rgba(121, 14, 9, 0.08);
+                        border-right: 1px solid rgba(121, 14, 9, 0.08);
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos {
-                        background-color: transparent !important;
+                        background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                        border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                        border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-positivo-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos.percentual-positivo-pedidos {
                         color: #1B5E20 !important;
-                        background: transparent !important;
+                        background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
                         font-weight: 700;
                         position: relative;
                         padding-left: 16px !important;
-                        border-left: 1px solid #FFFFFF !important;
-                        border-right: 1px solid #FFFFFF !important;
+                        border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                        border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-positivo-pedidos::before,
@@ -11908,12 +12438,12 @@ with tab3:
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-negativo-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos.percentual-negativo-pedidos {
                         color: #C62828 !important;
-                        background: transparent !important;
+                        background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
                         font-weight: 700;
                         position: relative;
                         padding-left: 16px !important;
-                        border-left: 1px solid #FFFFFF !important;
-                        border-right: 1px solid #FFFFFF !important;
+                        border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                        border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                     }
                     
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-negativo-pedidos::before,
@@ -11931,15 +12461,15 @@ with tab3:
                     .linha-regional-pedidos td.col-alcance-pedidos.percentual-neutro-pedidos,
                     .linha-regional-pedidos td.col-variacao-pedidos.percentual-neutro-pedidos {
                         color: #666666 !important;
-                        background: transparent !important;
+                        background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
                         font-weight: 500;
                     }
                     
                     .linha-regional-pedidos td:hover {
-                        transform: scale(1.02);
-                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                        z-index: 10;
-                        position: relative;
+                        transform: none;
+                        box-shadow: none;
+                        z-index: auto;
+                        position: static;
                     }
                     
                     .linha-regional-pedidos td.performance-excelente-pedidos {
@@ -12004,9 +12534,9 @@ with tab3:
                     }
 
                     .tabela-pedidos td {
-                        padding: 4px 4px !important;
-                        font-size: 9.5px !important;
-                        line-height: 1.1 !important;
+                        padding: 4.8px 4px !important;
+                        font-size: 10px !important;
+                        line-height: 1.18 !important;
                         box-shadow: none !important;
                         font-weight: 400 !important;
                         font-family: 'Manrope', 'Segoe UI', sans-serif !important;
@@ -12018,8 +12548,8 @@ with tab3:
                     }
 
                     .linha-regional-pedidos:hover {
-                        background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                        box-shadow: inset 0 0 0 1px #F1CBC4 !important;
+                        background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                        box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
                     }
 
                     .linha-regional-pedidos td.performance-excelente-pedidos,
@@ -12027,10 +12557,16 @@ with tab3:
                         animation: none !important;
                     }
 
-                    .tabela-pedidos tr td:first-child,
-                    .linha-total-pedidos td,
-                    .tabela-pedidos td[class*="percentual-"] {
-                        font-weight: 400 !important;
+                    .tabela-pedidos tr:not(.linha-total-pedidos) td:first-child {
+                        font-weight: 600 !important;
+                    }
+
+                    .linha-total-pedidos td {
+                        font-weight: 700 !important;
+                    }
+
+                    .linha-total-pedidos td:first-child {
+                        font-weight: 800 !important;
                     }
                 </style>
                 
@@ -12049,10 +12585,14 @@ with tab3:
                         classe = "col-total-anual-pedidos"
                     elif col in meses_2025_pedidos:
                         classe = "col-mes-pedidos"
-                    elif str(col).startswith('Tend ') or col == 'Real Jan/26':
-                        classe = "col-real-jan26-pedidos"
+                    elif str(col).startswith('Tend '):
+                        classe = "col-tend-pedidos"
                     elif 'Orç' in col and col != 'TEND vs ORÇ':
                         classe = "col-meta-pedidos"
+                    elif col == 'Real Jan/26':
+                        classe = "col-real-jan26-pedidos"
+                    elif str(col).endswith('/26'):
+                        classe = "col-mes-2026-pedidos"
                     elif 'Alcance' in col or col == 'TEND vs ORÇ':
                         classe = "col-alcance-pedidos"
                     elif 'Var' in col or col == 'MOM':
@@ -12078,10 +12618,14 @@ with tab3:
                                 classe_celula = "col-total-anual-pedidos"
                             elif col in meses_2025_pedidos:
                                 classe_celula = "col-mes-pedidos"
-                            elif str(col).startswith('Tend ') or col == 'Real Jan/26':
-                                classe_celula = "col-real-jan26-pedidos"
+                            elif str(col).startswith('Tend '):
+                                classe_celula = "col-tend-pedidos"
                             elif 'Orç' in col and col != 'TEND vs ORÇ':
                                 classe_celula = "col-meta-pedidos"
+                            elif col == 'Real Jan/26':
+                                classe_celula = "col-real-jan26-pedidos"
+                            elif str(col).endswith('/26'):
+                                classe_celula = "col-mes-2026-pedidos"
                             elif 'Alcance' in col or col == 'TEND vs ORÇ':
                                 classe_celula = "col-alcance-pedidos"
                             elif 'Var' in col or col == 'MOM':
@@ -12093,10 +12637,14 @@ with tab3:
                                 classe_celula = "col-total-anual-pedidos"
                             elif col in meses_2025_pedidos:
                                 classe_celula = "col-mes-pedidos"
-                            elif str(col).startswith('Tend ') or col == 'Real Jan/26':
-                                classe_celula = "col-real-jan26-pedidos"
+                            elif str(col).startswith('Tend '):
+                                classe_celula = "col-tend-pedidos"
                             elif 'Orç' in col and col != 'TEND vs ORÇ':
                                 classe_celula = "col-meta-pedidos"
+                            elif col == 'Real Jan/26':
+                                classe_celula = "col-real-jan26-pedidos"
+                            elif str(col).endswith('/26'):
+                                classe_celula = "col-mes-2026-pedidos"
                             elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'TEND vs ORÇ']:
                                 try:
                                     valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
@@ -13646,7 +14194,7 @@ with tab4:
                         .tabela-ligacoes th {
                             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
                             color: white !important;
-                            font-weight: 700;
+                            font-weight: 600;
                             padding: 5px 4px; /* compact */
                             text-align: center;
                             border-bottom: 3px solid #5A0A06;
@@ -13655,9 +14203,14 @@ with tab4:
                             overflow-wrap: anywhere;
                             word-break: break-word;
                             font-size: 9px;
-                            letter-spacing: 0.3px;
+                            letter-spacing: 0.5px;
                             text-transform: uppercase;
                             position: relative;
+                            transition: all 0.2s ease;
+                        }
+
+                        .tabela-ligacoes th:hover {
+                            background: linear-gradient(135deg, #8A1F1A 0%, #6B0F0B 100%) !important;
                         }
                         
                         .tabela-ligacoes th.col-regional {
@@ -13710,7 +14263,7 @@ with tab4:
                             text-align: left;
                             font-weight: 700;
                             color: #333;
-                            background: linear-gradient(90deg, #fef5f4 0%, white 100%) !important;
+                            background: transparent !important;
                             padding-left: 7px;
                             border-right: 1px solid #FFFFFF;
                         }
@@ -13738,17 +14291,57 @@ with tab4:
                         }
                         
                         .linha-regional-ligacoes:nth-child(even) {
-                            background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+                            background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
                         }
                         
                         .linha-regional-ligacoes:nth-child(odd) {
-                            background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+                            background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
                         }
                         
                         .linha-regional-ligacoes:hover {
-                            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                            transform: translateY(-1px);
-                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                            transform: none;
+                            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+                        }
+
+                        .linha-regional-ligacoes td.col-total-anual {
+                            background: linear-gradient(180deg, rgba(47, 55, 71, 0.045) 0%, rgba(47, 55, 71, 0.018) 100%) !important;
+                            color: #1F2937 !important;
+                            font-weight: 600;
+                            border-left: 1px solid rgba(47, 55, 71, 0.06);
+                            border-right: 1px solid rgba(47, 55, 71, 0.06);
+                        }
+
+                        .linha-regional-ligacoes td.col-mes-2025 {
+                            background: transparent !important;
+                            color: #2F3747 !important;
+                            font-weight: 600;
+                            border-left: 1px solid rgba(47, 55, 71, 0.04);
+                            border-right: 1px solid rgba(47, 55, 71, 0.04);
+                        }
+
+                        .linha-regional-ligacoes td.col-mes-2026,
+                        .linha-regional-ligacoes td.col-real-mes {
+                            background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+                            color: #1F2937 !important;
+                            font-weight: 600;
+                            border-left: 1px solid rgba(47, 55, 71, 0.08);
+                            border-right: 1px solid rgba(47, 55, 71, 0.08);
+                        }
+
+                        .linha-regional-ligacoes td.col-meta-mes {
+                            background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
+                            color: #6B1F1A !important;
+                            font-weight: 600;
+                            border-left: 1px solid rgba(121, 14, 9, 0.08);
+                            border-right: 1px solid rgba(121, 14, 9, 0.08);
+                        }
+
+                        .linha-regional-ligacoes td.col-alcance,
+                        .linha-regional-ligacoes td.col-variacao {
+                            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                         }
                         
                         .valor-negativo {
@@ -13756,14 +14349,25 @@ with tab4:
                             font-weight: 700;
                             position: relative;
                             padding-left: 16px !important;
-                            background: transparent !important;
+                            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                         }
                         .valor-positivo {
                             color: #1B5E20 !important;
                             font-weight: 700;
                             position: relative;
                             padding-left: 16px !important;
-                            background: transparent !important;
+                            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
+                        }
+                        .valor-neutro {
+                            color: #666666 !important;
+                            font-weight: 500;
+                            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                         }
                         .valor-positivo::before {
                             content: "▲";
@@ -13841,9 +14445,9 @@ with tab4:
                         }
 
                         .tabela-ligacoes td {
-                            padding: 4px 4px !important;
-                            font-size: 9.5px !important;
-                            line-height: 1.1 !important;
+                            padding: 4.8px 4px !important;
+                            font-size: 10px !important;
+                            line-height: 1.18 !important;
                             box-shadow: none !important;
                             font-weight: 400 !important;
                             font-family: 'Manrope', 'Segoe UI', sans-serif !important;
@@ -13855,16 +14459,16 @@ with tab4:
                         }
 
                         .linha-regional-ligacoes:hover {
-                            background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                            box-shadow: inset 0 0 0 1px #F1CBC4 !important;
+                            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
                         }
 
-                        .tabela-ligacoes tr td:first-child,
-                        .linha-total-ligacoes td,
-                        .tabela-ligacoes td.valor-positivo,
-                        .tabela-ligacoes td.valor-negativo,
-                        .tabela-ligacoes td.valor-destaque {
-                            font-weight: 400 !important;
+                        .tabela-ligacoes tr:not(.linha-total-ligacoes) td:first-child {
+                            font-weight: 700 !important;
+                        }
+
+                        .linha-total-ligacoes td {
+                            font-weight: 800 !important;
                         }
                     </style>
                     
@@ -13883,7 +14487,7 @@ with tab4:
                         if col == 'Regional':
                             classe = "col-regional"
                         elif col == col_real_mes_nome:
-                            classe = "col-mes-2025"
+                            classe = "col-real-mes"
                         elif col in meses_lista:
                             if '/25' in col:
                                 classe = "col-mes-2025"
@@ -13919,11 +14523,39 @@ with tab4:
                             if is_total:
                                 if col == 'Regional':
                                     classes_celula.append("col-regional")
-                                elif 'Real' in col or 'Orç' in col or 'Total' in col:
-                                    classes_celula.append("valor-destaque")
+                                elif col == 'Total 2025':
+                                    classes_celula.append("col-total-anual")
+                                elif col == col_real_mes_nome:
+                                    classes_celula.append("col-real-mes")
+                                elif col in meses_lista:
+                                    if '/25' in col:
+                                        classes_celula.append("col-mes-2025")
+                                    elif '/26' in col:
+                                        classes_celula.append("col-mes-2026")
+                                elif 'Orç' in col and col != 'TEND vs ORÇ':
+                                    classes_celula.append("col-meta-mes")
+                                elif 'Alcance' in col or col == 'TEND vs ORÇ':
+                                    classes_celula.append("col-alcance")
+                                elif 'Var' in col or col == 'MOM':
+                                    classes_celula.append("col-variacao")
                             else:
                                 if col == 'Regional':
                                     classes_celula.append("col-regional")
+                                elif col == 'Total 2025':
+                                    classes_celula.append("col-total-anual")
+                                elif col == col_real_mes_nome:
+                                    classes_celula.append("col-real-mes")
+                                elif col in meses_lista:
+                                    if '/25' in col:
+                                        classes_celula.append("col-mes-2025")
+                                    elif '/26' in col:
+                                        classes_celula.append("col-mes-2026")
+                                elif 'Orç' in col and col != 'TEND vs ORÇ':
+                                    classes_celula.append("col-meta-mes")
+                                elif 'Alcance' in col or col == 'TEND vs ORÇ':
+                                    classes_celula.append("col-alcance")
+                                elif 'Var' in col or col == 'MOM':
+                                    classes_celula.append("col-variacao")
                                 
                                 # Aplicar cores baseadas em valores
                                 if col in ['MOM', 'TEND vs ORÇ']:
@@ -13933,6 +14565,8 @@ with tab4:
                                             classes_celula.append("valor-positivo")
                                         elif valor_num < 0:
                                             classes_celula.append("valor-negativo")
+                                        else:
+                                            classes_celula.append("valor-neutro")
                                         
                                         # Indicador de performance para alcance da meta
                                         if (col == 'TEND vs ORÇ' or 'Alcance' in col) and valor_num > 0:
@@ -14793,16 +15427,16 @@ with tab5:
             }
 
             .linha-item-performance:nth-child(even) td {
-                background: linear-gradient(135deg, #FBF0EE 0%, #F8E8E6 100%) !important;
+                background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
             }
 
             .linha-item-performance:nth-child(odd) td {
-                background: linear-gradient(135deg, #FFF7F6 0%, #FCEFEA 100%) !important;
+                background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
             }
 
             .linha-item-performance:hover td {
-                background: linear-gradient(135deg, #FCE9E6 0%, #F8DFDA 100%) !important;
-                box-shadow: inset 0 0 0 1px #F1CBC4 !important;
+                background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
             }
 
             .linha-item-performance td.col-indicador {
@@ -14818,22 +15452,38 @@ with tab5:
                 padding-left: 10px !important;
             }
 
-            .linha-item-performance td.col-mes,
-            .linha-item-performance td.col-total-anual,
-            .linha-item-performance td.col-meta {
+            .linha-item-performance td.col-mes {
                 background: transparent !important;
-                color: #333 !important;
+                color: #2F3747 !important;
                 font-weight: 400 !important;
             }
 
+            .linha-item-performance td.col-total-anual {
+                background: linear-gradient(180deg, rgba(47, 55, 71, 0.045) 0%, rgba(47, 55, 71, 0.018) 100%) !important;
+                color: #1F2937 !important;
+                font-weight: 600 !important;
+                border-left: 1px solid rgba(47, 55, 71, 0.06) !important;
+                border-right: 1px solid rgba(47, 55, 71, 0.06) !important;
+            }
+
             .linha-item-performance td.col-meta {
-                border-left: 1px solid #FFFFFF !important;
-                border-right: 1px solid #FFFFFF !important;
+                background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
+                color: #6B1F1A !important;
+                font-weight: 600 !important;
+                border-left: 1px solid rgba(121, 14, 9, 0.08) !important;
+                border-right: 1px solid rgba(121, 14, 9, 0.08) !important;
+            }
+
+            .linha-item-performance td.col-meta {
+                border-left: 1px solid rgba(121, 14, 9, 0.08) !important;
+                border-right: 1px solid rgba(121, 14, 9, 0.08) !important;
             }
 
             .linha-item-performance td.col-variacao,
             .linha-item-performance td.col-alcance {
-                background-color: transparent !important;
+                background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
             }
 
             .tabela-container-performance-canal::-webkit-scrollbar {
@@ -14854,8 +15504,8 @@ with tab5:
 
             /* Compactação final */
             .tabela-performance-canal {
-                font-size: 9.5px !important;
-                line-height: 1.05 !important;
+                font-size: 10px !important;
+                line-height: 1.12 !important;
                 table-layout: fixed !important;
                 width: 100% !important;
                 min-width: 100% !important;
@@ -14872,9 +15522,9 @@ with tab5:
             }
 
             .tabela-performance-canal td {
-                padding: 3px 5px !important;
-                font-size: 9.5px !important;
-                line-height: 1.05 !important;
+                padding: 3.7px 5px !important;
+                font-size: 10px !important;
+                line-height: 1.12 !important;
                 font-weight: 400 !important;
                 white-space: nowrap !important;
                 overflow: hidden !important;
@@ -14882,8 +15532,8 @@ with tab5:
             }
 
             .linha-grupo-performance td {
-                padding: 4px 6px !important;
-                font-size: 9.5px !important;
+                padding: 4.7px 6px !important;
+                font-size: 10px !important;
                 letter-spacing: 0.2px !important;
             }
 
@@ -14900,14 +15550,14 @@ with tab5:
             .linha-item-performance td.pct-positivo,
             .linha-item-performance td.pct-negativo {
                 padding-left: 14px !important;
-                background: transparent !important;
-                border-left: 1px solid #FFFFFF !important;
-                border-right: 1px solid #FFFFFF !important;
-                font-weight: 400 !important;
+                background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+                border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+                border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
+                font-weight: 700 !important;
             }
 
             .linha-item-performance td.pct-neutro {
-                background: transparent !important;
+                background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
             }
 
             .linha-item-performance td.pct-positivo::before,
