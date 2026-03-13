@@ -104,6 +104,89 @@ def normalizar_numerico_serie(serie):
     s = s.str.replace(r'[^0-9\.-]', '', regex=True)
     return pd.to_numeric(s, errors='coerce')
 
+def normalizar_chave_visual(texto: str) -> str:
+    """Normaliza textos para buscar ícones sem depender de acentuação."""
+    base = unicodedata.normalize("NFKD", str(texto or ""))
+    base = base.encode("ASCII", "ignore").decode("ASCII").lower()
+    base = re.sub(r'[^a-z0-9]+', ' ', base).strip()
+    return base
+
+def get_kpi_icon_svg(icon_hint: str | None = None) -> str:
+    """Retorna SVG inline simples para reforçar a leitura visual dos KPIs."""
+    chave = normalizar_chave_visual(icon_hint or "")
+    if "click" in chave:
+        icon_name = "cursor"
+    elif "target" in chave or "total" in chave:
+        icon_name = "target"
+    elif "pedido" in chave or "commerce" in chave or "carrinho" in chave:
+        icon_name = "cart"
+    elif "fixa" in chave or "liga" in chave or "chamada" in chave or "phone" in chave:
+        icon_name = "phone"
+    elif "conta" in chave or "movel" in chave or "mobile" in chave:
+        icon_name = "mobile"
+    elif "trend" in chave or "tend" in chave:
+        icon_name = "spark"
+    else:
+        icon_name = "grid"
+
+    icon_library = {
+        "grid": (
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<rect x="3" y="3" width="7" height="7" rx="1.6"></rect>'
+            '<rect x="14" y="3" width="7" height="7" rx="1.6"></rect>'
+            '<rect x="3" y="14" width="7" height="7" rx="1.6"></rect>'
+            '<rect x="14" y="14" width="7" height="7" rx="1.6"></rect>'
+            '</svg>'
+        ),
+        "phone": (
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 '
+            '2 2 0 0 1 4 11.09 19.8 19.8 0 0 1 .92 2.18 2 2 0 0 1 2.91 0h2A2 2 0 0 1 6.9 1.72c.12.9.33 1.78.62 '
+            '2.62a2 2 0 0 1-.45 2.11L5.91 7.91a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 '
+            '2.62.62A2 2 0 0 1 22 16.92z"></path>'
+            '</svg>'
+        ),
+        "mobile": (
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<rect x="7" y="2.5" width="10" height="19" rx="2.4"></rect>'
+            '<path d="M11 18.5h2"></path>'
+            '</svg>'
+        ),
+        "cart": (
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<circle cx="9" cy="20" r="1.7"></circle>'
+            '<circle cx="18" cy="20" r="1.7"></circle>'
+            '<path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path>'
+            '</svg>'
+        ),
+        "target": (
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<circle cx="12" cy="12" r="8.5"></circle>'
+            '<circle cx="12" cy="12" r="4.2"></circle>'
+            '<path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"></path>'
+            '</svg>'
+        ),
+        "cursor": (
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M5 4.5v14l4.2-3.2 3 5.2 2.5-1.4-3-5.2 5.8-.8L5 4.5z"></path>'
+            '</svg>'
+        ),
+        "spark": (
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M4 16l4.5-5 3.5 3 6-8"></path>'
+            '<path d="M14.5 6h3.5v3.5"></path>'
+            '</svg>'
+        ),
+    }
+    return icon_library.get(icon_name, icon_library["grid"])
+
 # =========================
 # CONFIGURAÇÕES DE ESTILO GLOBAL
 # =========================
@@ -1226,6 +1309,93 @@ st.markdown("""
             flex: 0 0 auto;
         }
 
+        .kpi-grid-dual {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .kpi-title-dinamico {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            background: none !important;
+            color: #5A0A06 !important;
+            -webkit-text-fill-color: initial !important;
+        }
+
+        .kpi-title-text {
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(180deg, #7A1E19 0%, #5A0A06 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .kpi-title-icon,
+        .kpi-block-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+        }
+
+        .kpi-title-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #FF2800 0%, #790E09 100%);
+            color: #FFFFFF !important;
+            box-shadow: 0 8px 18px rgba(121, 14, 9, 0.18);
+        }
+
+        .kpi-title-icon svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        .kpi-block-label {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .kpi-block-label::before {
+            display: none !important;
+        }
+
+        .kpi-block-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, rgba(255, 40, 0, 0.12), rgba(121, 14, 9, 0.18));
+            color: #790E09 !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+        }
+
+        .kpi-block-icon svg {
+            width: 10px;
+            height: 10px;
+        }
+
+        .kpi-value-dinamico {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .kpi-tooltip {
+            gap: 4px;
+            min-width: auto;
+            padding: 0 7px;
+        }
+
+        .kpi-tooltip svg {
+            width: 10px;
+            height: 10px;
+        }
+
         .variacao-positiva {
             color: #166534 !important;
             background: linear-gradient(180deg, #F4FBF6 0%, #E8F5ED 100%) !important;
@@ -1814,6 +1984,16 @@ st.markdown("""
                 min-height: 48px;
             }
 
+            .kpi-grid-dual {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .kpi-title-icon {
+                width: 28px;
+                height: 28px;
+            }
+
             .kpi-card-stack-soft-left,
             .kpi-card-stack-soft-right {
                 left: 0;
@@ -1975,6 +2155,126 @@ else:
 
 st.markdown(kpi_pill_style, unsafe_allow_html=True)
 
+# Premium visual tuning for KPI cards, aligned with app9.py.
+st.markdown(
+    """
+    <style>
+    :root {
+        --claro-red: #FF2800;
+        --claro-red-deep: #790E09;
+        --claro-red-dark: #5A0A06;
+        --claro-shadow-soft: 0 0.75rem 2rem rgba(121, 14, 9, 0.08);
+        --claro-shadow-medium: 0 1rem 2.4rem rgba(121, 14, 9, 0.12);
+    }
+
+    .kpi-card-dinamico,
+    .kpi-block-dinamico,
+    [data-testid="stMetric"] {
+        border-radius: 1.1rem !important;
+        border: 1px solid rgba(121, 14, 9, 0.10) !important;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 40, 0, 0.06) 0%, rgba(255, 40, 0, 0.00) 32%),
+            linear-gradient(180deg, #FFFFFF 0%, #FBFBFC 100%) !important;
+        box-shadow: var(--claro-shadow-soft) !important;
+    }
+
+    .kpi-card-dinamico::before,
+    .kpi-block-dinamico::before {
+        background: linear-gradient(90deg, #FF2800 0%, #790E09 100%) !important;
+    }
+
+    .kpi-title-dinamico {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.65rem !important;
+        font-size: 1rem !important;
+    }
+
+    .kpi-title-icon {
+        width: 2rem !important;
+        height: 2rem !important;
+        border-radius: 0.75rem !important;
+        background: linear-gradient(135deg, #FF2800 0%, #790E09 100%) !important;
+        color: #FFFFFF !important;
+    }
+
+    .kpi-title-icon svg {
+        width: 1.05rem !important;
+        height: 1.05rem !important;
+    }
+
+    .kpi-block-label,
+    .kpi-block-label span {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.38rem !important;
+    }
+
+    .kpi-block-icon {
+        width: 1rem !important;
+        height: 1rem !important;
+        color: var(--claro-red-deep) !important;
+    }
+
+    .kpi-title-dinamico.is-primary .kpi-title-text {
+        font-size: 1.04rem !important;
+    }
+
+    .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) {
+        border-color: rgba(255, 40, 0, 0.20) !important;
+        box-shadow: var(--claro-shadow-medium) !important;
+        transform: translateY(-0.05rem);
+    }
+
+    .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) .kpi-value-wrap {
+        border-color: rgba(255, 40, 0, 0.18) !important;
+        box-shadow: 0 0.85rem 1.6rem rgba(121, 14, 9, 0.10) !important;
+    }
+
+    .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) .kpi-value-dinamico {
+        font-size: 1.95rem !important;
+    }
+
+    @media (max-width: 768px) {
+        .kpi-card-dinamico,
+        .kpi-block-dinamico,
+        [data-testid="stMetric"] {
+            border-radius: 0.9rem !important;
+            box-shadow: 0 0.35rem 0.85rem rgba(121, 14, 9, 0.05) !important;
+            background: #FFFFFF !important;
+        }
+
+        .kpi-title-dinamico {
+            gap: 0.45rem !important;
+            font-size: 0.86rem !important;
+        }
+
+        .kpi-title-icon {
+            width: 1.55rem !important;
+            height: 1.55rem !important;
+            border-radius: 0.55rem !important;
+        }
+
+        .kpi-title-icon svg {
+            width: 0.84rem !important;
+            height: 0.84rem !important;
+        }
+
+        .kpi-value-dinamico {
+            font-size: 1.45rem !important;
+            text-shadow: none !important;
+        }
+
+        .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) .kpi-value-dinamico {
+            font-size: 1.6rem !important;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # =========================
 # FUNÇÕES AUXILIARES
 # =========================
@@ -2045,12 +2345,23 @@ def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float 
     if not req_cols.issubset(set(df_lig.columns)):
         return pd.DataFrame()
 
-    coluna_data = next((c for c in ['PERIODO', 'DATA_MOVIMENTO', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO2'] if c in df_lig.columns), None)
-    if coluna_data is None:
+    # Regra da demanda diária: prioriza a data granular do movimento.
+    # `PERIODO` fica como último fallback para não concentrar todo o mês em uma data sintética.
+    coluna_data = None
+    serie_data_ref = None
+    for col_ref in ['DATA_MOVIMENTO', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO2', 'PERIODO']:
+        if col_ref not in df_lig.columns:
+            continue
+        serie_tmp = pd.to_datetime(df_lig[col_ref], errors='coerce')
+        if serie_tmp.notna().any():
+            coluna_data = col_ref
+            serie_data_ref = serie_tmp
+            break
+    if coluna_data is None or serie_data_ref is None:
         return pd.DataFrame()
 
     df_work = df_lig.copy()
-    df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work[coluna_data], errors='coerce')
+    df_work['DAT_MOVIMENTO2'] = serie_data_ref
     df_work = df_work[df_work['DAT_MOVIMENTO2'].notna()].copy()
     if df_work.empty:
         return pd.DataFrame()
@@ -2163,16 +2474,44 @@ def render_filter_label(texto: str):
     """Renderiza rótulo padrão para filtros com label colapsado."""
     st.markdown(f'<div class="filter-label-standard">{texto}</div>', unsafe_allow_html=True)
 
+def build_kpi_title_html(title: str, icon_hint: str | None = None) -> str:
+    """Monta o título dos cards KPI com ícone inline e rótulo acessível."""
+    title_txt = escape(str(title))
+    icon_svg = get_kpi_icon_svg(icon_hint or title)
+    title_key = normalizar_chave_visual(title)
+    prioridade = " is-primary" if "total" in title_key else ""
+    return (
+        f'<div class="kpi-title-dinamico{prioridade}" aria-label="{title_txt}">'
+        f'<span class="kpi-title-icon" aria-hidden="true">{icon_svg}</span>'
+        f'<span class="kpi-title-text">{title_txt}</span>'
+        '</div>'
+    )
+
+def build_kpi_block_label_html(label: str, icon_hint: str | None = None) -> str:
+    """Cria label compacta do bloco interno do card com um pequeno ícone."""
+    label_txt = escape(str(label))
+    icon_svg = get_kpi_icon_svg(icon_hint or label)
+    return (
+        f'<div class="kpi-block-label" aria-label="{label_txt}">'
+        f'<span class="kpi-block-icon" aria-hidden="true">{icon_svg}</span>'
+        f'<span>{label_txt}</span>'
+        '</div>'
+    )
+
 def build_tendencia_icon_html(usa_tendencia: bool) -> str:
     """Retorna ícone de tendência no valor KPI quando aplicável."""
     if not usa_tendencia:
         return ""
+    icon_svg = get_kpi_icon_svg("trend")
     return (
         '<span class="kpi-tooltip kpi-tooltip-inline" '
         'style="color:#FFFFFF !important;'
         '-webkit-text-fill-color:#FFFFFF !important;border:1px solid rgba(255,255,255,0.9);" '
         'title="Tendência = projeção de fechamento do mês com base no ritmo atual." '
-        'aria-label="Tendência aplicada ao valor">TEND</span>'
+        'aria-label="Tendência aplicada ao valor">'
+        f'{icon_svg}'
+        '<span>TEND</span>'
+        '</span>'
     )
 
 def build_kpi_meta_line(
@@ -6556,8 +6895,8 @@ with tab1:
                     meta_html = '<div class="kpi-variacao-item variacao-neutra" style="font-size: 10px !important;">Orç N/A</div>'
                 
                 bloco_html += (
-                    f'<div class="kpi-block-dinamico">'
-                    f'<div class="kpi-block-label">{plataforma}</div>'
+                    f'<div class="kpi-block-dinamico" title="Resumo de {plataforma} no canal {escape(canal)}" aria-label="Resumo de {plataforma} no canal {escape(canal)}">'
+                    f'{build_kpi_block_label_html(plataforma)}'
                     f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_formatado}</div>{tendencia_icon_html}</div>'
                     f'{real_hint_html}'
                     f'<div class="kpi-meta-line">'
@@ -6573,9 +6912,9 @@ with tab1:
             with cols[j]:
                 with st.container():
                     st.markdown(
-                        f'<div class="kpi-card-dinamico animate-fade-in-up">'
-                        f'<div class="kpi-title-dinamico">{canal}</div>'
-                        f'<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">{bloco_html}</div>'
+                        f'<div class="kpi-card-dinamico animate-fade-in-up" title="Resumo consolidado do canal {escape(canal)}" aria-label="Resumo consolidado do canal {escape(canal)}">'
+                        f'{build_kpi_title_html(canal, "canal")}'
+                        f'<div class="kpi-grid-dual">{bloco_html}</div>'
                         f'</div>',
                         unsafe_allow_html=True
                     )
@@ -8078,8 +8417,8 @@ with tab2:
                 with cols[j]:
                     st.markdown(
                         f"""
-                        <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 10px auto; max-width: 360px; min-height: 72px !important; padding: 7px 8px !important;">
-                            <div class="kpi-title-dinamico">{canal}</div>
+                        <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 10px auto; max-width: 360px; min-height: 72px !important; padding: 7px 8px !important;" title="Resumo de desativados do canal {escape(canal)}" aria-label="Resumo de desativados do canal {escape(canal)}">
+                            {build_kpi_title_html(canal, "canal")}
                             <div style="text-align: center; padding: 3px 0;">
                                 <div class="kpi-value-dinamico">{total_atual_fmt}</div>
                                 <div class="kpi-meta-line" style="margin: 5px 0; white-space: nowrap;">
@@ -9363,8 +9702,8 @@ with tab3:
         
         with col_cards:
             card_conta_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="{pedido_card_style}">'
-                f'<div class="kpi-title-dinamico">PEDIDOS CONTA</div>'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="{pedido_card_style}" title="Resumo de pedidos Conta" aria-label="Resumo de pedidos Conta">'
+                f'{build_kpi_title_html("PEDIDOS CONTA", "pedidos conta")}'
                 f'<div style="{pedido_card_inner_style}">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_conta_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
@@ -9383,8 +9722,8 @@ with tab3:
             st.markdown(card_conta_html, unsafe_allow_html=True)
 
             card_fixa_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up" style="{pedido_card_style}">'
-                f'<div class="kpi-title-dinamico">PEDIDOS FIXA</div>'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" style="{pedido_card_style}" title="Resumo de pedidos Fixa" aria-label="Resumo de pedidos Fixa">'
+                f'{build_kpi_title_html("PEDIDOS FIXA", "pedidos fixa")}'
                 f'<div style="{pedido_card_inner_style}">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_fixa_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
@@ -10656,10 +10995,9 @@ with tab4:
     # CARREGAR DADOS DE LIGAÇÕES (BASE REAL) - CORRIGIDO
     # =========================
     @st.cache_data(ttl=3600)
-    def load_ligacoes_base():
+    def load_ligacoes_base(ligacoes_mtime: float | None = None):
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
-            ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
             df_ligacoes = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
             if df_ligacoes.empty:
                 return pd.DataFrame()
@@ -10794,7 +11132,8 @@ with tab4:
     # CARREGAR DADOS
     # =========================
     with st.spinner('📥 Carregando dados REAIS de ligações...'):
-        df_lig = load_ligacoes_base()
+        ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+        df_lig = load_ligacoes_base(ligacoes_mtime)
     
     if df_lig.empty:
         st.error("""
@@ -11230,8 +11569,8 @@ with tab4:
         
         with col1:
             card_total_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up">'
-                f'<div class="kpi-title-dinamico">TOTAL LIGAÇÕES</div>'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" title="Resumo total de ligações" aria-label="Resumo total de ligações">'
+                f'{build_kpi_title_html("TOTAL LIGAÇÕES", "total ligacoes")}'
                 f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{total_atual_fmt}</div>{tendencia_icon_total}</div>'
                 f'{real_hint_total}'
@@ -11253,8 +11592,8 @@ with tab4:
         
         with col2:
             card_fixa_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up">'
-                f'<div class="kpi-title-dinamico">LIGAÇÕES FIXA</div>'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" title="Resumo de ligações Fixa" aria-label="Resumo de ligações Fixa">'
+                f'{build_kpi_title_html("LIGAÇÕES FIXA", "ligacoes fixa")}'
                 f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{fixa_atual_fmt}</div>{tendencia_icon_fixa}</div>'
                 f'{real_hint_fixa}'
@@ -11277,8 +11616,8 @@ with tab4:
         
         with col3:
             card_conta_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up">'
-                f'<div class="kpi-title-dinamico">LIGAÇÕES CONTA</div>'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" title="Resumo de ligações Conta" aria-label="Resumo de ligações Conta">'
+                f'{build_kpi_title_html("LIGAÇÕES CONTA", "ligacoes conta")}'
                 f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{conta_atual_fmt}</div>{tendencia_icon_conta}</div>'
                 f'{real_hint_conta}'
@@ -11301,8 +11640,8 @@ with tab4:
         
         with col4:
             card_ctc_html = (
-                f'<div class="kpi-card-dinamico animate-fade-in-up">'
-                f'<div class="kpi-title-dinamico">CLICK TO CALL</div>'
+                f'<div class="kpi-card-dinamico animate-fade-in-up" title="Resumo de Click to Call" aria-label="Resumo de Click to Call">'
+                f'{build_kpi_title_html("CLICK TO CALL", "click to call")}'
                 f'<div style="text-align: center; padding: 3px 0;">'
                 f'<div class="kpi-value-dinamico">{clicktocall_atual_fmt}</div>'
                 f'<div class="kpi-meta-line" style="margin: 3px 0;">'
@@ -12514,13 +12853,12 @@ with tab5:
         return df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem
 
     @st.cache_data(ttl=3600)
-    def load_ligacoes_para_performance():
+    def load_ligacoes_para_performance(ligacoes_mtime: float | None = None):
         colunas_saida = [
             'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
             'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
         ]
         try:
-            ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
             df_lig = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
             if df_lig.empty:
                 return pd.DataFrame(columns=colunas_saida)
@@ -13341,7 +13679,8 @@ with tab5:
         return "".join(partes)
 
     df_perf_base = preparar_base_performance(df)
-    df_lig_raw = load_ligacoes_para_performance()
+    ligacoes_perf_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+    df_lig_raw = load_ligacoes_para_performance(ligacoes_perf_mtime)
     df_lig_perf = preparar_base_performance(df_lig_raw)
 
     if not df_lig_perf.empty:
@@ -14995,9 +15334,8 @@ with tab5:
                         return html_out, df_out_export
 
                     @st.cache_data(ttl=1800)
-                    def load_ligacoes_demanda_diaria() -> pd.DataFrame:
+                    def load_ligacoes_demanda_diaria(lig_mtime: float | None = None) -> pd.DataFrame:
                         try:
-                            lig_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
                             df_lig_raw = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, lig_mtime)
                             if df_lig_raw.empty:
                                 return pd.DataFrame()
@@ -15096,7 +15434,8 @@ with tab5:
                         df_out['REGIONAL'] = df_out['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
                         return df_out[cols_saida].copy()
 
-                    df_lig_demanda_base = load_ligacoes_demanda_diaria()
+                    lig_demanda_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+                    df_lig_demanda_base = load_ligacoes_demanda_diaria(lig_demanda_mtime)
                     if df_lig_demanda_base.empty:
                         df_lig_demanda_sem = pd.DataFrame(columns=['CANAL_RESUMO', 'REGIONAL', 'DATA_DIA', 'SEMANA_IDX', 'SEMANA_STD', 'DIA_ROTULO', 'QTDE', 'TIPO_DEMANDA'])
                         df_lig_demanda_sem_m1 = pd.DataFrame(columns=['CANAL_RESUMO', 'REGIONAL', 'DATA_DIA', 'SEMANA_IDX', 'SEMANA_STD', 'DIA_ROTULO', 'QTDE', 'TIPO_DEMANDA'])
@@ -15164,10 +15503,9 @@ with tab5:
         st.warning("Não há dados disponíveis para montar a visão regional.")
     else:
         @st.cache_data(ttl=1800)
-        def load_ligacoes_resumo():
+        def load_ligacoes_resumo(ligacoes_mtime: float | None = None):
             """Carrega ligações reais (televendas_ligacoes2.xlsx) já tratadas para REGIONAL/mes/plataforma."""
             try:
-                ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
                 df_lig = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
                 if df_lig.empty:
                     return pd.DataFrame()
@@ -15175,7 +15513,8 @@ with tab5:
             except Exception:
                 return pd.DataFrame()
 
-        df_lig_resumo = load_ligacoes_resumo()
+        ligacoes_resumo_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+        df_lig_resumo = load_ligacoes_resumo(ligacoes_resumo_mtime)
         # Normalizações auxiliares
         df_reg_base['COD_PLATAFORMA'] = df_reg_base['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
         df_reg_base['DSC_IND_NORM'] = df_reg_base['DSC_INDICADOR'].apply(normalizar_texto_chave)
