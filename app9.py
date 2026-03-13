@@ -2155,6 +2155,1292 @@ else:
 
 st.markdown(kpi_pill_style, unsafe_allow_html=True)
 
+# Executive visual polish for titles, tabs, filters, shells and spacing.
+st.markdown(
+    """
+    <style>
+    :root {
+        --ui-red: #FF2800;
+        --ui-red-deep: #790E09;
+        --ui-red-dark: #5A0A06;
+        --ui-ink: #312B2A;
+        --ui-muted: #7A6B69;
+        --ui-border: rgba(121, 14, 9, 0.12);
+        --ui-border-strong: rgba(121, 14, 9, 0.20);
+        --ui-soft-bg: #FFF8F7;
+        --ui-panel-bg: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%);
+        --ui-shadow-soft: 0 0.85rem 2.2rem rgba(121, 14, 9, 0.08);
+        --ui-shadow-card: 0 0.65rem 1.65rem rgba(121, 14, 9, 0.08);
+        --ui-shadow-focus: 0 0 0 0.18rem rgba(255, 40, 0, 0.12);
+    }
+
+    .dashboard-hero-divider {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 38rem;
+        margin: 0.45rem auto 1.35rem auto;
+        padding: 0 0.4rem;
+    }
+
+    .dashboard-hero-divider-line {
+        width: 100%;
+        height: 0.14rem;
+        border-radius: 999px;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 40, 0, 0.00) 0%,
+            rgba(255, 40, 0, 0.18) 16%,
+            rgba(255, 40, 0, 0.92) 50%,
+            rgba(121, 14, 9, 0.18) 84%,
+            rgba(121, 14, 9, 0.00) 100%
+        );
+        box-shadow: 0 0.35rem 1rem rgba(121, 14, 9, 0.14);
+    }
+
+    .dashboard-hero-divider-badge {
+        position: absolute;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.36rem;
+        padding: 0.28rem 0.88rem;
+        border-radius: 999px;
+        border: 1px solid rgba(121, 14, 9, 0.14);
+        background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+        box-shadow:
+            0 0.45rem 1rem rgba(121, 14, 9, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    }
+
+    .dashboard-hero-divider-badge i {
+        display: block;
+        width: 0.42rem;
+        height: 0.42rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #FF2800 0%, #790E09 100%);
+        box-shadow: 0 0 0 0.15rem rgba(255, 40, 0, 0.08);
+    }
+
+    .dashboard-hero-divider-badge i:nth-child(2) {
+        width: 0.5rem;
+        height: 0.5rem;
+        box-shadow: 0 0 0 0.18rem rgba(121, 14, 9, 0.09);
+    }
+
+    hr {
+        border: none !important;
+        height: 0.12rem !important;
+        margin: 0.95rem 0 1.05rem 0 !important;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 40, 0, 0.00) 0%,
+            rgba(255, 40, 0, 0.14) 18%,
+            rgba(255, 40, 0, 0.62) 50%,
+            rgba(121, 14, 9, 0.14) 82%,
+            rgba(121, 14, 9, 0.00) 100%
+        ) !important;
+        border-radius: 999px !important;
+    }
+
+    .section-title,
+    .subsection-title,
+    .card-title {
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        color: var(--ui-ink) !important;
+        letter-spacing: -0.015em !important;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--ui-border) !important;
+    }
+
+    .section-title {
+        display: flex !important;
+        align-items: flex-start !important;
+        flex-wrap: wrap !important;
+        gap: 0.85rem !important;
+        margin: 1.85rem 0 1.05rem 0 !important;
+        padding: 1rem 1.18rem 0.94rem 1.14rem !important;
+        border-left: 0.34rem solid var(--ui-red) !important;
+        border-radius: 1.15rem !important;
+        background: linear-gradient(90deg, rgba(255, 40, 0, 0.08) 0%, rgba(255, 255, 255, 0.96) 52%, #FFFDFD 100%) !important;
+        box-shadow: var(--ui-shadow-soft) !important;
+        font-size: clamp(1.22rem, 1.75vw, 1.72rem) !important;
+        font-weight: 800 !important;
+        line-height: 1.06 !important;
+    }
+
+    .section-title::before {
+        width: 0.34rem !important;
+        border-radius: 999px !important;
+        background: linear-gradient(180deg, #FF2800 0%, #790E09 100%) !important;
+    }
+
+    .section-title::after,
+    .subsection-title::after,
+    .card-title::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(115deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.00) 34%);
+        pointer-events: none;
+    }
+
+    .subsection-title {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.78rem !important;
+        margin: 1.15rem 0 0.75rem 0 !important;
+        padding: 0.8rem 0.92rem !important;
+        border-left: 0.28rem solid var(--ui-red) !important;
+        border-radius: 0.95rem !important;
+        background: linear-gradient(90deg, rgba(255, 40, 0, 0.06) 0%, rgba(255, 255, 255, 0.98) 62%, #FFFFFF 100%) !important;
+        box-shadow: 0 0.6rem 1.4rem rgba(121, 14, 9, 0.07) !important;
+        font-size: clamp(1.02rem, 1.35vw, 1.2rem) !important;
+        font-weight: 800 !important;
+    }
+
+    .card-title {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 0.7rem !important;
+        margin: 0 0 0.82rem 0 !important;
+        padding: 0.84rem 0.92rem !important;
+        border-radius: 0.95rem !important;
+        background: var(--ui-panel-bg) !important;
+        box-shadow: 0 0.5rem 1.2rem rgba(121, 14, 9, 0.06) !important;
+        text-align: left !important;
+        font-size: 0.98rem !important;
+        font-weight: 800 !important;
+    }
+
+    .section-title > span:first-child,
+    .subsection-title > span:first-child,
+    .card-title > span:first-child,
+    .section-icon {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 2.35rem !important;
+        height: 2.35rem !important;
+        flex: 0 0 2.35rem !important;
+        border-radius: 0.9rem !important;
+        background: linear-gradient(180deg, rgba(255, 40, 0, 0.13) 0%, rgba(121, 14, 9, 0.06) 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.12) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.92),
+            0 0.35rem 0.95rem rgba(121, 14, 9, 0.09) !important;
+        font-size: 1.05rem !important;
+    }
+
+    .subsection-title > span:first-child {
+        width: 2.05rem !important;
+        height: 2.05rem !important;
+        flex-basis: 2.05rem !important;
+        border-radius: 0.78rem !important;
+        font-size: 0.94rem !important;
+    }
+
+    .card-title > span:first-child {
+        width: 1.9rem !important;
+        height: 1.9rem !important;
+        flex-basis: 1.9rem !important;
+        border-radius: 0.72rem !important;
+    }
+
+    .section-title > div:last-child {
+        width: 100%;
+        flex: 1 0 100%;
+        margin: -0.16rem 0 0 0;
+        padding-left: 3.2rem;
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        font-size: 0.72rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.12em !important;
+        text-transform: uppercase !important;
+        color: var(--ui-muted) !important;
+        line-height: 1.35 !important;
+    }
+
+    .subsection-title > div:last-child,
+    .card-title > div:last-child {
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        color: var(--ui-muted) !important;
+    }
+
+    .filter-title {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.62rem !important;
+        margin: 0 0 0.92rem 0 !important;
+        padding-bottom: 0.6rem !important;
+        border-bottom: 1px solid rgba(121, 14, 9, 0.14) !important;
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        font-size: 0.92rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.01em !important;
+        color: var(--ui-ink) !important;
+        position: relative;
+    }
+
+    .filter-title::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -1px;
+        width: 4.1rem;
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #FF2800 0%, #790E09 100%);
+    }
+
+    .filter-container,
+    .info-box,
+    .analitico-corte-info,
+    [data-testid="stExpander"] {
+        border-radius: 1rem !important;
+        border: 1px solid var(--ui-border) !important;
+        background: var(--ui-panel-bg) !important;
+        box-shadow: var(--ui-shadow-card) !important;
+    }
+
+    .filter-label-standard,
+    [data-testid="stWidgetLabel"] p {
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        font-size: 0.72rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.1em !important;
+        text-transform: uppercase !important;
+        color: var(--ui-red-deep) !important;
+        line-height: 1.2 !important;
+        margin: 0 0 0.42rem 0 !important;
+    }
+
+    [data-testid="stWidgetLabel"] {
+        margin-bottom: 0.42rem !important;
+    }
+
+    [data-testid="stSelectbox"],
+    [data-testid="stMultiSelect"] {
+        margin: 0 0 0.78rem 0 !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+        min-height: 2.95rem !important;
+        border: 1px solid var(--ui-border-strong) !important;
+        border-radius: 0.95rem !important;
+        padding: 0.42rem 0.82rem !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCF8F8 100%) !important;
+        box-shadow: 0 0.35rem 0.95rem rgba(121, 14, 9, 0.08) !important;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div:hover,
+    [data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"]:focus-within > div {
+        border-color: var(--ui-red) !important;
+        box-shadow: var(--ui-shadow-focus), 0 0.65rem 1.3rem rgba(121, 14, 9, 0.10) !important;
+        transform: translateY(-1px);
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div *,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div *,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] span {
+        color: var(--ui-ink) !important;
+        -webkit-text-fill-color: var(--ui-ink) !important;
+        fill: #6A5755 !important;
+        font-weight: 700 !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] input::placeholder,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] input::placeholder {
+        color: rgba(122, 107, 105, 0.82) !important;
+        -webkit-text-fill-color: rgba(122, 107, 105, 0.82) !important;
+    }
+
+    div[data-baseweb="popover"] ul[role="listbox"] {
+        border-radius: 0.95rem !important;
+        border: 1px solid rgba(121, 14, 9, 0.18) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        box-shadow: 0 1rem 2rem rgba(121, 14, 9, 0.14) !important;
+        padding: 0.35rem !important;
+    }
+
+    div[data-baseweb="popover"] li[role="option"] {
+        border-radius: 0.7rem !important;
+        font-weight: 700 !important;
+        color: var(--ui-ink) !important;
+        background: transparent !important;
+        transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+    }
+
+    div[data-baseweb="popover"] li[role="option"]:hover {
+        background: rgba(255, 40, 0, 0.08) !important;
+        color: var(--ui-red-deep) !important;
+        transform: translateX(1px);
+    }
+
+    div[data-baseweb="popover"] li[role="option"][aria-selected="true"] {
+        background: rgba(121, 14, 9, 0.10) !important;
+        color: var(--ui-red-dark) !important;
+    }
+
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+        border: 1px solid rgba(121, 14, 9, 0.14) !important;
+        border-radius: 999px !important;
+        background: linear-gradient(135deg, rgba(255, 40, 0, 0.12), rgba(121, 14, 9, 0.16)) !important;
+        box-shadow: 0 0.15rem 0.45rem rgba(121, 14, 9, 0.08) !important;
+        padding: 0.12rem 0.28rem 0.12rem 0.58rem !important;
+    }
+
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] *,
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] svg {
+        color: var(--ui-red-deep) !important;
+        fill: var(--ui-red-deep) !important;
+        -webkit-text-fill-color: var(--ui-red-deep) !important;
+        font-weight: 800 !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(180deg, #FFFFFF 0%, #F7F5F5 100%) !important;
+        border: 1px solid var(--ui-border) !important;
+        border-radius: 1.12rem !important;
+        box-shadow: var(--ui-shadow-card) !important;
+        padding: 0.42rem !important;
+        gap: 0.45rem !important;
+        margin: 0.38rem 0 1.1rem 0 !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"]::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.00) 36%);
+        pointer-events: none;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        position: relative;
+        overflow: hidden;
+        min-height: 2.58rem !important;
+        padding: 0.54rem 1rem !important;
+        border-radius: 0.88rem !important;
+        border: 1px solid transparent !important;
+        background: transparent !important;
+        color: #5B4C4A !important;
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        font-size: 0.83rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.02em !important;
+        transition: all 0.22s ease !important;
+        box-shadow: none !important;
+    }
+
+    .stTabs [data-baseweb="tab"]::before {
+        content: "";
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        top: 7px;
+        height: 38%;
+        border-radius: 10px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0));
+        opacity: 0;
+        transition: opacity 0.22s ease;
+        pointer-events: none;
+    }
+
+    .stTabs [data-baseweb="tab"]::after {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 5px;
+        height: 2px;
+        background: transparent;
+        border-radius: 2px;
+        transition: all 0.22s ease;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background: #FFFFFF !important;
+        color: #231F20 !important;
+        border-color: rgba(121, 14, 9, 0.10) !important;
+        box-shadow: 0 0.45rem 1rem rgba(121, 14, 9, 0.08) !important;
+        transform: translateY(-1px);
+    }
+
+    .stTabs [data-baseweb="tab"]:hover::before {
+        opacity: 1;
+    }
+
+    .stTabs [data-baseweb="tab"]:focus-visible {
+        outline: none !important;
+        box-shadow: var(--ui-shadow-focus) !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #B2463F 0%, #8D1A12 55%, #790E09 100%) !important;
+        color: #FFFFFF !important;
+        border-color: #790E09 !important;
+        box-shadow:
+            0 0.8rem 1.55rem rgba(121, 14, 9, 0.24),
+            inset 0 1px 0 rgba(255, 255, 255, 0.20) !important;
+        transform: translateY(-1px);
+    }
+
+    .stTabs [aria-selected="true"]::before {
+        opacity: 1;
+    }
+
+    .stTabs [aria-selected="true"]::after {
+        background: rgba(255, 255, 255, 0.94);
+    }
+
+    .stPlotlyChart,
+    div[data-testid="stPlotlyChart"] {
+        border-radius: 1.08rem !important;
+        border: 1px solid var(--ui-border) !important;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 248, 247, 0.94) 100%) !important;
+        box-shadow: var(--ui-shadow-card) !important;
+        padding: 0.28rem 0.34rem 0.12rem 0.34rem !important;
+        overflow: visible !important;
+    }
+
+    [data-testid="stPlotlyChart"] .js-plotly-plot .plotly,
+    [data-testid="stPlotlyChart"] .plot-container {
+        background: transparent !important;
+    }
+
+    [data-testid="stDataFrame"] {
+        border-radius: 1.08rem !important;
+        border: 1px solid var(--ui-border) !important;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 248, 247, 0.94) 100%) !important;
+        box-shadow: var(--ui-shadow-card) !important;
+        padding: 0.18rem !important;
+    }
+
+    [class^="tabela-container-"],
+    [class*=" tabela-container-"],
+    .tabela-container-melhorada {
+        border-radius: 1.12rem !important;
+        border: 1px solid var(--ui-border) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%) !important;
+        box-shadow: var(--ui-shadow-card) !important;
+    }
+
+    .js-plotly-plot .plotly .legend text {
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        font-weight: 800 !important;
+        fill: #5A4543 !important;
+    }
+
+    .js-plotly-plot .plotly .legendtitletext {
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        font-weight: 800 !important;
+        fill: #790E09 !important;
+    }
+
+    .js-plotly-plot .plotly .legend rect.bg {
+        fill: rgba(255, 255, 255, 0.92) !important;
+        stroke: rgba(121, 14, 9, 0.12) !important;
+        stroke-width: 1 !important;
+    }
+
+    .js-plotly-plot .plotly .main-svg .gtitle {
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        font-weight: 800 !important;
+        fill: #3E302E !important;
+    }
+
+    .evo-monthly-panel {
+        border-radius: 1.08rem !important;
+        border: 1px solid var(--ui-border) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%) !important;
+        box-shadow: var(--ui-shadow-soft) !important;
+    }
+
+    .evo-monthly-summary {
+        border-radius: 0.95rem !important;
+        border: 1px solid rgba(121, 14, 9, 0.08) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FFFDFD 100%) !important;
+        box-shadow: 0 0.55rem 1.25rem rgba(121, 14, 9, 0.06) !important;
+    }
+
+    .evo-monthly-legend-card {
+        border-radius: 0.95rem !important;
+        border: 1px solid rgba(121, 14, 9, 0.12) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%) !important;
+        box-shadow: 0 0.55rem 1.25rem rgba(121, 14, 9, 0.07) !important;
+    }
+
+    .evo-monthly-legend-title {
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        letter-spacing: 0.12em !important;
+        color: #7A1E19 !important;
+    }
+
+    .evo-monthly-legend-text {
+        font-weight: 800 !important;
+    }
+
+    .evo-monthly-legend-note {
+        font-size: 0.62rem !important;
+        line-height: 1.4 !important;
+    }
+
+    [data-testid="stSidebar"] h3 {
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        font-size: 0.88rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        color: var(--ui-red-deep) !important;
+    }
+
+    [data-testid="stSidebar"] hr {
+        margin: 0.75rem 0 !important;
+    }
+
+    @media (max-width: 768px) {
+        .dashboard-hero-divider {
+            margin: 0.35rem auto 1rem auto;
+        }
+
+        .section-title {
+            padding: 0.86rem 0.94rem 0.82rem 0.92rem !important;
+            margin: 1.35rem 0 0.88rem 0 !important;
+            gap: 0.72rem !important;
+            font-size: 1.08rem !important;
+        }
+
+        .section-title > div:last-child {
+            padding-left: 2.86rem;
+            font-size: 0.66rem !important;
+        }
+
+        .subsection-title {
+            padding: 0.72rem 0.84rem !important;
+            font-size: 0.94rem !important;
+        }
+
+        .card-title {
+            padding: 0.76rem 0.82rem !important;
+            font-size: 0.9rem !important;
+        }
+
+        .section-title > span:first-child,
+        .section-icon {
+            width: 2.06rem !important;
+            height: 2.06rem !important;
+            flex-basis: 2.06rem !important;
+        }
+
+        .subsection-title > span:first-child {
+            width: 1.85rem !important;
+            height: 1.85rem !important;
+            flex-basis: 1.85rem !important;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            min-height: 2.38rem !important;
+            padding: 0.48rem 0.82rem !important;
+            font-size: 0.76rem !important;
+        }
+
+        [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+        [data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+            min-height: 2.72rem !important;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Rebalance the UI toward the Claro palette after the broader polish pass.
+st.markdown(
+    """
+    <style>
+    .dashboard-hero-divider-line {
+        height: 0.16rem !important;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 40, 0, 0.00) 0%,
+            rgba(255, 40, 0, 0.28) 14%,
+            rgba(255, 40, 0, 0.98) 50%,
+            rgba(121, 14, 9, 0.30) 86%,
+            rgba(121, 14, 9, 0.00) 100%
+        ) !important;
+        box-shadow: 0 0.45rem 1.15rem rgba(121, 14, 9, 0.18) !important;
+    }
+
+    .dashboard-hero-divider-badge {
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        background:
+            radial-gradient(circle at 30% 20%, rgba(255, 40, 0, 0.10), rgba(255, 40, 0, 0.00) 52%),
+            linear-gradient(180deg, #FFFFFF 0%, #FFF4F2 100%) !important;
+        box-shadow:
+            0 0.55rem 1.2rem rgba(121, 14, 9, 0.14),
+            inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
+    }
+
+    .dashboard-hero-divider-badge i {
+        background: linear-gradient(135deg, #FF2800 0%, #790E09 100%) !important;
+        box-shadow: 0 0 0 0.18rem rgba(255, 40, 0, 0.10) !important;
+    }
+
+    .section-title {
+        border-color: rgba(121, 14, 9, 0.16) !important;
+        background:
+            linear-gradient(90deg, rgba(255, 40, 0, 0.18) 0%, rgba(255, 40, 0, 0.07) 18%, rgba(255, 255, 255, 0.98) 58%, #FFFFFF 100%) !important;
+        box-shadow:
+            0 1rem 2.3rem rgba(121, 14, 9, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+        color: #2E2322 !important;
+    }
+
+    .subsection-title {
+        border-color: rgba(121, 14, 9, 0.14) !important;
+        background:
+            linear-gradient(90deg, rgba(255, 40, 0, 0.14) 0%, rgba(255, 40, 0, 0.05) 18%, rgba(255, 255, 255, 0.98) 64%, #FFFFFF 100%) !important;
+        box-shadow:
+            0 0.75rem 1.75rem rgba(121, 14, 9, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+    }
+
+    .card-title {
+        border-color: rgba(121, 14, 9, 0.14) !important;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 40, 0, 0.08) 0%, rgba(255, 40, 0, 0.00) 32%),
+            linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%) !important;
+        box-shadow: 0 0.7rem 1.5rem rgba(121, 14, 9, 0.09) !important;
+    }
+
+    .section-title > span:first-child,
+    .subsection-title > span:first-child,
+    .card-title > span:first-child,
+    .section-icon {
+        background:
+            radial-gradient(circle at 30% 25%, rgba(255,255,255,0.42), rgba(255,255,255,0.00) 46%),
+            linear-gradient(135deg, rgba(255, 40, 0, 0.22) 0%, rgba(121, 14, 9, 0.12) 100%) !important;
+        border-color: rgba(121, 14, 9, 0.16) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.96),
+            0 0.45rem 1.05rem rgba(121, 14, 9, 0.12) !important;
+    }
+
+    .section-title > div:last-child {
+        color: #7A241F !important;
+    }
+
+    .subsection-title,
+    .card-title,
+    .filter-title {
+        color: #3A2A29 !important;
+    }
+
+    .filter-title {
+        border-bottom-color: rgba(121, 14, 9, 0.18) !important;
+    }
+
+    .filter-title::after {
+        width: 4.6rem !important;
+        height: 2.5px !important;
+        background: linear-gradient(90deg, #FF2800 0%, #790E09 70%, #5A0A06 100%) !important;
+        box-shadow: 0 0.22rem 0.5rem rgba(121, 14, 9, 0.18);
+    }
+
+    .filter-container,
+    .info-box,
+    .analitico-corte-info,
+    [data-testid="stExpander"] {
+        border-color: rgba(121, 14, 9, 0.16) !important;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 40, 0, 0.06) 0%, rgba(255, 40, 0, 0.00) 28%),
+            linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%) !important;
+        box-shadow: 0 0.8rem 1.8rem rgba(121, 14, 9, 0.10) !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+        border-color: rgba(121, 14, 9, 0.24) !important;
+        background:
+            radial-gradient(circle at 12% 0%, rgba(255, 40, 0, 0.08) 0%, rgba(255, 40, 0, 0.00) 32%),
+            linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%) !important;
+        box-shadow: 0 0.42rem 1.05rem rgba(121, 14, 9, 0.10) !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div:hover,
+    [data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"]:focus-within > div {
+        border-color: #FF2800 !important;
+        box-shadow:
+            0 0 0 0.18rem rgba(255, 40, 0, 0.12),
+            0 0.75rem 1.45rem rgba(121, 14, 9, 0.14) !important;
+    }
+
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        background: linear-gradient(135deg, #FFEBE7 0%, #FFD9D2 100%) !important;
+        box-shadow: 0 0.2rem 0.55rem rgba(121, 14, 9, 0.12) !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        border-color: rgba(121, 14, 9, 0.16) !important;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 40, 0, 0.08) 0%, rgba(255, 40, 0, 0.00) 30%),
+            linear-gradient(180deg, #FFFFFF 0%, #F8F5F5 100%) !important;
+        box-shadow: 0 0.85rem 1.9rem rgba(121, 14, 9, 0.10) !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        color: #6D312C !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #5A0A06 !important;
+        border-color: rgba(121, 14, 9, 0.14) !important;
+        box-shadow: 0 0.55rem 1.1rem rgba(121, 14, 9, 0.10) !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #FF2800 0%, #A91C14 48%, #790E09 100%) !important;
+        box-shadow:
+            0 0.95rem 1.8rem rgba(121, 14, 9, 0.26),
+            inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+    }
+
+    .stPlotlyChart,
+    div[data-testid="stPlotlyChart"],
+    [data-testid="stDataFrame"],
+    [class^="tabela-container-"],
+    [class*=" tabela-container-"],
+    .tabela-container-melhorada {
+        border-color: rgba(121, 14, 9, 0.16) !important;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 40, 0, 0.045) 0%, rgba(255, 40, 0, 0.00) 28%),
+            linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%) !important;
+        box-shadow: 0 0.8rem 1.8rem rgba(121, 14, 9, 0.09) !important;
+    }
+
+    .evo-monthly-panel,
+    .evo-monthly-summary,
+    .evo-monthly-legend-card {
+        border-color: rgba(121, 14, 9, 0.14) !important;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 40, 0, 0.05) 0%, rgba(255, 40, 0, 0.00) 28%),
+            linear-gradient(180deg, #FFFFFF 0%, #FFF9F8 100%) !important;
+    }
+
+    div[data-testid="stPopover"] > button {
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        background: linear-gradient(135deg, #FF2800 0%, #A51A13 52%, #790E09 100%) !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 0.7rem 1.45rem rgba(121, 14, 9, 0.20) !important;
+    }
+
+    div[data-testid="stPopover"] > button p {
+        color: #FFFFFF !important;
+    }
+
+    div[data-testid="stPopover"] > button:hover {
+        border-color: rgba(255, 255, 255, 0.22) !important;
+        box-shadow:
+            0 0 0 0.16rem rgba(255, 40, 0, 0.10),
+            0 0.95rem 1.7rem rgba(121, 14, 9, 0.26) !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Executive/luxury pass: stronger borders, cleaner surfaces and dark-red icons.
+st.markdown(
+    """
+    <style>
+    .dashboard-hero-divider-line {
+        height: 0.15rem !important;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 40, 0, 0.00) 0%,
+            rgba(121, 14, 9, 0.20) 18%,
+            rgba(121, 14, 9, 0.95) 50%,
+            rgba(90, 10, 6, 0.24) 82%,
+            rgba(90, 10, 6, 0.00) 100%
+        ) !important;
+        box-shadow: 0 0.42rem 1rem rgba(121, 14, 9, 0.16) !important;
+    }
+
+    .dashboard-hero-divider-badge {
+        border: 1px solid rgba(121, 14, 9, 0.22) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        box-shadow:
+            0 0.55rem 1.15rem rgba(121, 14, 9, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+    }
+
+    .dashboard-hero-divider-badge i {
+        background: #790E09 !important;
+        box-shadow: 0 0 0 0.14rem rgba(121, 14, 9, 0.08) !important;
+    }
+
+    .section-title,
+    .subsection-title,
+    .card-title {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        box-shadow:
+            0 0.85rem 1.85rem rgba(121, 14, 9, 0.09),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+    }
+
+    .section-title {
+        border-left: 0.36rem solid #790E09 !important;
+    }
+
+    .subsection-title {
+        border-left: 0.3rem solid #790E09 !important;
+    }
+
+    .section-title::before,
+    .subsection-title::before {
+        background: linear-gradient(180deg, #790E09 0%, #5A0A06 100%) !important;
+    }
+
+    .section-title > span:first-child,
+    .subsection-title > span:first-child,
+    .card-title > span:first-child,
+    .section-icon {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F8 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.20) !important;
+        box-shadow:
+            0 0.4rem 0.95rem rgba(121, 14, 9, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+        color: #790E09 !important;
+        -webkit-text-fill-color: #790E09 !important;
+        background-clip: border-box !important;
+        -webkit-background-clip: border-box !important;
+    }
+
+    .section-title > span:first-child svg,
+    .subsection-title > span:first-child svg,
+    .card-title > span:first-child svg,
+    .section-icon svg {
+        width: 1.05rem !important;
+        height: 1.05rem !important;
+        display: block !important;
+        stroke: currentColor !important;
+        overflow: visible !important;
+    }
+
+    .subsection-title > span:first-child svg {
+        width: 0.92rem !important;
+        height: 0.92rem !important;
+    }
+
+    .section-title > div:last-child,
+    .subsection-title > div:last-child,
+    .card-title > div:last-child {
+        color: #7A1E19 !important;
+    }
+
+    .filter-title {
+        color: #3A2624 !important;
+        border-bottom-color: rgba(121, 14, 9, 0.18) !important;
+    }
+
+    .filter-title::after {
+        width: 4.45rem !important;
+        background: linear-gradient(90deg, #790E09 0%, #5A0A06 100%) !important;
+        box-shadow: 0 0.18rem 0.45rem rgba(121, 14, 9, 0.18) !important;
+    }
+
+    .filter-container,
+    .info-box,
+    .analitico-corte-info,
+    [data-testid="stExpander"] {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        box-shadow: 0 0.75rem 1.55rem rgba(121, 14, 9, 0.08) !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.24) !important;
+        box-shadow: 0 0.38rem 0.95rem rgba(121, 14, 9, 0.08) !important;
+    }
+
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div:hover,
+    [data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"]:focus-within > div {
+        border-color: #790E09 !important;
+        box-shadow:
+            0 0 0 0.16rem rgba(121, 14, 9, 0.10),
+            0 0.7rem 1.35rem rgba(121, 14, 9, 0.12) !important;
+    }
+
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F8 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.20) !important;
+        box-shadow: 0 0.2rem 0.48rem rgba(121, 14, 9, 0.08) !important;
+    }
+
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] *,
+    [data-testid="stMultiSelect"] span[data-baseweb="tag"] svg {
+        color: #790E09 !important;
+        fill: #790E09 !important;
+        -webkit-text-fill-color: #790E09 !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FAF8F8 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.18) !important;
+        box-shadow: 0 0.8rem 1.7rem rgba(121, 14, 9, 0.10) !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.12) !important;
+        color: #6B2A25 !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8F4F4 100%) !important;
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        color: #5A0A06 !important;
+        box-shadow: 0 0.55rem 1rem rgba(121, 14, 9, 0.10) !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #790E09 0%, #66110C 52%, #5A0A06 100%) !important;
+        border-color: #5A0A06 !important;
+        box-shadow:
+            0 0.95rem 1.8rem rgba(121, 14, 9, 0.24),
+            inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+    }
+
+    .stPlotlyChart,
+    div[data-testid="stPlotlyChart"],
+    [data-testid="stDataFrame"],
+    [class^="tabela-container-"],
+    [class*=" tabela-container-"],
+    .tabela-container-melhorada {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.18) !important;
+        border-top: 3px solid #790E09 !important;
+        box-shadow: 0 0.75rem 1.55rem rgba(121, 14, 9, 0.08) !important;
+    }
+
+    .evo-monthly-panel,
+    .evo-monthly-summary,
+    .evo-monthly-legend-card {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        border-color: rgba(121, 14, 9, 0.18) !important;
+        box-shadow: 0 0.7rem 1.45rem rgba(121, 14, 9, 0.08) !important;
+    }
+
+    .evo-monthly-legend-title {
+        color: #790E09 !important;
+    }
+
+    div[data-testid="stPopover"] > button {
+        background: linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%) !important;
+        border: 1px solid rgba(121, 14, 9, 0.22) !important;
+        color: #790E09 !important;
+        box-shadow:
+            0 0.6rem 1.15rem rgba(121, 14, 9, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+    }
+
+    div[data-testid="stPopover"] > button p {
+        color: #790E09 !important;
+    }
+
+    div[data-testid="stPopover"] > button:hover {
+        border-color: rgba(121, 14, 9, 0.28) !important;
+        box-shadow:
+            0 0 0 0.14rem rgba(121, 14, 9, 0.08),
+            0 0.8rem 1.45rem rgba(121, 14, 9, 0.16) !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Executive tab refinement: clearer contrast and premium segmented navigation.
+st.markdown(
+    """
+    <style>
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: stretch !important;
+        gap: 0.58rem !important;
+        padding: 0.58rem !important;
+        margin: 0.34rem 0 1.2rem 0 !important;
+        border-radius: 1.28rem !important;
+        border: 1px solid rgba(121, 14, 9, 0.18) !important;
+        background:
+            radial-gradient(circle at top, rgba(255, 255, 255, 0.80), rgba(255, 255, 255, 0.00) 58%),
+            linear-gradient(180deg, #FFFFFF 0%, #F7F4F4 100%) !important;
+        box-shadow:
+            0 1rem 2rem rgba(121, 14, 9, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+        overflow: visible !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        position: relative !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.68rem !important;
+        flex: 1 1 calc(20% - 0.58rem) !important;
+        min-width: 11rem !important;
+        min-height: 3.24rem !important;
+        padding: 0.8rem 1.08rem !important;
+        border-radius: 1.02rem !important;
+        border: 1px solid rgba(121, 14, 9, 0.16) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBF7F7 100%) !important;
+        box-shadow:
+            0 0.48rem 1rem rgba(121, 14, 9, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+        font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
+        font-size: 0.79rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        line-height: 1.08 !important;
+        transition:
+            transform 0.22s ease,
+            box-shadow 0.22s ease,
+            border-color 0.22s ease,
+            background 0.22s ease !important;
+        overflow: hidden !important;
+    }
+
+    .stTabs [data-baseweb="tab"]::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    .stTabs [data-baseweb="tab"] .tab-icon-badge {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 1.72rem !important;
+        height: 1.72rem !important;
+        flex: 0 0 1.72rem !important;
+        border-radius: 999px !important;
+        border: 1px solid rgba(121, 14, 9, 0.24) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F8 100%) !important;
+        box-shadow:
+            0 0.32rem 0.72rem rgba(121, 14, 9, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+        color: #6A201B !important;
+        -webkit-text-fill-color: #6A201B !important;
+        transform: translateY(-0.5px) !important;
+        transition:
+            transform 0.22s ease,
+            box-shadow 0.22s ease,
+            background 0.22s ease,
+            border-color 0.22s ease !important;
+    }
+
+    .stTabs [data-baseweb="tab"] .tab-icon-badge svg {
+        width: 0.92rem !important;
+        height: 0.92rem !important;
+        display: block !important;
+        stroke: currentColor !important;
+        color: currentColor !important;
+        fill: none !important;
+    }
+
+    .stTabs [data-baseweb="tab"] .tab-label-text {
+        display: block !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        text-align: center !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.08 !important;
+    }
+
+    .stTabs [data-baseweb="tab"]::after {
+        content: "";
+        position: absolute !important;
+        left: 1rem !important;
+        right: 1rem !important;
+        bottom: 0.42rem !important;
+        height: 2px !important;
+        border-radius: 999px !important;
+        background: linear-gradient(
+            90deg,
+            rgba(121, 14, 9, 0.00) 0%,
+            rgba(121, 14, 9, 0.48) 50%,
+            rgba(121, 14, 9, 0.00) 100%
+        ) !important;
+        opacity: 0.52 !important;
+        transform: scaleX(0.62) !important;
+        transition: all 0.22s ease !important;
+    }
+
+    .stTabs [data-baseweb="tab"],
+    .stTabs [data-baseweb="tab"] *,
+    .stTabs [data-baseweb="tab"] div,
+    .stTabs [data-baseweb="tab"] p,
+    .stTabs [data-baseweb="tab"] span {
+        color: #6A201B !important;
+        fill: #6A201B !important;
+        -webkit-text-fill-color: #6A201B !important;
+    }
+
+    .stTabs [data-baseweb="tab"] p {
+        margin: 0 !important;
+        text-align: center !important;
+        line-height: 1.1 !important;
+    }
+
+    .stTabs [data-baseweb="tab"] .tab-icon-badge,
+    .stTabs [data-baseweb="tab"] .tab-icon-badge svg {
+        color: #6A201B !important;
+        fill: none !important;
+        -webkit-text-fill-color: #6A201B !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8F1F1 100%) !important;
+        border-color: rgba(121, 14, 9, 0.28) !important;
+        box-shadow:
+            0 0.86rem 1.45rem rgba(121, 14, 9, 0.14),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+        transform: translateY(-2px) !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover .tab-icon-badge {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8F1F1 100%) !important;
+        border-color: rgba(121, 14, 9, 0.30) !important;
+        box-shadow:
+            0 0.42rem 0.9rem rgba(121, 14, 9, 0.14),
+            inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover::after {
+        opacity: 1 !important;
+        transform: scaleX(1) !important;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 40, 0, 0.00) 0%,
+            rgba(121, 14, 9, 0.78) 50%,
+            rgba(255, 40, 0, 0.00) 100%
+        ) !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:focus-visible {
+        outline: none !important;
+        box-shadow:
+            0 0 0 0.18rem rgba(121, 14, 9, 0.12),
+            0 0.86rem 1.45rem rgba(121, 14, 9, 0.14) !important;
+    }
+
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background:
+            radial-gradient(circle at top, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.00) 54%),
+            linear-gradient(135deg, #790E09 0%, #66110C 48%, #5A0A06 100%) !important;
+        border-color: #4A0704 !important;
+        box-shadow:
+            0 1.05rem 1.95rem rgba(121, 14, 9, 0.26),
+            inset 0 1px 0 rgba(255, 255, 255, 0.16),
+            inset 0 -1px 0 rgba(74, 7, 4, 0.36) !important;
+        transform: translateY(-2px) !important;
+    }
+
+    .stTabs [data-baseweb="tab"][aria-selected="true"]::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    .stTabs [data-baseweb="tab"][aria-selected="true"]::after {
+        opacity: 1 !important;
+        transform: scaleX(1) !important;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.00) 0%,
+            rgba(255, 255, 255, 0.96) 50%,
+            rgba(255, 255, 255, 0.00) 100%
+        ) !important;
+    }
+
+    .stTabs [data-baseweb="tab"][aria-selected="true"],
+    .stTabs [data-baseweb="tab"][aria-selected="true"] *,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] div,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] p,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] span {
+        color: #FFFFFF !important;
+        fill: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        text-shadow: 0 1px 0 rgba(74, 7, 4, 0.28) !important;
+    }
+
+    .stTabs [data-baseweb="tab"][aria-selected="true"] .tab-icon-badge {
+        border-color: rgba(255, 255, 255, 0.22) !important;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.08) 100%) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.16),
+            0 0.36rem 0.8rem rgba(74, 7, 4, 0.18) !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
+    div[data-testid="stTabs"] > div[role="tabpanel"] {
+        padding-top: 0.1rem !important;
+    }
+
+    @media (max-width: 1180px) {
+        .stTabs [data-baseweb="tab"] {
+            flex: 1 1 calc(33.333% - 0.58rem) !important;
+        }
+    }
+
+    @media (max-width: 860px) {
+        .stTabs [data-baseweb="tab"] {
+            flex: 1 1 calc(50% - 0.58rem) !important;
+            min-width: 0 !important;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.46rem !important;
+            padding: 0.48rem !important;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            flex: 1 1 100% !important;
+            min-height: 3.05rem !important;
+            padding: 0.72rem 0.88rem !important;
+            font-size: 0.75rem !important;
+            letter-spacing: 0.06em !important;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Premium visual tuning for KPI cards, aligned with app9.py.
 st.markdown(
     """
@@ -2473,6 +3759,26 @@ def get_mes_anterior(mes_atual: str) -> str:
 def render_filter_label(texto: str):
     """Renderiza rótulo padrão para filtros com label colapsado."""
     st.markdown(f'<div class="filter-label-standard">{texto}</div>', unsafe_allow_html=True)
+
+def build_visual_title_html(
+    title: str,
+    icon_hint: str | None = None,
+    title_class: str = "section-title",
+    subtitle: str | None = None,
+    extra_style: str | None = None
+) -> str:
+    """Monta títulos visuais com ícone SVG inline alinhado à paleta do dashboard."""
+    title_txt = escape(str(title))
+    icon_svg = get_kpi_icon_svg(icon_hint or title)
+    style_attr = f' style="{escape(str(extra_style), quote=True)}"' if extra_style else ""
+    subtitle_html = f'<div>{escape(str(subtitle))}</div>' if subtitle else ""
+    return (
+        f'<div class="{title_class}"{style_attr}>'
+        f'<span class="section-icon" aria-hidden="true">{icon_svg}</span>'
+        f'{title_txt}'
+        f'{subtitle_html}'
+        '</div>'
+    )
 
 def build_kpi_title_html(title: str, icon_hint: str | None = None) -> str:
     """Monta o título dos cards KPI com ícone inline e rótulo acessível."""
@@ -6509,24 +7815,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("""
-    <div style="margin: 12px 0 24px 0; text-align: center; position: relative;">
-        <div style="height: 2px; background: linear-gradient(90deg, 
-                    rgba(255, 40, 0, 0) 0%, 
-                    rgba(255, 40, 0, 0.3) 20%, 
-                    rgba(255, 40, 0, 0.8) 50%, 
-                    rgba(255, 40, 0, 0.3) 80%, 
-                    rgba(255, 40, 0, 0) 100%);"></div>
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                    background: white; padding: 0 20px;">
-            <span style="color: #FF2800; font-size: 14px; font-weight: 700; letter-spacing: 3px;">● ● ●</span>
-        </div>
+    <div class="dashboard-hero-divider" aria-hidden="true">
+        <span class="dashboard-hero-divider-line"></span>
+        <span class="dashboard-hero-divider-badge">
+            <i></i><i></i><i></i>
+        </span>
     </div>
 """, unsafe_allow_html=True)
 
 # =========================
 # ABAS PRINCIPAIS
 # =========================
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📱 ATIVADOS", "📉 DESATIVADOS", "📋 PEDIDOS", "📞 LIGAÇÕES", "📊 ANALÍTICO"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["ATIVADOS", "DESATIVADOS", "PEDIDOS", "LIGAÇÕES", "ANALÍTICO"])
 
 # Persistir aba selecionada entre reruns para evitar voltar para Ativados ao filtrar
 components.html(
@@ -6535,11 +7835,60 @@ components.html(
     (function() {
       const KEY = "dashboard_tab_ativa";
       const doc = window.parent.document;
+      const TAB_ICONS = {
+        ATIVADOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.4"></rect><path d="M11 18.5h2"></path></svg>`,
+        DESATIVADOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l4.5 5 3.5-3 6 8"></path><path d="M14.5 18H18v-3.5"></path></svg>`,
+        PEDIDOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`,
+        LIGACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
+        ANALITICO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"></rect><rect x="14" y="3" width="7" height="7" rx="1.6"></rect><rect x="3" y="14" width="7" height="7" rx="1.6"></rect><rect x="14" y="14" width="7" height="7" rx="1.6"></rect></svg>`
+      };
+
+      function normalizeTabLabel(value) {
+        return String(value || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9]+/g, " ")
+          .trim()
+          .toUpperCase();
+      }
 
       function getTabs() {
         const tabList = doc.querySelector('div[data-baseweb="tab-list"]');
         if (!tabList) return [];
         return Array.from(tabList.querySelectorAll('button[role="tab"]'));
+      }
+
+      function decorateTabs() {
+        const tabs = getTabs();
+        tabs.forEach((tab) => {
+          const rawLabel = (tab.dataset.tabLabel || tab.innerText || "").trim();
+          const labelNormalized = normalizeTabLabel(rawLabel);
+          const iconSvg = TAB_ICONS[labelNormalized];
+          if (!iconSvg || !rawLabel) return;
+
+          const existingBadge = tab.querySelector(".tab-icon-badge");
+          const existingLabel = tab.querySelector(".tab-label-text");
+          if (tab.dataset.tabDecorated === "1" && existingBadge && existingLabel) {
+            existingLabel.textContent = rawLabel;
+            tab.dataset.tabLabel = rawLabel;
+            return;
+          }
+
+          const badge = doc.createElement("span");
+          badge.className = "tab-icon-badge";
+          badge.setAttribute("aria-hidden", "true");
+          badge.innerHTML = iconSvg;
+
+          const label = doc.createElement("span");
+          label.className = "tab-label-text";
+          label.textContent = rawLabel;
+
+          tab.textContent = "";
+          tab.appendChild(badge);
+          tab.appendChild(label);
+          tab.dataset.tabLabel = rawLabel;
+          tab.dataset.tabDecorated = "1";
+        });
       }
 
       function bindTabClicks() {
@@ -6549,7 +7898,7 @@ components.html(
           tab.dataset.tabBound = "1";
           tab.addEventListener("click", () => {
             try {
-              window.sessionStorage.setItem(KEY, tab.innerText.trim());
+              window.sessionStorage.setItem(KEY, normalizeTabLabel(tab.dataset.tabLabel || tab.innerText));
             } catch (e) {}
           });
         });
@@ -6561,9 +7910,10 @@ components.html(
           saved = window.sessionStorage.getItem(KEY);
         } catch (e) {}
         if (!saved) return;
+        const savedNormalized = normalizeTabLabel(saved);
 
         const tabs = getTabs();
-        const target = tabs.find((t) => t.innerText.trim() === saved);
+        const target = tabs.find((t) => normalizeTabLabel(t.dataset.tabLabel || t.innerText) === savedNormalized);
         if (target && target.getAttribute("aria-selected") !== "true") {
           target.click();
         }
@@ -6571,6 +7921,7 @@ components.html(
 
       let attempts = 0;
       const timer = setInterval(() => {
+        decorateTabs();
         bindTabClicks();
         restoreSavedTab();
         attempts += 1;
@@ -6847,7 +8198,7 @@ with tab1:
     num_canais = len(canal_list)
     
     # Renderizar cards KPI
-    st.markdown('<div class="section-title"><span class="section-icon">📊</span> PERFORMANCE POR CANAL</div>', unsafe_allow_html=True)
+    st.markdown(build_visual_title_html("PERFORMANCE POR CANAL", "target"), unsafe_allow_html=True)
     
     for i in range(0, num_canais, 3):
         cols = st.columns(3, gap="medium")
@@ -6923,7 +8274,7 @@ with tab1:
     # GRÁFICO DE LINHAS TEMPORAL
     # =========================
     with st.container():
-        st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL - COMPARATIVO ANUAL</div>', unsafe_allow_html=True)
+        st.markdown(build_visual_title_html("EVOLUÇÃO MENSAL - COMPARATIVO ANUAL", "trend"), unsafe_allow_html=True)
         
         with st.container():
             col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
@@ -7031,7 +8382,7 @@ with tab1:
     # =========================
     # GRÁFICO DE BARRAS HORIZONTAIS
     # =========================
-    st.markdown('<div class="section-title"><span class="section-icon">📊</span> DISTRIBUIÇÃO POR CANAL E PRODUTO</div>', unsafe_allow_html=True)
+    st.markdown(build_visual_title_html("DISTRIBUIÇÃO POR CANAL E PRODUTO", "grid"), unsafe_allow_html=True)
     
     # Usar o mesmo mês selecionado nos cards KPI
     mes_selecionado = mes_selecionado_cards
@@ -7248,7 +8599,7 @@ with tab1:
     # TABELA DINÂMICA POR REGIONAL COM MÉTRICAS AVANÇADAS (VERSÃO MELHORADA)
     # =========================
     st.markdown(
-        '<div class="section-title"><span class="section-icon">📊</span> CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL</div>',
+        build_visual_title_html("CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL", "grid"),
         unsafe_allow_html=True
     )
     
@@ -8192,15 +9543,14 @@ with tab2:
     # =========================
     # CABEÇALHO DA ABA
     # =========================
-    st.markdown("""
-        <div class="section-title">
-            <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📉</span>
-            DESATIVADOS
-            <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE CHURN/DESATIVAÇOES - LINHAS SILENTES E INADIMPLENTES
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        build_visual_title_html(
+            "DESATIVADOS",
+            "trend",
+            subtitle="ANÁLISE DE CHURN/DESATIVAÇOES - LINHAS SILENTES E INADIMPLENTES"
+        ),
+        unsafe_allow_html=True
+    )
     
     # =========================
     # FILTROS GERAIS (SIDEBAR)
@@ -8381,7 +9731,7 @@ with tab2:
     # =========================
     # CARDS KPI POR CANAL + INADIMPLÊNCIA POR CANAL (LADO A LADO)
     # =========================
-    st.markdown('<div class="section-title"><span class="section-icon">📊</span> PERFORMANCE POR CANAL - DESATIVADOS</div>', unsafe_allow_html=True)
+    st.markdown(build_visual_title_html("PERFORMANCE POR CANAL - DESATIVADOS", "target"), unsafe_allow_html=True)
 
     # Layout lado a lado: cards (esquerda) + gráfico de inadimplência (direita)
     col_cards_des, col_inad_des = st.columns([1.25, 1], gap="large")
@@ -8541,7 +9891,7 @@ with tab2:
     # =========================
     # GRÁFICO DE LINHAS TEMPORAL
     # =========================
-    st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL - DESATIVADOS</div>', unsafe_allow_html=True)
+    st.markdown(build_visual_title_html("EVOLUÇÃO MENSAL - DESATIVADOS", "trend"), unsafe_allow_html=True)
     
     # Filtros para o gráfico de linhas
     with st.container():
@@ -8681,7 +10031,7 @@ with tab2:
     # =========================
     # GRÁFICO DE BARRAS HORIZONTAIS
     # =========================
-    st.markdown('<div class="section-title"><span class="section-icon">📊</span> DESATIVADOS vs SILENTES POR CANAL</div>', unsafe_allow_html=True)
+    st.markdown(build_visual_title_html("DESATIVADOS vs SILENTES POR CANAL", "grid"), unsafe_allow_html=True)
     
     # Filtrar dados para o mês selecionado
     df_mes_selecionado = df_filtrado[df_filtrado['mes_ano'] == mes_selecionado]
@@ -8826,7 +10176,7 @@ with tab2:
     # =========================
     # TABELA DINÂMICA POR REGIONAL
     # =========================
-    st.markdown('<div class="section-title"><span class="section-icon">📋</span> DESATIVADOS POR REGIONAL</div>', unsafe_allow_html=True)
+    st.markdown(build_visual_title_html("DESATIVADOS POR REGIONAL", "grid"), unsafe_allow_html=True)
 
     # Filtros específicos da tabela dinâmica (Canal, Silente e Inadimplente)
     col_filtro_tab_des1, col_filtro_tab_des2, col_filtro_tab_des3 = st.columns([2, 1.2, 1.2])
@@ -9326,15 +10676,14 @@ with tab2:
 # ABA 3: PEDIDOS
 # =========================
 with tab3:
-    st.markdown("""
-        <div class="section-title">
-            <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📋</span>
-            PEDIDOS E-Commerce
-            <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE PEDIDOS PME
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        build_visual_title_html(
+            "PEDIDOS E-Commerce",
+            "pedidos",
+            subtitle="ANÁLISE DE PEDIDOS PME"
+        ),
+        unsafe_allow_html=True
+    )
     
     # =========================
     # FILTRAR DADOS PARA PEDIDOS E-Commerce (usando base original, sem filtros globais)
@@ -9631,7 +10980,7 @@ with tab3:
         # =========================
         # CARDS KPI PARA CONTA E FIXA
         # =========================
-        st.markdown('<div class="section-title"><span class="section-icon">📊</span> PERFORMANCE DE PEDIDOS POR MÊS</div>', unsafe_allow_html=True)
+        st.markdown(build_visual_title_html("PERFORMANCE DE PEDIDOS POR MÊS", "cart"), unsafe_allow_html=True)
         
         # Calcular métricas para CONTA e FIXA
         metricas_conta = calcular_metricas_pedidos('CONTA', mes_selecionado_pedidos, mes_anterior_pedidos)
@@ -9683,6 +11032,7 @@ with tab3:
             "text-align: center; padding: 5px 0; min-height: 128px; display: flex; "
             "flex-direction: column; justify-content: space-between;"
         )
+        altura_painel_pedidos = 392
 
         coluna_origem_afiliados_pedidos = next(
             (
@@ -9698,7 +11048,7 @@ with tab3:
         )
 
         # Layout: cards | barras por origem | donut
-        col_cards, col_bar_origem_pedidos, col_donut = st.columns([0.72, 1.50, 0.70], gap="small")
+        col_cards, col_bar_origem_pedidos, col_donut = st.columns([0.72, 1.48, 0.80], gap="medium")
         
         with col_cards:
             card_conta_html = (
@@ -9874,14 +11224,14 @@ with tab3:
                     )
 
                 eixo_x_max_origem = max_total_origem * 1.34 if max_total_origem > 0 else 1
-                altura_bar_origem = 362
+                altura_bar_origem = altura_painel_pedidos
 
                 fig_bar_origem_pedidos.update_layout(
                     barmode='stack',
                     plot_bgcolor='#FFFFFF',
                     paper_bgcolor='#FCFCFD',
                     font=dict(family='Manrope', size=12, color='#2F3747'),
-                    margin=dict(l=12, r=144, t=52, b=10),
+                    margin=dict(l=12, r=24, t=74, b=14),
                     height=altura_bar_origem,
                     xaxis=dict(
                         title='',
@@ -9902,17 +11252,18 @@ with tab3:
                         categoryarray=origens_plot[::-1]
                     ),
                     legend=dict(
-                        title=dict(text='<b>PRODUTO</b>', font=dict(size=11, color='#2F3747')),
-                        orientation='v',
-                        yanchor='middle',
-                        y=0.5,
-                        xanchor='left',
-                        x=1.01,
+                        title=dict(text=''),
+                        orientation='h',
+                        yanchor='bottom',
+                        y=1.02,
+                        xanchor='right',
+                        x=0.995,
                         bgcolor='rgba(255,255,255,0.92)',
                         bordercolor='#E9ECEF',
                         borderwidth=1,
-                        font=dict(size=9, color='#2F3747'),
-                        traceorder='normal'
+                        font=dict(size=10, color='#2F3747'),
+                        traceorder='normal',
+                        itemsizing='constant'
                     ),
                     title=dict(
                         text=(
@@ -9932,8 +11283,8 @@ with tab3:
                         font_family='Segoe UI',
                         font_color='#2F3747'
                     ),
-                    bargap=0.18,
-                    bargroupgap=0.08,
+                    bargap=0.10,
+                    bargroupgap=0.05,
                     uniformtext_minsize=9,
                     uniformtext_mode='hide'
                 )
@@ -9945,8 +11296,8 @@ with tab3:
                     config={'displayModeBar': False, 'displaylogo': False}
                 )
             else:
-                st.markdown("""
-                    <div class="info-box" style="margin: 0; min-height: 362px; display:flex; align-items:center; justify-content:center; text-align:center;">
+                st.markdown(f"""
+                    <div class="info-box" style="margin: 0; min-height: {altura_painel_pedidos}px; display:flex; align-items:center; justify-content:center; text-align:center;">
                         <div>
                             <div style="font-size:15px; font-weight:800; color:#790E09; margin-bottom:8px;">ORIGEM_AFILIADOS</div>
                             <div style="font-size:13px; color:#64748B;">Sem dados suficientes para montar o gráfico empilhado.</div>
@@ -9978,14 +11329,15 @@ with tab3:
                 'CONTA': '#D64B3F',
                 'FIXA': '#8D1A12'
             }
-            pulls = [0.03 if p == produto_lider else 0.0 for p in df_donut['Produto']]
+            pulls = [0.015 if p == produto_lider else 0.0 for p in df_donut['Produto']]
 
             fig_donut = go.Figure(
                 data=[
                     go.Pie(
                         labels=df_donut['Produto'],
                         values=df_donut['Quantidade'],
-                        hole=0.64,
+                        hole=0.58,
+                        domain=dict(x=[0.10, 0.90], y=[0.06, 0.82]),
                         sort=False,
                         direction='clockwise',
                         pull=pulls,
@@ -9996,6 +11348,7 @@ with tab3:
                         text=df_donut['Percentual'].apply(lambda v: f"{v:.1f}%".replace('.', ',')),
                         textinfo='text',
                         textposition='outside',
+                        textfont=dict(size=11, color='#6A201B'),
                         hovertemplate=(
                             "<b>%{label}</b><br>"
                             "<b>Pedidos:</b> %{value:,.0f}<br>"
@@ -10007,25 +11360,26 @@ with tab3:
             )
 
             fig_donut.update_layout(
-                height=318,
+                height=altura_painel_pedidos,
                 plot_bgcolor='white',
                 paper_bgcolor='#FCFCFD',
                 font=dict(family='Segoe UI', size=13, color='#2F3747'),
-                margin=dict(l=4, r=92, t=14, b=6),
+                margin=dict(l=22, r=22, t=64, b=16),
                 showlegend=True,
                 legend=dict(
-                    title=dict(text='<b>PRODUTO</b>', font=dict(size=12, color='#2F3747')),
-                    orientation='v',
-                    yanchor='middle',
-                    y=0.5,
-                    xanchor='left',
-                    x=0.98,
+                    title=dict(text=''),
+                    orientation='h',
+                    yanchor='bottom',
+                    y=1.02,
+                    xanchor='center',
+                    x=0.5,
                     bgcolor='rgba(255,255,255,0.92)',
                     bordercolor='#E6ECF4',
                     borderwidth=1.2,
-                    font=dict(size=10, color='#2F3747')
+                    font=dict(size=10, color='#2F3747'),
+                    itemsizing='constant'
                 ),
-                uniformtext_minsize=10,
+                uniformtext_minsize=9,
                 uniformtext_mode='hide'
             )
 
@@ -10036,7 +11390,7 @@ with tab3:
                     f"{formatar_numero_brasileiro(total_geral_pedidos, 0)}</span><br>"
                     f"<span style='font-size:11px; color:#64748B;'>Líder: {produto_lider} ({str(round(pct_lider,1)).replace('.', ',')}%)</span>"
                 ),
-                x=0.5, y=0.5,
+                x=0.5, y=0.44,
                 showarrow=False,
                 align='center'
             )
@@ -10052,7 +11406,7 @@ with tab3:
         # TABELA DINÂMICA POR REGIONAL
         # =========================
         container_evolucao_pedidos = st.container()
-        st.markdown('<div class="section-title"><span class="section-icon">📋</span> PEDIDOS POR REGIONAL</div>', unsafe_allow_html=True)
+        st.markdown(build_visual_title_html("PEDIDOS POR REGIONAL", "grid"), unsafe_allow_html=True)
         
         # Adicionar filtros específicos para a tabela
         col_filtro_t1_pedidos, col_filtro_t2_pedidos = st.columns(2)
@@ -10797,7 +12151,7 @@ with tab3:
                 # =========================
                 # GRÁFICO DE EVOLUÇÃO MENSAL
                 # =========================
-                st.markdown('<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL DE PEDIDOS</div>', unsafe_allow_html=True)
+                st.markdown(build_visual_title_html("EVOLUÇÃO MENSAL DE PEDIDOS", "trend"), unsafe_allow_html=True)
                 
                 # Filtros para o gráfico de evolução
                 with st.container():
@@ -10981,15 +12335,14 @@ with tab3:
 # ABA 4: LIGAÇÕES - VERSÃO CORRIGIDA
 # =========================
 with tab4:
-    st.markdown("""
-        <div class="section-title">
-            <span style="background: linear-gradient(135deg, #790E09, #5A0A06); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📞</span>
-            LIGAÇÕES
-            <div style="font-size: 14px; color: #666666; font-weight: 500; margin-top: 5px; letter-spacing: 1px;">
-                ANÁLISE DE LIGAÇÕES E CONTATOS - TELEVENDAS RECEPTIVO
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        build_visual_title_html(
+            "LIGAÇÕES",
+            "phone",
+            subtitle="ANÁLISE DE LIGAÇÕES E CONTATOS - TELEVENDAS RECEPTIVO"
+        ),
+        unsafe_allow_html=True
+    )
     
     # =========================
     # CARREGAR DADOS DE LIGAÇÕES (BASE REAL) - CORRIGIDO
@@ -11446,7 +12799,7 @@ with tab4:
     if mes_selecionado:
         st.markdown("---")
         st.markdown(
-            '<div class="section-title"><span class="section-icon">📊</span> INDICADORES DE LIGAÇÕES</div>',
+            build_visual_title_html("INDICADORES DE LIGAÇÕES", "phone"),
             unsafe_allow_html=True
         )
         
@@ -11665,7 +13018,7 @@ with tab4:
         # =========================
         st.markdown("---")
         st.markdown(
-            '<div class="section-title"><span class="section-icon">📈</span> EVOLUÇÃO MENSAL DE LIGAÇÕES - VISÃO COMPARATIVA</div>',
+            build_visual_title_html("EVOLUÇÃO MENSAL DE LIGAÇÕES - VISÃO COMPARATIVA", "trend"),
             unsafe_allow_html=True
         )
 
@@ -11981,7 +13334,7 @@ with tab4:
         # =========================
         st.markdown("---")
         st.markdown(
-            '<div class="section-title"><span class="section-icon">📋</span> PERFORMANCE POR REGIONAL - LIGAÇÕES</div>',
+            build_visual_title_html("PERFORMANCE POR REGIONAL - LIGAÇÕES", "grid"),
             unsafe_allow_html=True
         )
 
@@ -12688,27 +14041,33 @@ with tab5:
         <style>
         div[data-testid="stPopover"] > button {
             border-radius: 999px !important;
-            border: 1px solid #790E09 !important;
-            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
-            color: #FFFFFF !important;
-            font-weight: 700 !important;
-            padding: 0.28rem 0.9rem !important;
+            border: 1px solid rgba(121, 14, 9, 0.18) !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%) !important;
+            color: #790E09 !important;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.03em !important;
+            padding: 0.32rem 0.96rem !important;
             min-height: 2rem !important;
-            box-shadow: 0 6px 16px rgba(121, 14, 9, 0.24) !important;
+            box-shadow:
+                0 0.45rem 1rem rgba(121, 14, 9, 0.10),
+                inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
         }
         div[data-testid="stPopover"] > button:hover {
-            filter: brightness(1.06);
+            border-color: rgba(255, 40, 0, 0.24) !important;
+            box-shadow: 0 0 0 0.16rem rgba(255, 40, 0, 0.08), 0 0.65rem 1.25rem rgba(121, 14, 9, 0.14) !important;
             transform: translateY(-1px);
         }
         div[data-testid="stPopover"] > button p {
-            font-size: 0.82rem !important;
+            font-size: 0.8rem !important;
+            color: #790E09 !important;
         }
         div.st-key-obs_save_btn_top button,
         div.st-key-obs_clear_btn_top button {
-            border-radius: 8px !important;
+            border-radius: 10px !important;
             min-height: 2rem !important;
-            padding: 0.25rem 0.65rem !important;
-            font-weight: 600 !important;
+            padding: 0.28rem 0.72rem !important;
+            font-weight: 700 !important;
         }
         div.st-key-obs_save_btn_top button p,
         div.st-key-obs_clear_btn_top button p {
@@ -13779,7 +15138,7 @@ with tab5:
         st.warning("Não há meses disponíveis para montar a tabela analítica.")
     else:
         st.markdown(
-            '<div class="subsection-title" style="margin-top:18px;"><span class="section-icon">📋</span> RESULTADO DOS CANAIS</div>',
+            build_visual_title_html("RESULTADO DOS CANAIS", "grid", "subsection-title", extra_style="margin-top:18px;"),
             unsafe_allow_html=True
         )
         col_res_a1, col_res_a2 = st.columns([1.1, 1.1])
@@ -13819,7 +15178,12 @@ with tab5:
             for col_ref, produto_resultado, table_id_resultado in blocos_resultado:
                 with col_ref:
                     st.markdown(
-                        f'<div class="subsection-title" style="margin-top:8px;"><span class="section-icon">&#128312;</span> {produto_resultado}</div>',
+                        build_visual_title_html(
+                            produto_resultado,
+                            produto_resultado,
+                            "subsection-title",
+                            extra_style="margin-top:8px;"
+                        ),
                         unsafe_allow_html=True
                     )
                     tabela_resultado_canais = construir_tabela_resultado_canais(
@@ -13857,7 +15221,7 @@ with tab5:
     # NOVO VISUAL: EVOLUCAO SEMANAL (REALIZADO x META)
     # ------------------------------------------------------------
     st.markdown(
-        '<div class="subsection-title" style="margin-top:18px;"><span class="section-icon">&#128200;</span> EVOLUCAO SEMANAL</div>',
+        build_visual_title_html("EVOLUCAO SEMANAL", "trend", "subsection-title", extra_style="margin-top:18px;"),
         unsafe_allow_html=True
     )
 
@@ -14238,7 +15602,7 @@ with tab5:
                         )
 
                     st.markdown(
-                        '<div class="subsection-title" style="margin-top:14px;"><span class="section-icon">&#128221;</span> RESUMO SEMANAL</div>',
+                        build_visual_title_html("RESUMO SEMANAL", "grid", "subsection-title", extra_style="margin-top:14px;"),
                         unsafe_allow_html=True
                     )
 
@@ -15463,7 +16827,7 @@ with tab5:
                         ].copy()
 
                     st.markdown(
-                        '<div class="subsection-title" style="margin-top:8px;"><span class="section-icon">&#128312;</span> CONTA</div>',
+                        build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
                         unsafe_allow_html=True
                     )
                     html_tabela_conta, df_export_conta = construir_tabela_resumo_semanal(
@@ -15477,7 +16841,7 @@ with tab5:
                     st.markdown(html_tabela_conta, unsafe_allow_html=True)
 
                     st.markdown(
-                        '<div class="subsection-title" style="margin-top:1px;"><span class="section-icon">&#128312;</span> FIXA</div>',
+                        build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:1px;"),
                         unsafe_allow_html=True
                     )
                     html_tabela_fixa, df_export_fixa = construir_tabela_resumo_semanal(
@@ -15494,7 +16858,12 @@ with tab5:
     # NOVO VISUAL: PERFORMANCE REGIONAL CONSOLIDADA (PEDIDOS/LIGAÇÕES/V.B/ATIVADOS)
     # ------------------------------------------------------------
     st.markdown(
-        '<div class="subsection-title" style="margin-top:12px;"><span class="section-icon">📊</span> PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES</div>',
+        build_visual_title_html(
+            "PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES",
+            "grid",
+            "subsection-title",
+            extra_style="margin-top:12px;"
+        ),
         unsafe_allow_html=True
     )
 
@@ -16058,7 +17427,12 @@ with tab5:
         for col_ref, produto_ref in blocos_resumo_regional:
             with col_ref:
                 st.markdown(
-                    f'<div class="subsection-title" style="margin-top:8px;"><span class="section-icon">&#128312;</span> {produto_ref}</div>',
+                    build_visual_title_html(
+                        produto_ref,
+                        produto_ref,
+                        "subsection-title",
+                        extra_style="margin-top:8px;"
+                    ),
                     unsafe_allow_html=True
                 )
                 html_tabela_reg = montar_html_resumo_regional_produto(produto_ref)
@@ -16074,7 +17448,12 @@ with tab5:
 
     if tem_meses_analitico:
         st.markdown(
-            '<div class="subsection-title" style="margin-top:22px;"><span class="section-icon">🎯</span> NECESSIDADE DIÁRIA POR CANAL/PRODUTO</div>',
+            build_visual_title_html(
+                "NECESSIDADE DIÁRIA POR CANAL/PRODUTO",
+                "target",
+                "subsection-title",
+                extra_style="margin-top:22px;"
+            ),
             unsafe_allow_html=True
         )
         col_f_a1, col_f_a2, col_f_a3 = st.columns([1.0, 1.0, 1.2])
