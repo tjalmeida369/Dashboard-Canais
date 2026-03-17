@@ -10,10 +10,12 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 import locale
 import re
+import shutil
+import tempfile
 import unicodedata
 from html import escape
 from textwrap import dedent
-
+# ============================================
 # Harmonizar tema plotly com títulos menores
 base_template = go.layout.Template(
     layout=go.Layout(
@@ -110,6 +112,20 @@ def normalizar_chave_visual(texto: str) -> str:
     base = base.encode("ASCII", "ignore").decode("ASCII").lower()
     base = re.sub(r'[^a-z0-9]+', ' ', base).strip()
     return base
+
+def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
+    """Localiza uma coluna por alias, ignorando acentos e pequenas variacoes de nome."""
+    mapa_colunas: dict[str, str] = {}
+    for coluna in colunas:
+        chave = normalizar_chave_visual(coluna)
+        if chave and chave not in mapa_colunas:
+            mapa_colunas[chave] = coluna
+
+    for alias in aliases:
+        coluna_real = mapa_colunas.get(normalizar_chave_visual(alias))
+        if coluna_real:
+            return coluna_real
+    return None
 
 def get_kpi_icon_svg(icon_hint: str | None = None) -> str:
     """Retorna SVG inline simples para reforçar a leitura visual dos KPIs."""
@@ -3184,12 +3200,12 @@ st.markdown(
     <style>
     .stTabs [data-baseweb="tab-list"] {
         display: flex !important;
-        flex-wrap: wrap !important;
+        flex-wrap: nowrap !important;
         align-items: stretch !important;
-        gap: 0.58rem !important;
-        padding: 0.58rem !important;
+        gap: 0.34rem !important;
+        padding: 0.42rem !important;
         margin: 0.34rem 0 1.2rem 0 !important;
-        border-radius: 1.28rem !important;
+        border-radius: 1.12rem !important;
         border: 1px solid rgba(121, 14, 9, 0.18) !important;
         background:
             radial-gradient(circle at top, rgba(255, 255, 255, 0.80), rgba(255, 255, 255, 0.00) 58%),
@@ -3197,7 +3213,10 @@ st.markdown(
         box-shadow:
             0 1rem 2rem rgba(121, 14, 9, 0.10),
             inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
-        overflow: visible !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(121, 14, 9, 0.30) transparent !important;
     }
 
     .stTabs [data-baseweb="tab"] {
@@ -3205,21 +3224,21 @@ st.markdown(
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 0.68rem !important;
-        flex: 1 1 calc(20% - 0.58rem) !important;
-        min-width: 11rem !important;
-        min-height: 3.24rem !important;
-        padding: 0.8rem 1.08rem !important;
-        border-radius: 1.02rem !important;
+        gap: 0.46rem !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        min-height: 2.86rem !important;
+        padding: 0.58rem 0.66rem !important;
+        border-radius: 0.9rem !important;
         border: 1px solid rgba(121, 14, 9, 0.16) !important;
         background: linear-gradient(180deg, #FFFFFF 0%, #FBF7F7 100%) !important;
         box-shadow:
             0 0.48rem 1rem rgba(121, 14, 9, 0.08),
             inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
         font-family: 'Sora', 'Manrope', 'Segoe UI', sans-serif !important;
-        font-size: 0.79rem !important;
+        font-size: 0.67rem !important;
         font-weight: 800 !important;
-        letter-spacing: 0.08em !important;
+        letter-spacing: 0.04em !important;
         text-transform: uppercase !important;
         line-height: 1.08 !important;
         transition:
@@ -3239,9 +3258,9 @@ st.markdown(
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 1.72rem !important;
-        height: 1.72rem !important;
-        flex: 0 0 1.72rem !important;
+        width: 1.34rem !important;
+        height: 1.34rem !important;
+        flex: 0 0 1.34rem !important;
         border-radius: 999px !important;
         border: 1px solid rgba(121, 14, 9, 0.24) !important;
         background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F8 100%) !important;
@@ -3259,8 +3278,8 @@ st.markdown(
     }
 
     .stTabs [data-baseweb="tab"] .tab-icon-badge svg {
-        width: 0.92rem !important;
-        height: 0.92rem !important;
+        width: 0.72rem !important;
+        height: 0.72rem !important;
         display: block !important;
         stroke: currentColor !important;
         color: currentColor !important;
@@ -3276,6 +3295,7 @@ st.markdown(
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         line-height: 1.08 !important;
+        font-size: inherit !important;
     }
 
     .stTabs [data-baseweb="tab"]::after {
@@ -3409,31 +3429,42 @@ st.markdown(
         padding-top: 0.1rem !important;
     }
 
-    @media (max-width: 1180px) {
-        .stTabs [data-baseweb="tab"] {
-            flex: 1 1 calc(33.333% - 0.58rem) !important;
-        }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
+        height: 0.34rem !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-thumb {
+        border-radius: 999px !important;
+        background: linear-gradient(90deg, rgba(162, 59, 54, 0.85), rgba(121, 14, 9, 0.92)) !important;
     }
 
     @media (max-width: 860px) {
-        .stTabs [data-baseweb="tab"] {
-            flex: 1 1 calc(50% - 0.58rem) !important;
-            min-width: 0 !important;
-        }
-    }
-
-    @media (max-width: 560px) {
         .stTabs [data-baseweb="tab-list"] {
-            gap: 0.46rem !important;
-            padding: 0.48rem !important;
+            gap: 0.28rem !important;
+            padding: 0.34rem !important;
         }
 
         .stTabs [data-baseweb="tab"] {
-            flex: 1 1 100% !important;
-            min-height: 3.05rem !important;
-            padding: 0.72rem 0.88rem !important;
-            font-size: 0.75rem !important;
-            letter-spacing: 0.06em !important;
+            min-height: 2.66rem !important;
+            padding: 0.5rem 0.52rem !important;
+            font-size: 0.62rem !important;
+            letter-spacing: 0.03em !important;
+            gap: 0.34rem !important;
+        }
+
+        .stTabs [data-baseweb="tab"] .tab-icon-badge {
+            width: 1.16rem !important;
+            height: 1.16rem !important;
+            flex-basis: 1.16rem !important;
+        }
+
+        .stTabs [data-baseweb="tab"] .tab-icon-badge svg {
+            width: 0.62rem !important;
+            height: 0.62rem !important;
         }
     }
     </style>
@@ -3634,9 +3665,9 @@ st.markdown(
         position: relative !important;
         gap: 0.72rem !important;
         margin-top: 0.08rem !important;
-        margin-bottom: 0.42rem !important;
+        margin-bottom: 0.46rem !important;
         padding-top: 0.14rem !important;
-        padding-bottom: 0.44rem !important;
+        padding-bottom: 0.5rem !important;
         min-height: 2rem !important;
     }
 
@@ -3646,7 +3677,19 @@ st.markdown(
     }
 
     .kpi-title-dinamico::after {
-        bottom: 0.04rem !important;
+        bottom: 0.02rem !important;
+        width: 34px !important;
+        height: 2px !important;
+        border-radius: 999px !important;
+        background: linear-gradient(
+            90deg,
+            rgba(90, 10, 6, 0.08),
+            rgba(121, 14, 9, 0.82) 26%,
+            rgba(255, 40, 0, 0.96) 50%,
+            rgba(121, 14, 9, 0.82) 74%,
+            rgba(90, 10, 6, 0.08)
+        ) !important;
+        box-shadow: 0 1px 3px rgba(121, 14, 9, 0.16) !important;
     }
 
     .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) {
@@ -3675,9 +3718,11 @@ st.markdown(
         min-height: 1.4rem !important;
         padding: 0.2rem 0.6rem !important;
         border-radius: 999px !important;
-        border: 1px solid rgba(121, 14, 9, 0.12) !important;
-        background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%) !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94) !important;
+        border: 1px solid rgba(121, 14, 9, 0.14) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.96),
+            0 1px 0 rgba(121, 14, 9, 0.04) !important;
     }
 
     .kpi-block-icon {
@@ -3691,40 +3736,48 @@ st.markdown(
     }
 
     .kpi-value-wrap {
-        padding: 0.42rem 0.88rem !important;
+        padding: 0.46rem 0.94rem !important;
         border-radius: 1rem !important;
-        border: 1px solid rgba(121, 14, 9, 0.12) !important;
+        border: 1px solid rgba(121, 14, 9, 0.16) !important;
         background:
-            radial-gradient(circle at top center, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.00) 56%),
-            linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(250, 251, 253, 0.98) 100%) !important;
+            radial-gradient(circle at top center, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.00) 58%),
+            linear-gradient(180deg, #FFFFFF 0%, #F9FAFC 100%) !important;
         box-shadow:
             inset 0 1px 0 rgba(255, 255, 255, 0.96),
-            0 1px 0 rgba(255, 255, 255, 0.65) !important;
+            inset 0 -1px 0 rgba(47, 55, 71, 0.03),
+            0 1px 0 rgba(255, 255, 255, 0.68) !important;
     }
 
     .kpi-card-dinamico:has(.kpi-title-dinamico.is-primary) .kpi-value-wrap {
-        border-color: rgba(121, 14, 9, 0.16) !important;
+        border-color: rgba(121, 14, 9, 0.18) !important;
         background:
-            radial-gradient(circle at top center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.00) 58%),
+            radial-gradient(circle at top center, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.00) 60%),
             linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%) !important;
         box-shadow:
             inset 0 1px 0 rgba(255, 255, 255, 0.96),
+            inset 0 -1px 0 rgba(47, 55, 71, 0.035),
             0 1px 0 rgba(255, 255, 255, 0.68) !important;
     }
 
     .kpi-value-wrap::after {
-        left: 16% !important;
-        right: 16% !important;
+        left: 12% !important;
+        right: 12% !important;
+        height: 2px !important;
         background: linear-gradient(
             90deg,
             transparent,
-            rgba(121, 14, 9, 0.20),
+            rgba(121, 14, 9, 0.26),
             transparent
         ) !important;
     }
 
     .kpi-value-dinamico {
-        letter-spacing: -0.04em !important;
+        letter-spacing: -0.045em !important;
+        background: linear-gradient(135deg, #243041 0%, #1F2937 58%, #790E09 100%) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        text-shadow: none !important;
     }
 
     .kpi-meta-line {
@@ -3865,6 +3918,125 @@ def load_excel_cached(path: str, file_mtime: float | None = None) -> pd.DataFram
     return pd.read_excel(path)
 
 LIGACOES_FILE_PATH = "televendas_ligacoes2.xlsx"
+COTACOES_FILE_PATH = Path(
+    "RelatorioFluxoVidaCotacao.xlsx"
+)
+
+def _read_excel_with_copy_fallback(
+    path: str | Path,
+    *,
+    usecols=None,
+    nrows: int | None = None
+) -> pd.DataFrame:
+    """Le Excel com fallback para copia temporaria quando o arquivo estiver bloqueado."""
+    path_obj = Path(path)
+    try:
+        return pd.read_excel(path_obj, usecols=usecols, nrows=nrows)
+    except PermissionError:
+        temp_path = Path(tempfile.gettempdir()) / f"{path_obj.stem}_cache{path_obj.suffix}"
+        shutil.copy2(path_obj, temp_path)
+        return pd.read_excel(temp_path, usecols=usecols, nrows=nrows)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_cotacoes_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega e trata a base de fluxo de vida da cotacao com contagem unica por ID."""
+    _ = file_mtime
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    try:
+        header_df = _read_excel_with_copy_fallback(path_obj, nrows=0)
+    except Exception:
+        return pd.DataFrame()
+
+    coluna_cotacao = encontrar_coluna_por_alias(header_df.columns, "COTAÇÃO", "COTACAO")
+    coluna_data = encontrar_coluna_por_alias(
+        header_df.columns,
+        "DATA CRIAÇÃO COTAÇÃO",
+        "DATA CRIACAO COTACAO"
+    )
+    coluna_canal = encontrar_coluna_por_alias(header_df.columns, "CANAL_PLAN", "CANAL PLAN")
+    coluna_regional = encontrar_coluna_por_alias(header_df.columns, "REGIONAL")
+    coluna_status = encontrar_coluna_por_alias(header_df.columns, "STATUS ATUAL")
+
+    colunas_obrigatorias = [coluna_cotacao, coluna_data, coluna_canal, coluna_regional]
+    if any(col is None for col in colunas_obrigatorias):
+        return pd.DataFrame()
+
+    colunas_leitura = [col for col in [coluna_cotacao, coluna_data, coluna_canal, coluna_regional, coluna_status] if col]
+
+    try:
+        df_cot = _read_excel_with_copy_fallback(path_obj, usecols=colunas_leitura)
+    except Exception:
+        return pd.DataFrame()
+
+    rename_map = {
+        coluna_cotacao: "COTACAO_ID",
+        coluna_data: "DATA_CRIACAO_COTACAO",
+        coluna_canal: "CANAL_PLAN",
+        coluna_regional: "REGIONAL",
+    }
+    if coluna_status:
+        rename_map[coluna_status] = "STATUS_ATUAL"
+
+    df_cot = df_cot.rename(columns=rename_map).copy()
+    if "STATUS_ATUAL" not in df_cot.columns:
+        df_cot["STATUS_ATUAL"] = ""
+
+    df_cot["COTACAO_ID"] = (
+        df_cot["COTACAO_ID"]
+        .astype(str)
+        .str.strip()
+        .replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NULL": pd.NA})
+    )
+    df_cot["DATA_CRIACAO_COTACAO"] = pd.to_datetime(
+        df_cot["DATA_CRIACAO_COTACAO"],
+        errors="coerce"
+    )
+    df_cot["CANAL_PLAN"] = (
+        df_cot["CANAL_PLAN"]
+        .astype(str)
+        .str.strip()
+        .replace({"": "Canal nao informado", "nan": "Canal nao informado"})
+    )
+    df_cot["REGIONAL"] = (
+        df_cot["REGIONAL"]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+        .str[:3]
+        .replace({"": "N/I", "NAN": "N/I"})
+    )
+    df_cot["STATUS_ATUAL"] = df_cot["STATUS_ATUAL"].astype(str).str.strip()
+
+    df_cot = df_cot[
+        df_cot["COTACAO_ID"].notna() &
+        df_cot["DATA_CRIACAO_COTACAO"].notna()
+    ].copy()
+    if df_cot.empty:
+        return pd.DataFrame()
+
+    df_cot.sort_values(["COTACAO_ID", "DATA_CRIACAO_COTACAO"], inplace=True)
+    df_cot = (
+        df_cot.groupby("COTACAO_ID", as_index=False, observed=True)
+        .agg({
+            "DATA_CRIACAO_COTACAO": "min",
+            "CANAL_PLAN": "first",
+            "REGIONAL": "first",
+            "STATUS_ATUAL": "first"
+        })
+    )
+
+    meses_pt = {
+        1: "jan", 2: "fev", 3: "mar", 4: "abr", 5: "mai", 6: "jun",
+        7: "jul", 8: "ago", 9: "set", 10: "out", 11: "nov", 12: "dez"
+    }
+    df_cot["mes_ano"] = df_cot["DATA_CRIACAO_COTACAO"].apply(
+        lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}" if pd.notna(dt) else None
+    )
+    df_cot["dat_tratada"] = df_cot["mes_ano"]
+    return df_cot
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float | None = None) -> pd.DataFrame:
@@ -4005,6 +4177,19 @@ def get_mes_anterior(mes_atual: str) -> str:
         
         return f"{mes_anterior_str}/{ano_anterior_str}"
     except:
+        return mes_atual
+
+def get_mes_ano_anterior(mes_atual: str) -> str:
+    """Retorna o mesmo mes do ano anterior no formato 'mmm/aa'."""
+    try:
+        data_ref = pd.Timestamp(mes_ano_para_data(mes_atual)).normalize()
+        data_yoy = data_ref - pd.DateOffset(years=1)
+        meses_pt = {
+            1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+            7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+        }
+        return f"{meses_pt.get(int(data_yoy.month), 'jan')}/{str(int(data_yoy.year))[-2:]}"
+    except Exception:
         return mes_atual
 
 def render_filter_label(texto: str):
@@ -8240,7 +8425,7 @@ st.markdown("""
 # =========================
 # ABAS PRINCIPAIS
 # =========================
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["ATIVADOS", "DESATIVADOS", "PEDIDOS", "LIGAÇÕES", "ANALÍTICO"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["ATIVADOS", "DESATIVADOS", "PEDIDOS", "LIGAÇÕES", "ANALÍTICO", "COTAÇÕES"])
 
 # Persistir aba selecionada entre reruns para evitar voltar para Ativados ao filtrar
 components.html(
@@ -8254,7 +8439,8 @@ components.html(
         DESATIVADOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l4.5 5 3.5-3 6 8"></path><path d="M14.5 18H18v-3.5"></path></svg>`,
         PEDIDOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`,
         LIGACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
-        ANALITICO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"></rect><rect x="14" y="3" width="7" height="7" rx="1.6"></rect><rect x="3" y="14" width="7" height="7" rx="1.6"></rect><rect x="14" y="14" width="7" height="7" rx="1.6"></rect></svg>`
+        ANALITICO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"></rect><rect x="14" y="3" width="7" height="7" rx="1.6"></rect><rect x="3" y="14" width="7" height="7" rx="1.6"></rect><rect x="14" y="14" width="7" height="7" rx="1.6"></rect></svg>`,
+        COTACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`
       };
 
       function normalizeTabLabel(value) {
@@ -18162,3 +18348,436 @@ with tab5:
                 html_fixa,
                 unsafe_allow_html=True
             )
+
+# ABA 6: COTAÇÕES
+# =========================
+with tab6:
+    st.markdown(
+        build_visual_title_html(
+            "COTAÇÕES",
+            "cart",
+            subtitle="ANÁLISE DO FLUXO DE VIDA DA COTAÇÃO"
+        ),
+        unsafe_allow_html=True
+    )
+
+    cotacoes_candidates = [
+        COTACOES_FILE_PATH,
+        Path(__file__).with_name("RelatorioFluxoVidaCotacao.xlsx")
+    ]
+    cotacoes_path = next((path for path in cotacoes_candidates if Path(path).exists()), None)
+
+    if cotacoes_path is None:
+        st.warning("Arquivo de COTAÇÕES não encontrado no caminho configurado.")
+    else:
+        cotacoes_mtime = Path(cotacoes_path).stat().st_mtime if Path(cotacoes_path).exists() else None
+        df_cotacoes = load_cotacoes_data(str(cotacoes_path), cotacoes_mtime)
+
+        if df_cotacoes.empty:
+            st.warning("Não foi possível carregar dados válidos de COTAÇÕES.")
+        else:
+            st.sidebar.markdown("---")
+            st.sidebar.markdown("### 📄 FILTROS COTAÇÕES")
+
+            regionais_cotacoes_disp = sorted(df_cotacoes["REGIONAL"].dropna().astype(str).unique().tolist())
+            canais_cotacoes_disp = sorted(df_cotacoes["CANAL_PLAN"].dropna().astype(str).unique().tolist())
+            status_cotacoes_disp = sorted(
+                [
+                    status for status in df_cotacoes["STATUS_ATUAL"].dropna().astype(str).str.strip().unique().tolist()
+                    if status
+                ]
+            )
+            meses_cotacoes_disp = sorted(
+                df_cotacoes["mes_ano"].dropna().astype(str).unique().tolist(),
+                key=mes_ano_para_data
+            )
+
+            with st.sidebar:
+                regionais_cotacoes_sel = st.multiselect(
+                    "**Regional (Cotações):**",
+                    options=regionais_cotacoes_disp,
+                    default=regionais_cotacoes_disp,
+                    help="Selecione uma ou mais regionais",
+                    key="filtro_regional_cotacoes"
+                )
+                canais_cotacoes_sel = st.multiselect(
+                    "**Canal (Cotações):**",
+                    options=canais_cotacoes_disp,
+                    default=canais_cotacoes_disp,
+                    help="Selecione um ou mais canais",
+                    key="filtro_canal_cotacoes"
+                )
+                periodos_cotacoes_sel = st.multiselect(
+                    "**Período (Cotações):**",
+                    options=meses_cotacoes_disp,
+                    default=meses_cotacoes_disp,
+                    help="Selecione um ou mais períodos",
+                    key="filtro_periodo_cotacoes"
+                )
+                status_cotacoes_sel = st.multiselect(
+                    "**Status Atual:**",
+                    options=status_cotacoes_disp,
+                    default=status_cotacoes_disp,
+                    help="Selecione um ou mais status",
+                    key="filtro_status_cotacoes"
+                )
+                st.markdown("---")
+                st.info(f"**Total de cotações únicas:** {formatar_numero_brasileiro(len(df_cotacoes), 0)}")
+
+            mask_cotacoes = (
+                df_cotacoes["REGIONAL"].isin(regionais_cotacoes_sel) &
+                df_cotacoes["CANAL_PLAN"].isin(canais_cotacoes_sel) &
+                df_cotacoes["mes_ano"].isin(periodos_cotacoes_sel)
+            )
+            if status_cotacoes_sel:
+                mask_cotacoes &= df_cotacoes["STATUS_ATUAL"].isin(status_cotacoes_sel)
+            df_cotacoes_filtrado = df_cotacoes.loc[mask_cotacoes].copy()
+
+            if df_cotacoes_filtrado.empty:
+                st.info("Sem dados de COTAÇÕES para os filtros selecionados.")
+            else:
+                meses_cotacoes_cards = sorted(
+                    df_cotacoes_filtrado["mes_ano"].dropna().astype(str).unique().tolist(),
+                    key=mes_ano_para_data
+                )
+                mes_atual_cotacoes = get_mes_atual_formatado()
+                if meses_cotacoes_cards:
+                    if mes_atual_cotacoes in meses_cotacoes_cards:
+                        idx_padrao_cot = meses_cotacoes_cards.index(mes_atual_cotacoes)
+                    else:
+                        idx_padrao_cot = len(meses_cotacoes_cards) - 1
+                else:
+                    idx_padrao_cot = 0
+
+                with st.container():
+                    st.markdown(
+                        '<div class="filter-title">📅 SELECIONE O MÊS PARA ANÁLISE DE COTAÇÕES</div>',
+                        unsafe_allow_html=True
+                    )
+                    col_filtro_cot_1, col_filtro_cot_2 = st.columns([1, 3])
+
+                    with col_filtro_cot_1:
+                        render_filter_label("Mês")
+                        mes_selecionado_cot = st.selectbox(
+                            "Selecione o mês para análise de cotações",
+                            options=meses_cotacoes_cards,
+                            index=idx_padrao_cot,
+                            key="mes_compartilhado_cotacoes",
+                            label_visibility="collapsed"
+                        )
+
+                    mes_anterior_cot = get_mes_anterior(mes_selecionado_cot)
+                    mes_yoy_cot = get_mes_ano_anterior(mes_selecionado_cot)
+
+                    with col_filtro_cot_2:
+                        st.markdown(
+                            f"""
+                            <div class="info-box" style="margin: 0; padding: 12px 15px;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: nowrap; height: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 13px; color: #333333; font-weight: 600;">Mês Atual:</span>
+                                        <span style="font-size: 14px; color: #FF2800; font-weight: 800;
+                                                background: rgba(255, 40, 0, 0.1); padding: 6px 15px; border-radius: 20px;">
+                                            {mes_selecionado_cot}
+                                        </span>
+                                    </div>
+                                    <div style="width: 1px; height: 30px; background: #E9ECEF;"></div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 13px; color: #333333; font-weight: 600;">M-1:</span>
+                                        <span style="font-size: 14px; color: #790E09; font-weight: 700;
+                                                background: rgba(121, 14, 9, 0.1); padding: 6px 15px; border-radius: 20px;">
+                                            {mes_anterior_cot}
+                                        </span>
+                                    </div>
+                                    <div style="width: 1px; height: 30px; background: #E9ECEF;"></div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 13px; color: #333333; font-weight: 600;">M-12:</span>
+                                        <span style="font-size: 14px; color: #5A6268; font-weight: 700;
+                                                background: rgba(90, 98, 104, 0.10); padding: 6px 15px; border-radius: 20px;">
+                                            {mes_yoy_cot}
+                                        </span>
+                                    </div>
+                                    <div style="width: 1px; height: 30px; background: #E9ECEF;"></div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 13px; color: #333333; font-weight: 600;">Comparativos:</span>
+                                        <span style="font-size: 13px; color: #666666; font-weight: 600;">
+                                            MoM (M-1) e YoY (M-12)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                st.markdown(
+                    build_visual_title_html("QUANTIDADE DE COTAÇÕES POR CANAL", "target"),
+                    unsafe_allow_html=True
+                )
+
+                agg_cotacoes_pm = (
+                    df_cotacoes_filtrado.groupby(
+                        ["CANAL_PLAN", "mes_ano"],
+                        as_index=False,
+                        observed=True
+                    )["COTACAO_ID"]
+                    .nunique()
+                    .rename(columns={"COTACAO_ID": "QTD_COTACOES"})
+                )
+                cotacoes_lookup = {
+                    (str(row["CANAL_PLAN"]).strip(), str(row["mes_ano"]).strip()): int(row["QTD_COTACOES"] or 0)
+                    for _, row in agg_cotacoes_pm.iterrows()
+                }
+
+                def calcular_metricas_canal_cotacoes(canal: str, mes_atual: str, mes_anterior: str, mes_yoy: str) -> dict:
+                    atual = int(cotacoes_lookup.get((canal, mes_atual), 0))
+                    anterior = int(cotacoes_lookup.get((canal, mes_anterior), 0))
+                    yoy = int(cotacoes_lookup.get((canal, mes_yoy), 0))
+                    variacao_mom = (((atual - anterior) / anterior) * 100.0) if anterior > 0 else None
+                    variacao_yoy = (((atual - yoy) / yoy) * 100.0) if yoy > 0 else None
+                    return {
+                        "atual": atual,
+                        "anterior": anterior,
+                        "yoy": yoy,
+                        "variacao_mom": variacao_mom,
+                        "variacao_yoy": variacao_yoy
+                    }
+
+                def montar_variacao_card(valor: float | None, label: str) -> tuple[str, str]:
+                    if valor is None:
+                        return "variacao-neutra", f"{label} N/A"
+                    classe = "variacao-positiva" if float(valor) >= 0 else "variacao-negativa"
+                    return classe, f"{float(valor):+.0f}% {label}"
+
+                ordem_canais_cot = [
+                    "Televendas Ativo",
+                    "Televendas Receptivo",
+                    "S2S+DAC",
+                    "E-Commerce",
+                    "Inside Sales",
+                    "Hospitality"
+                ]
+                canais_cot_presentes = (
+                    df_cotacoes_filtrado["CANAL_PLAN"]
+                    .dropna()
+                    .astype(str)
+                    .str.strip()
+                    .unique()
+                    .tolist()
+                )
+                canais_cot_list = [canal for canal in ordem_canais_cot if canal in canais_cot_presentes]
+                for canal in canais_cot_presentes:
+                    if canal not in canais_cot_list:
+                        canais_cot_list.append(canal)
+
+                if not canais_cot_list:
+                    st.info("Sem canais disponíveis para exibir os cards de COTAÇÕES.")
+                else:
+                    for i in range(0, len(canais_cot_list), 3):
+                        cols = st.columns(3, gap="medium")
+                        canais_linha = canais_cot_list[i:i + 3]
+
+                        for j, canal in enumerate(canais_linha):
+                            metricas_cot = calcular_metricas_canal_cotacoes(
+                                canal,
+                                mes_selecionado_cot,
+                                mes_anterior_cot,
+                                mes_yoy_cot
+                            )
+
+                            atual_fmt = formatar_numero_brasileiro(metricas_cot["atual"], 0)
+                            anterior_fmt = formatar_numero_brasileiro(metricas_cot["anterior"], 0)
+                            yoy_fmt = formatar_numero_brasileiro(metricas_cot["yoy"], 0)
+                            classe_mom_cot, texto_mom_cot = montar_variacao_card(metricas_cot["variacao_mom"], "vs M-1")
+                            classe_yoy_cot, texto_yoy_cot = montar_variacao_card(metricas_cot["variacao_yoy"], "vs M-12")
+                            chip_yoy = (
+                                f'<span class="kpi-meta-chip kpi-meta-chip-silentes" '
+                                f'title="M-12: referente ao mês {escape(mes_yoy_cot)}" '
+                                f'aria-label="M-12: referente ao mês {escape(mes_yoy_cot)}">'
+                                f'<span class="kpi-meta-label">M-12</span>'
+                                f'<span class="kpi-meta-value">{yoy_fmt}</span>'
+                                f'</span>'
+                            )
+
+                            with cols[j]:
+                                st.markdown(
+                                    f"""
+                                    <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 88px !important; padding: 9px 10px !important;" title="Resumo de cotações do canal {escape(canal)}" aria-label="Resumo de cotações do canal {escape(canal)}">
+                                        {build_kpi_title_html(canal, "canal")}
+                                        <div style="text-align: center; padding: 4px 0 2px 0;">
+                                            <div class="kpi-value-dinamico">{atual_fmt}</div>
+                                            <div class="kpi-meta-line" style="margin: 6px 0; white-space: nowrap;">
+                                                {build_kpi_meta_line(anterior_fmt, mes_anterior_ref=mes_anterior_cot)}
+                                                {chip_yoy}
+                                            </div>
+                                            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+                                                <div class="kpi-variacao-item {classe_mom_cot}" style="font-size: 10px !important;">
+                                                    {texto_mom_cot}
+                                                </div>
+                                                <div class="kpi-variacao-item {classe_yoy_cot}" style="font-size: 10px !important;">
+                                                    {texto_yoy_cot}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True
+                                )
+
+            # =========================
+            # GRÁFICO CASCATA POR STATUS
+            # =========================
+            st.markdown(
+                build_visual_title_html("CASCATA DE COTAÇÕES POR STATUS ATUAL", "trend"),
+                unsafe_allow_html=True
+            )
+
+            meses_cascata_disp = sorted(
+                df_cotacoes["mes_ano"].dropna().astype(str).unique().tolist(),
+                key=mes_ano_para_data
+            )
+            canais_cascata_disp = ["Todos"] + sorted(
+                df_cotacoes["CANAL_PLAN"].dropna().astype(str).str.strip().unique().tolist()
+            )
+            regionais_cascata_disp = ["Todas"] + sorted(
+                df_cotacoes["REGIONAL"].dropna().astype(str).str.strip().unique().tolist()
+            )
+
+            mes_cascata_default = (
+                get_mes_atual_formatado()
+                if get_mes_atual_formatado() in meses_cascata_disp
+                else (meses_cascata_disp[-1] if meses_cascata_disp else "")
+            )
+
+            col_cascata_f1, col_cascata_f2, col_cascata_f3 = st.columns([1.0, 1.0, 1.0], gap="medium")
+            with col_cascata_f1:
+                render_filter_label("Mês")
+                mes_cascata_sel = st.selectbox(
+                    "Mês da cascata",
+                    options=meses_cascata_disp,
+                    index=meses_cascata_disp.index(mes_cascata_default) if mes_cascata_default in meses_cascata_disp else 0,
+                    key="cotacoes_cascata_mes",
+                    label_visibility="collapsed"
+                )
+            with col_cascata_f2:
+                render_filter_label("Canal")
+                canal_cascata_sel = st.selectbox(
+                    "Canal da cascata",
+                    options=canais_cascata_disp,
+                    index=0,
+                    key="cotacoes_cascata_canal",
+                    label_visibility="collapsed"
+                )
+            with col_cascata_f3:
+                render_filter_label("Regional")
+                regional_cascata_sel = st.selectbox(
+                    "Regional da cascata",
+                    options=regionais_cascata_disp,
+                    index=0,
+                    key="cotacoes_cascata_regional",
+                    label_visibility="collapsed"
+                )
+
+            df_cascata = df_cotacoes[df_cotacoes["mes_ano"].eq(mes_cascata_sel)].copy()
+            if canal_cascata_sel != "Todos":
+                df_cascata = df_cascata[df_cascata["CANAL_PLAN"].eq(canal_cascata_sel)].copy()
+            if regional_cascata_sel != "Todas":
+                df_cascata = df_cascata[df_cascata["REGIONAL"].eq(regional_cascata_sel)].copy()
+
+            if df_cascata.empty:
+                st.info("Sem dados para o gráfico cascata com os filtros selecionados.")
+            else:
+                df_cascata["STATUS_ATUAL"] = (
+                    df_cascata["STATUS_ATUAL"]
+                    .astype(str)
+                    .str.strip()
+                    .replace({"": "Status nao informado", "nan": "Status nao informado"})
+                )
+                df_status_cascata = (
+                    df_cascata.groupby("STATUS_ATUAL", as_index=False, observed=True)["COTACAO_ID"]
+                    .nunique()
+                    .rename(columns={"COTACAO_ID": "QTD_COTACOES"})
+                    .sort_values(["QTD_COTACOES", "STATUS_ATUAL"], ascending=[False, True], ignore_index=True)
+                )
+
+                status_labels = df_status_cascata["STATUS_ATUAL"].astype(str).tolist()
+                status_values = pd.to_numeric(df_status_cascata["QTD_COTACOES"], errors="coerce").fillna(0).astype(float).tolist()
+                total_cotacoes_cascata = float(sum(status_values))
+                labels_cascata = status_labels + ["Total"]
+                valores_cascata = status_values + [total_cotacoes_cascata]
+                medidas_cascata = ["relative"] * len(status_values) + ["total"]
+                textos_cascata = [formatar_numero_brasileiro(v, 0) for v in valores_cascata]
+
+                fig_cascata = go.Figure(
+                    go.Waterfall(
+                        orientation="v",
+                        measure=medidas_cascata,
+                        x=labels_cascata,
+                        y=valores_cascata,
+                        text=textos_cascata,
+                        textposition="outside",
+                        increasing={"marker": {"color": "#FF2800", "line": {"color": "#FFFFFF", "width": 1.2}}},
+                        decreasing={"marker": {"color": "#790E09", "line": {"color": "#FFFFFF", "width": 1.2}}},
+                        totals={"marker": {"color": "#5A0A06", "line": {"color": "#FFFFFF", "width": 1.2}}},
+                        connector={"line": {"color": "rgba(90, 98, 104, 0.48)", "width": 1.4}},
+                        customdata=textos_cascata,
+                        hovertemplate="<b>%{x}</b><br><b>Cotações únicas:</b> %{customdata}<extra></extra>"
+                    )
+                )
+
+                fig_cascata.update_layout(
+                    plot_bgcolor="#FFFFFF",
+                    paper_bgcolor="#F4F7FB",
+                    font=dict(family="Segoe UI", size=13, color="#2F3747"),
+                    margin=dict(l=28, r=22, t=68, b=110),
+                    xaxis=dict(
+                        title="",
+                        tickangle=-24,
+                        tickfont=dict(size=11, color="#5B6578"),
+                        showgrid=False,
+                        linecolor="#E2E8F0",
+                        linewidth=1.2,
+                        ticks="outside",
+                        ticklen=5
+                    ),
+                    yaxis=dict(
+                        title="",
+                        tickfont=dict(size=12, color="#5B6578"),
+                        showgrid=True,
+                        gridcolor="rgba(226, 232, 240, 0.76)",
+                        gridwidth=1,
+                        linecolor="#E2E8F0",
+                        linewidth=1.2,
+                        zeroline=False
+                    ),
+                    showlegend=False,
+                    hoverlabel=dict(
+                        bgcolor="white",
+                        bordercolor="#E2E8F0",
+                        font_size=12,
+                        font_family="Segoe UI",
+                        font_color="#2F3747"
+                    )
+                )
+                apply_standard_title_style(fig_cascata, size=16)
+
+                st.markdown(
+                    f"""
+                    <div class="info-box" style="margin: 0 0 12px 0; padding: 10px 14px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                            <div style="font-size:13px; color:#5B6578; font-weight:700;">
+                                Cada barra representa a quantidade única de cotações no <b>STATUS ATUAL</b>, e a última coluna mostra o total do recorte filtrado.
+                            </div>
+                            <div style="font-size:13px; color:#790E09; font-weight:800;">
+                                Total filtrado: {formatar_numero_brasileiro(total_cotacoes_cascata, 0)}
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                st.plotly_chart(
+                    fig_cascata,
+                    width="stretch",
+                    config={"displayModeBar": False, "displaylogo": False}
+                )
