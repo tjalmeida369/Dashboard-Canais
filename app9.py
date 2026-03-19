@@ -12,6 +12,7 @@ import locale
 import re
 import shutil
 import tempfile
+import gc
 import unicodedata
 from html import escape
 from textwrap import dedent
@@ -126,6 +127,51 @@ def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
         if coluna_real:
             return coluna_real
     return None
+
+CACHE_MAX_ENTRIES_LARGE = 4
+CACHE_MAX_ENTRIES_MEDIUM = 8
+CACHE_MAX_ENTRIES_SMALL = 16
+COTACOES_CACHE_VERSION = "2026-03-17-cotacoes-linhas-v6"
+ALLOWED_CANAIS_VENDA_COTACOES = {
+    normalizar_chave_visual("CORPPME"),
+    normalizar_chave_visual("CORPLP"),
+    normalizar_chave_visual("NETPME"),
+}
+PRIMARY_BASE_USECOLS = [
+    'REGIONAL', 'DSC_REGIONAL_CMV',
+    'CANAL_PLAN', 'DSC_CANAL',
+    'dat_tratada', 'mes_ano',
+    'DSC_INDICADOR', 'COD_PLATAFORMA',
+    'DAT_MOVIMENTO2', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO_2', 'PERIODO',
+    'QTDE', 'DESAFIO_QTD', 'TEND_QTD',
+    'ID_AFILIADOS', 'ID_AFILIADO',
+    'ORIGEM_AFILIADOS', 'ORIGEM_AFILIADO'
+]
+
+def compactar_colunas_categoricas(
+    df: pd.DataFrame,
+    colunas: list[str] | tuple[str, ...]
+) -> pd.DataFrame:
+    """Compacta colunas dimensionais repetitivas para reduzir memória sem alterar valores."""
+    if df is None or df.empty:
+        return df
+
+    for coluna in colunas:
+        if coluna not in df.columns:
+            continue
+        serie = df[coluna]
+        if isinstance(serie.dtype, pd.CategoricalDtype):
+            continue
+        if not (pd.api.types.is_object_dtype(serie) or pd.api.types.is_string_dtype(serie)):
+            continue
+        try:
+            total = int(len(serie))
+            nunique = int(serie.nunique(dropna=False))
+            if total > 0 and nunique <= max(64, int(total * 0.50)):
+                df[coluna] = serie.astype("category")
+        except Exception:
+            continue
+    return df
 
 def get_kpi_icon_svg(icon_hint: str | None = None) -> str:
     """Retorna SVG inline simples para reforçar a leitura visual dos KPIs."""
@@ -3868,7 +3914,7 @@ st.markdown(
 # =========================
 # FUNÇÕES AUXILIARES
 # =========================
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
 def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """
     Carrega e pré-trata a base principal.
@@ -3876,7 +3922,10 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """
     _ = file_mtime  # parâmetro sentinela para invalidação de cache
     try:
-        df = pd.read_excel(path)
+        header_df = load_excel_cached(path, file_mtime, nrows=0)
+        colunas_disponiveis = list(getattr(header_df, "columns", []))
+        colunas_leitura = [col for col in PRIMARY_BASE_USECOLS if col in colunas_disponiveis]
+        df = load_excel_cached(path, file_mtime, usecols=colunas_leitura or None)
     except FileNotFoundError:
         st.error("Arquivo de dados não encontrado!")
         st.stop()
@@ -3884,8 +3933,37 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
         st.error(f"Erro ao carregar dados: {str(e)}")
         st.stop()
 
+    rename_map = {}
+    if 'REGIONAL' not in df.columns and 'DSC_REGIONAL_CMV' in df.columns:
+        rename_map['DSC_REGIONAL_CMV'] = 'REGIONAL'
+    if 'CANAL_PLAN' not in df.columns and 'DSC_CANAL' in df.columns:
+        rename_map['DSC_CANAL'] = 'CANAL_PLAN'
+    if 'DAT_MOVIMENTO2' not in df.columns:
+        for coluna_data_alt in ['DAT_MOVIMENTO', 'DAT_MOVIMENTO_2', 'PERIODO']:
+            if coluna_data_alt in df.columns:
+                rename_map[coluna_data_alt] = 'DAT_MOVIMENTO2'
+                break
+    if 'ID_AFILIADOS' not in df.columns and 'ID_AFILIADO' in df.columns:
+        rename_map['ID_AFILIADO'] = 'ID_AFILIADOS'
+    if 'ORIGEM_AFILIADOS' not in df.columns and 'ORIGEM_AFILIADO' in df.columns:
+        rename_map['ORIGEM_AFILIADO'] = 'ORIGEM_AFILIADOS'
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    colunas_descartar = [
+        col for col in ['DSC_REGIONAL_CMV', 'DSC_CANAL', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO_2', 'PERIODO', 'ID_AFILIADO', 'ORIGEM_AFILIADO']
+        if col in df.columns
+    ]
+    if colunas_descartar:
+        df = df.drop(columns=colunas_descartar, errors='ignore')
+
+    if 'dat_tratada' not in df.columns and 'mes_ano' in df.columns:
+        df['dat_tratada'] = df['mes_ano']
+    if 'mes_ano' not in df.columns and 'dat_tratada' in df.columns:
+        df['mes_ano'] = df['dat_tratada']
+
     # Pré-tratamento leve para reduzir retrabalho a cada rerun.
-    colunas_texto = ['REGIONAL', 'CANAL_PLAN', 'dat_tratada', 'DSC_INDICADOR', 'COD_PLATAFORMA']
+    colunas_texto = ['REGIONAL', 'CANAL_PLAN', 'dat_tratada', 'mes_ano', 'DSC_INDICADOR', 'COD_PLATAFORMA', 'ID_AFILIADOS', 'ORIGEM_AFILIADOS']
     for col in colunas_texto:
         if col in df.columns:
             if pd.api.types.is_string_dtype(df[col]):
@@ -3908,19 +3986,56 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     else:
         df['TEND_QTD'] = df.get('QTDE', 0)
 
+    compactar_colunas_categoricas(df, colunas_texto)
+    del header_df, colunas_disponiveis, colunas_leitura, rename_map, colunas_descartar
+    gc.collect()
     return df
 
 
-@st.cache_data(show_spinner=False)
-def load_excel_cached(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+def load_excel_cached(
+    path: str,
+    file_mtime: float | None = None,
+    usecols=None,
+    nrows: int | None = None
+) -> pd.DataFrame:
     """Leitura de Excel com cache invalidado por data de modificação."""
     _ = file_mtime
-    return pd.read_excel(path)
+    return pd.read_excel(path, usecols=usecols, nrows=nrows)
 
 LIGACOES_FILE_PATH = "televendas_ligacoes2.xlsx"
 COTACOES_FILE_PATH = Path(
     "RelatorioFluxoVidaCotacao.xlsx"
 )
+BACKLOG_CONSOLIDADO_FILE_PATH = Path(
+    "backlog_consolidado.csv"
+)
+ANALITICO_MIGRACOES_FILE_PATH = Path(
+    "ANALITICO_MIGRACOES_fev26.xlsx"
+)
+BACKLOG_CANAIS_PERMITIDOS = [
+    "DAC",
+    "DAC Adequacao de Pacote",
+    "Hospitality PME",
+    "Internet",
+    "Ativo Aquisicao Direto",
+    "Ativo Aquisicao Indireto",
+    "Ativo Rentabilizacao Indireto",
+    "Receptivo",
+    "Receptivo Rentabilizacao Exclusivo",
+]
+BACKLOG_MAPEAMENTO_CANAIS_NORM = {
+    normalizar_chave_visual("DAC"): "S2S+DAC",
+    normalizar_chave_visual("DAC Adequacao de Pacote"): "S2S+DAC",
+    normalizar_chave_visual("Hospitality PME"): "Hospitality PME",
+    normalizar_chave_visual("Internet"): "E-Commerce",
+    normalizar_chave_visual("Ativo Aquisicao Direto"): "Televendas Ativo",
+    normalizar_chave_visual("Ativo Aquisicao Indireto"): "Televendas Ativo",
+    normalizar_chave_visual("Ativo Rentabilizacao Indireto"): "Televendas Ativo",
+    normalizar_chave_visual("Receptivo"): "Televendas Receptivo",
+    normalizar_chave_visual("Receptivo Rentabilizacao Exclusivo"): "Televendas Receptivo",
+}
+MIGRACOES_PME_CANAIS = ["E-Commerce", "Inside Sales", "Televendas"]
 
 def _read_excel_with_copy_fallback(
     path: str | Path,
@@ -3937,10 +4052,32 @@ def _read_excel_with_copy_fallback(
         shutil.copy2(path_obj, temp_path)
         return pd.read_excel(temp_path, usecols=usecols, nrows=nrows)
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def load_cotacoes_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
-    """Carrega e trata a base de fluxo de vida da cotacao com contagem unica por ID."""
-    _ = file_mtime
+def _filtrar_regra_cotacoes_novas_linhas(df: pd.DataFrame) -> pd.DataFrame:
+    """Aplica a regra base de COTAÇÕES por canal de venda e palavras-chave."""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=getattr(df, "columns", None))
+
+    atividades_norm = df["LISTA_ATIVIDADES"].astype(str).map(normalizar_chave_visual)
+    canal_venda_norm = df["CANAL_DE_VENDA"].astype(str).map(normalizar_chave_visual)
+    mask_regra = (
+        df["QTD_NOVAS_LINHAS_ATIVAR"].ne(0) &
+        df["QTD_LINHAS_VOZ"].ne(0) &
+        canal_venda_norm.isin(ALLOWED_CANAIS_VENDA_COTACOES) &
+        (
+            atividades_norm.str.contains(r"\bnovo\b", regex=True, na=False) |
+            atividades_norm.str.contains(r"\bincremento de linhas\b", regex=True, na=False)
+        )
+    )
+    return df.loc[mask_regra]
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+def load_cotacoes_data(
+    path: str,
+    file_mtime: float | None = None,
+    cache_version: str = COTACOES_CACHE_VERSION
+) -> pd.DataFrame:
+    """Carrega e trata a base de fluxo de vida da cotacao aplicando a regra de novas linhas."""
+    _ = (file_mtime, cache_version)
     path_obj = Path(path)
     if not path_obj.exists():
         return pd.DataFrame()
@@ -3956,15 +4093,36 @@ def load_cotacoes_data(path: str, file_mtime: float | None = None) -> pd.DataFra
         "DATA CRIAÇÃO COTAÇÃO",
         "DATA CRIACAO COTACAO"
     )
+    coluna_canal_venda = encontrar_coluna_por_alias(header_df.columns, "CANAL DE VENDA")
     coluna_canal = encontrar_coluna_por_alias(header_df.columns, "CANAL_PLAN", "CANAL PLAN")
-    coluna_regional = encontrar_coluna_por_alias(header_df.columns, "REGIONAL")
+    coluna_regional = encontrar_coluna_por_alias(
+        header_df.columns,
+        "REGIONAL",
+        "REGIONAL CRIADOR COTAÇÃO",
+        "REGIONAL CRIADOR COTACAO",
+        "REGIONAL CLIENTE"
+    )
     coluna_status = encontrar_coluna_por_alias(header_df.columns, "STATUS ATUAL")
+    coluna_novas_linhas = encontrar_coluna_por_alias(
+        header_df.columns,
+        "QUANTIDADE NOVAS LINHAS A SEREM ATIVADAS"
+    )
+    coluna_linhas_voz = encontrar_coluna_por_alias(header_df.columns, "QTD LINHAS VOZ")
+    coluna_lista_atividades = encontrar_coluna_por_alias(header_df.columns, "LISTA ATIVIDADES")
 
-    colunas_obrigatorias = [coluna_cotacao, coluna_data, coluna_canal, coluna_regional]
+    colunas_obrigatorias = [
+        coluna_data, coluna_canal_venda, coluna_canal, coluna_regional,
+        coluna_novas_linhas, coluna_linhas_voz, coluna_lista_atividades
+    ]
     if any(col is None for col in colunas_obrigatorias):
         return pd.DataFrame()
 
-    colunas_leitura = [col for col in [coluna_cotacao, coluna_data, coluna_canal, coluna_regional, coluna_status] if col]
+    colunas_leitura = [
+        col for col in [
+            coluna_cotacao, coluna_data, coluna_canal_venda, coluna_canal, coluna_regional, coluna_status,
+            coluna_novas_linhas, coluna_linhas_voz, coluna_lista_atividades
+        ] if col
+    ]
 
     try:
         df_cot = _read_excel_with_copy_fallback(path_obj, usecols=colunas_leitura)
@@ -3972,15 +4130,22 @@ def load_cotacoes_data(path: str, file_mtime: float | None = None) -> pd.DataFra
         return pd.DataFrame()
 
     rename_map = {
-        coluna_cotacao: "COTACAO_ID",
         coluna_data: "DATA_CRIACAO_COTACAO",
+        coluna_canal_venda: "CANAL_DE_VENDA",
         coluna_canal: "CANAL_PLAN",
         coluna_regional: "REGIONAL",
+        coluna_novas_linhas: "QTD_NOVAS_LINHAS_ATIVAR",
+        coluna_linhas_voz: "QTD_LINHAS_VOZ",
+        coluna_lista_atividades: "LISTA_ATIVIDADES",
     }
+    if coluna_cotacao:
+        rename_map[coluna_cotacao] = "COTACAO_ID"
     if coluna_status:
         rename_map[coluna_status] = "STATUS_ATUAL"
 
-    df_cot = df_cot.rename(columns=rename_map).copy()
+    df_cot = df_cot.rename(columns=rename_map)
+    if "COTACAO_ID" not in df_cot.columns:
+        df_cot["COTACAO_ID"] = ""
     if "STATUS_ATUAL" not in df_cot.columns:
         df_cot["STATUS_ATUAL"] = ""
 
@@ -3993,6 +4158,12 @@ def load_cotacoes_data(path: str, file_mtime: float | None = None) -> pd.DataFra
     df_cot["DATA_CRIACAO_COTACAO"] = pd.to_datetime(
         df_cot["DATA_CRIACAO_COTACAO"],
         errors="coerce"
+    )
+    df_cot["CANAL_DE_VENDA"] = (
+        df_cot["CANAL_DE_VENDA"]
+        .astype(str)
+        .str.strip()
+        .replace({"": "Canal de venda nao informado", "nan": "Canal de venda nao informado"})
     )
     df_cot["CANAL_PLAN"] = (
         df_cot["CANAL_PLAN"]
@@ -4009,24 +4180,17 @@ def load_cotacoes_data(path: str, file_mtime: float | None = None) -> pd.DataFra
         .replace({"": "N/I", "NAN": "N/I"})
     )
     df_cot["STATUS_ATUAL"] = df_cot["STATUS_ATUAL"].astype(str).str.strip()
+    df_cot["QTD_NOVAS_LINHAS_ATIVAR"] = normalizar_numerico_serie(df_cot["QTD_NOVAS_LINHAS_ATIVAR"]).fillna(0)
+    df_cot["QTD_LINHAS_VOZ"] = normalizar_numerico_serie(df_cot["QTD_LINHAS_VOZ"]).fillna(0)
+    df_cot["LISTA_ATIVIDADES"] = df_cot["LISTA_ATIVIDADES"].astype(str).str.strip()
 
-    df_cot = df_cot[
-        df_cot["COTACAO_ID"].notna() &
-        df_cot["DATA_CRIACAO_COTACAO"].notna()
-    ].copy()
+    df_cot = _filtrar_regra_cotacoes_novas_linhas(df_cot)
     if df_cot.empty:
         return pd.DataFrame()
 
-    df_cot.sort_values(["COTACAO_ID", "DATA_CRIACAO_COTACAO"], inplace=True)
-    df_cot = (
-        df_cot.groupby("COTACAO_ID", as_index=False, observed=True)
-        .agg({
-            "DATA_CRIACAO_COTACAO": "min",
-            "CANAL_PLAN": "first",
-            "REGIONAL": "first",
-            "STATUS_ATUAL": "first"
-        })
-    )
+    df_cot = df_cot.loc[df_cot["DATA_CRIACAO_COTACAO"].notna()]
+    if df_cot.empty:
+        return pd.DataFrame()
 
     meses_pt = {
         1: "jan", 2: "fev", 3: "mar", 4: "abr", 5: "mai", 6: "jun",
@@ -4036,9 +4200,752 @@ def load_cotacoes_data(path: str, file_mtime: float | None = None) -> pd.DataFra
         lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}" if pd.notna(dt) else None
     )
     df_cot["dat_tratada"] = df_cot["mes_ano"]
+    compactar_colunas_categoricas(df_cot, ["CANAL_DE_VENDA", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL", "mes_ano", "dat_tratada"])
     return df_cot
 
-@st.cache_data(ttl=3600, show_spinner=False)
+def _agregar_cotacoes_dataframe(df_cot: pd.DataFrame) -> pd.DataFrame:
+    """Agrupa a base filtrada de COTAÇÕES para alimentar cards e gráficos."""
+    colunas_saida = ["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL", "VALOR_NOVAS_LINHAS"]
+    if df_cot is None or df_cot.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_agg = (
+        df_cot.assign(
+            STATUS_ATUAL=(
+                df_cot["STATUS_ATUAL"]
+                .astype(str)
+                .str.strip()
+                .replace({"": "Status nao informado", "nan": "Status nao informado"})
+            )
+        )
+        .groupby(["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL"], as_index=False, observed=True)
+        ["QTD_NOVAS_LINHAS_ATIVAR"]
+        .sum()
+        .rename(columns={"QTD_NOVAS_LINHAS_ATIVAR": "VALOR_NOVAS_LINHAS"})
+    )
+    compactar_colunas_categoricas(df_agg, ["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL"])
+    return df_agg[colunas_saida]
+
+@st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+def preparar_agregados_cotacoes(
+    path: str,
+    file_mtime: float | None = None,
+    cache_version: str = COTACOES_CACHE_VERSION
+) -> pd.DataFrame:
+    """Pré-agrega novas linhas de cotações por mês/canal/regional/status para reduzir groupbys."""
+    df_cot = load_cotacoes_data(path, file_mtime, cache_version)
+    df_agg = _agregar_cotacoes_dataframe(df_cot)
+    del df_cot
+    gc.collect()
+    return df_agg
+
+def diagnosticar_cotacoes_loader(path: str | Path) -> dict:
+    """Retorna diagnóstico detalhado da carga de COTAÇÕES para depuração no Cloud."""
+    path_obj = Path(path)
+    diag = {
+        "path": str(path_obj),
+        "exists": path_obj.exists(),
+        "matched_columns": {},
+        "rows_header": 0,
+        "rows_raw": 0,
+        "rows_regra": 0,
+        "rows_validas": 0,
+        "rows_final": 0,
+        "sum_final": 0.0,
+        "error": ""
+    }
+    if not path_obj.exists():
+        diag["error"] = "Arquivo não encontrado."
+        return diag
+
+    try:
+        header_df = _read_excel_with_copy_fallback(path_obj, nrows=0)
+        diag["rows_header"] = int(len(header_df.columns))
+    except Exception as exc:
+        diag["error"] = f"Falha ao ler cabeçalho: {exc}"
+        return diag
+
+    aliases = {
+        "COTACAO": ("COTAÇÃO", "COTACAO"),
+        "DATA": ("DATA CRIAÇÃO COTAÇÃO", "DATA CRIACAO COTACAO"),
+        "CANAL_VENDA": ("CANAL DE VENDA",),
+        "CANAL": ("CANAL_PLAN", "CANAL PLAN"),
+        "REGIONAL": ("REGIONAL", "REGIONAL CRIADOR COTAÇÃO", "REGIONAL CRIADOR COTACAO", "REGIONAL CLIENTE"),
+        "STATUS": ("STATUS ATUAL",),
+        "NOVAS_LINHAS": ("QUANTIDADE NOVAS LINHAS A SEREM ATIVADAS",),
+        "LINHAS_VOZ": ("QTD LINHAS VOZ",),
+        "ATIVIDADES": ("LISTA ATIVIDADES",)
+    }
+    matched = {chave: encontrar_coluna_por_alias(header_df.columns, *alts) for chave, alts in aliases.items()}
+    diag["matched_columns"] = matched
+    if any(v is None for k, v in matched.items() if k not in {"STATUS", "COTACAO"}):
+        faltantes = [k for k, v in matched.items() if v is None and k not in {"STATUS", "COTACAO"}]
+        diag["error"] = f"Colunas obrigatórias não encontradas: {', '.join(faltantes)}"
+        return diag
+
+    usecols = [v for v in matched.values() if v]
+    try:
+        df = _read_excel_with_copy_fallback(path_obj, usecols=usecols)
+    except Exception as exc:
+        diag["error"] = f"Falha ao ler dados: {exc}"
+        return diag
+
+    diag["rows_raw"] = int(len(df))
+    rename_map = {
+        matched["DATA"]: "DATA_CRIACAO_COTACAO",
+        matched["CANAL_VENDA"]: "CANAL_DE_VENDA",
+        matched["CANAL"]: "CANAL_PLAN",
+        matched["REGIONAL"]: "REGIONAL",
+        matched["NOVAS_LINHAS"]: "QTD_NOVAS_LINHAS_ATIVAR",
+        matched["LINHAS_VOZ"]: "QTD_LINHAS_VOZ",
+        matched["ATIVIDADES"]: "LISTA_ATIVIDADES",
+    }
+    if matched["COTACAO"]:
+        rename_map[matched["COTACAO"]] = "COTACAO_ID"
+    if matched["STATUS"]:
+        rename_map[matched["STATUS"]] = "STATUS_ATUAL"
+    df = df.rename(columns=rename_map)
+    if "COTACAO_ID" not in df.columns:
+        df["COTACAO_ID"] = ""
+    if "STATUS_ATUAL" not in df.columns:
+        df["STATUS_ATUAL"] = ""
+
+    df["COTACAO_ID"] = (
+        df["COTACAO_ID"].astype(str).str.strip().replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NULL": pd.NA})
+    )
+    df["DATA_CRIACAO_COTACAO"] = pd.to_datetime(df["DATA_CRIACAO_COTACAO"], errors="coerce")
+    df["CANAL_DE_VENDA"] = df["CANAL_DE_VENDA"].astype(str).str.strip()
+    df["QTD_NOVAS_LINHAS_ATIVAR"] = normalizar_numerico_serie(df["QTD_NOVAS_LINHAS_ATIVAR"]).fillna(0)
+    df["QTD_LINHAS_VOZ"] = normalizar_numerico_serie(df["QTD_LINHAS_VOZ"]).fillna(0)
+    df["LISTA_ATIVIDADES"] = df["LISTA_ATIVIDADES"].astype(str).str.strip()
+
+    df_regra = _filtrar_regra_cotacoes_novas_linhas(df)
+    diag["rows_regra"] = int(len(df_regra))
+    if df_regra.empty:
+        return diag
+
+    df_valid = df_regra.loc[df_regra["DATA_CRIACAO_COTACAO"].notna()]
+    diag["rows_validas"] = int(len(df_valid))
+    if df_valid.empty:
+        return diag
+
+    df_final = df_valid.copy()
+    diag["rows_final"] = int(len(df_final))
+    diag["sum_final"] = float(pd.to_numeric(df_final["QTD_NOVAS_LINHAS_ATIVAR"], errors="coerce").fillna(0).sum())
+    return diag
+
+def _formatar_mes_ano_backlog(data_valor) -> str | None:
+    """Formata datas do backlog como mmm/aa em PT-BR."""
+    if pd.isna(data_valor):
+        return None
+    data_ts = pd.Timestamp(data_valor)
+    meses_pt = {
+        1: "jan", 2: "fev", 3: "mar", 4: "abr", 5: "mai", 6: "jun",
+        7: "jul", 8: "ago", 9: "set", 10: "out", 11: "nov", 12: "dez"
+    }
+    return f"{meses_pt.get(data_ts.month, 'jan')}/{data_ts.strftime('%y')}"
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+def load_backlog_consolidado_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega o backlog consolidado com os mesmos filtros do notebook de preparo."""
+    _ = file_mtime
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    usecols = [
+        "NR_CONTRATO",
+        "NM_VISAO_ANALISE",
+        "NM_REGIONAL",
+        "NM_CANAL_VENDA_SUBGRUPO",
+        "DT_AGENDA_ORDEM_SERVICO",
+    ]
+    read_kwargs = {
+        "usecols": usecols,
+        "low_memory": False,
+        "dtype": {
+            "NR_CONTRATO": "string",
+            "NM_VISAO_ANALISE": "string",
+            "NM_REGIONAL": "string",
+            "NM_CANAL_VENDA_SUBGRUPO": "string",
+            "DT_AGENDA_ORDEM_SERVICO": "string",
+        }
+    }
+    try:
+        df = pd.read_csv(path_obj, **read_kwargs)
+    except UnicodeDecodeError:
+        df = pd.read_csv(path_obj, encoding="latin-1", **read_kwargs)
+    except Exception:
+        return pd.DataFrame()
+
+    for coluna in [
+        "NR_CONTRATO",
+        "NM_VISAO_ANALISE",
+        "NM_REGIONAL",
+        "NM_CANAL_VENDA_SUBGRUPO",
+        "DT_AGENDA_ORDEM_SERVICO",
+    ]:
+        df[coluna] = df[coluna].astype("string").str.strip()
+
+    canais_permitidos_norm = {normalizar_chave_visual(v) for v in BACKLOG_CANAIS_PERMITIDOS}
+    canais_backlog_norm = df["NM_CANAL_VENDA_SUBGRUPO"].map(normalizar_chave_visual)
+    filtro = (
+        df["NM_VISAO_ANALISE"].map(normalizar_chave_visual).eq(normalizar_chave_visual("Novos Domicilios")) &
+        canais_backlog_norm.isin(canais_permitidos_norm)
+    )
+    df = df.loc[filtro]
+    if df.empty:
+        return pd.DataFrame()
+
+    df["NM_CANAL_VENDA_SUBGRUPO"] = (
+        canais_backlog_norm.loc[df.index]
+        .map(BACKLOG_MAPEAMENTO_CANAIS_NORM)
+        .fillna(df["NM_CANAL_VENDA_SUBGRUPO"].astype("string").str.strip())
+        .astype("string")
+        .str.strip()
+        .replace({"": pd.NA, "nan": pd.NA})
+    )
+    df["NR_CONTRATO"] = (
+        df["NR_CONTRATO"]
+        .astype("string")
+        .str.strip()
+        .str.replace(r"\.0$", "", regex=True)
+        .replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NULL": pd.NA})
+    )
+    df["NM_REGIONAL"] = (
+        df["NM_REGIONAL"]
+        .astype("string")
+        .str.strip()
+        .replace({"": "Não Informado", "nan": "Não Informado"})
+    )
+    df["DT_AGENDA_ORDEM_SERVICO"] = pd.to_datetime(df["DT_AGENDA_ORDEM_SERVICO"], errors="coerce")
+    df = df.loc[
+        df["NM_CANAL_VENDA_SUBGRUPO"].notna() &
+        df["NR_CONTRATO"].notna() &
+        df["DT_AGENDA_ORDEM_SERVICO"].notna()
+    ]
+    if df.empty:
+        return pd.DataFrame()
+
+    df["MES_ANO"] = df["DT_AGENDA_ORDEM_SERVICO"].map(_formatar_mes_ano_backlog)
+    df = df.loc[
+        df["MES_ANO"].notna(),
+        ["NM_REGIONAL", "NM_CANAL_VENDA_SUBGRUPO", "MES_ANO", "NR_CONTRATO"]
+    ]
+    compactar_colunas_categoricas(df, ["NM_REGIONAL", "NM_CANAL_VENDA_SUBGRUPO", "MES_ANO"])
+    return df
+
+def montar_tabela_backlog_canais(
+    df_backlog: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Monta a tabela canal x mês do backlog com linha total no topo."""
+    colunas_vazias = ["CANAL"]
+    if df_backlog is None or df_backlog.empty:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    meses_ordem = sorted(
+        df_backlog["MES_ANO"].dropna().astype(str).unique().tolist(),
+        key=mes_ano_para_data
+    )
+    if not meses_ordem:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    tabela = pd.pivot_table(
+        df_backlog,
+        index="NM_CANAL_VENDA_SUBGRUPO",
+        columns="MES_ANO",
+        values="NR_CONTRATO",
+        aggfunc=pd.Series.nunique,
+        fill_value=0
+    ).reindex(columns=meses_ordem, fill_value=0)
+
+    if tabela.empty:
+        return pd.DataFrame(columns=["CANAL", *meses_ordem]), pd.DataFrame(columns=["CANAL", *meses_ordem])
+
+    tabela = tabela.assign(_ordem=tabela.sum(axis=1)).sort_values("_ordem", ascending=False).drop(columns="_ordem")
+    totais_mes = (
+        df_backlog.groupby("MES_ANO", observed=True)["NR_CONTRATO"]
+        .nunique()
+        .reindex(meses_ordem, fill_value=0)
+    )
+
+    df_num = tabela.reset_index().rename(columns={"NM_CANAL_VENDA_SUBGRUPO": "CANAL"})
+    linha_total = {"CANAL": "TOTAL"}
+    for mes in meses_ordem:
+        linha_total[mes] = float(totais_mes.get(mes, 0))
+    df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
+
+    df_fmt = df_num.copy()
+    for col in df_fmt.columns:
+        if col == "CANAL":
+            continue
+        df_fmt[col] = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0).apply(
+            lambda valor: formatar_numero_brasileiro(valor, 0)
+        )
+    return df_fmt, df_num
+
+def criar_tabela_html_backlog_canais(
+    df_formatado: pd.DataFrame,
+    df_numerico: pd.DataFrame,
+    table_id: str
+) -> str:
+    """Cria tabela HTML do backlog no padrão premium das tabelas analíticas."""
+    if df_formatado is None or df_formatado.empty:
+        return ""
+
+    colunas = list(df_formatado.columns)
+    qtd_meses = max(len(colunas) - 1, 1)
+    largura_canal_pct = 18.0 if qtd_meses >= 10 else 22.0
+    largura_mes_pct = (100.0 - largura_canal_pct) / qtd_meses
+    larguras = [largura_canal_pct] + [largura_mes_pct] * qtd_meses
+    colgroup_html = "<colgroup>" + "".join(
+        [f'<col style="width:{largura:.4f}%;">' for largura in larguras]
+    ) + "</colgroup>"
+
+    html = f"""
+    <style>
+        .{table_id}-container {{
+            width: 100%;
+            overflow-x: auto;
+            border: 2px solid #790E09;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(121,14,9,0.16);
+            margin: 10px 0 18px 0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+        }}
+        table.{table_id} {{
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 1120px;
+            table-layout: fixed;
+            font-size: 9.5px;
+            line-height: 1.08;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        .{table_id} thead th {{
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+            color: #fff;
+            padding: 5px 5px;
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: 0.25px;
+            white-space: nowrap;
+            font-size: 9px;
+            border-right: 1px solid rgba(255,255,255,0.9);
+            border-bottom: 2px solid #4A0704;
+        }}
+        .{table_id} thead th.col-total-mes {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+        }}
+        .{table_id} thead th.col-canal {{
+            position: sticky;
+            left: 0;
+            z-index: 50;
+            background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
+            text-align: left;
+            padding-left: 7px;
+        }}
+        .{table_id} tbody td {{
+            padding: 5px 6px;
+            text-align: right;
+            border-bottom: 1px solid #F0E4E2;
+            color: #2F3747;
+            font-size: 9.5px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }}
+        .{table_id} tbody tr:nth-child(odd) td {{
+            background: #FFF9F8;
+        }}
+        .{table_id} tbody tr:nth-child(even) td {{
+            background: #FDF3F2;
+        }}
+        .{table_id} tbody tr:hover td {{
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%);
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+        }}
+        .{table_id} tbody td.col-canal {{
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            text-align: left;
+            padding-left: 7px;
+            font-weight: 600;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }}
+        .{table_id} tbody td.col-total-mes {{
+            background: linear-gradient(180deg, rgba(121, 14, 9, 0.07) 0%, rgba(121, 14, 9, 0.028) 100%) !important;
+            color: #6B1F1A;
+            font-weight: 700;
+        }}
+        .{table_id} tbody tr.linha-total td {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 700;
+            border-bottom: 2px solid #A23B36;
+        }}
+        .{table_id} tbody tr.linha-total td.col-canal {{
+            z-index: 30;
+        }}
+        .{table_id}-container::-webkit-scrollbar {{
+            width: 8px;
+            height: 8px;
+        }}
+        .{table_id}-container::-webkit-scrollbar-track {{
+            background: #F5F5F5;
+            border-radius: 10px;
+        }}
+        .{table_id}-container::-webkit-scrollbar-thumb {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+            border-radius: 10px;
+        }}
+    </style>
+    <div class="{table_id}-container">
+      <table class="{table_id}">
+        {colgroup_html}
+        <thead>
+          <tr>
+    """
+    for idx_col, coluna in enumerate(colunas):
+        classes = []
+        if idx_col == 0:
+            classes.append("col-canal")
+        elif str(coluna).strip().upper().startswith("TEND."):
+            classes.append("col-total-mes")
+        html += f'<th class="{" ".join(classes)}">{escape(str(coluna))}</th>'
+    html += "</tr></thead><tbody>"
+
+    for idx_linha, row in df_formatado.iterrows():
+        canal_ref = str(df_numerico.iloc[idx_linha, 0]) if idx_linha < len(df_numerico) else str(row.iloc[0])
+        is_total = canal_ref.strip().upper() == "TOTAL"
+        classe_linha = ' class="linha-total"' if is_total else ""
+        html += f"<tr{classe_linha}>"
+        for idx_col, coluna in enumerate(colunas):
+            valor = escape(str(row[coluna]))
+            classes = []
+            if idx_col == 0:
+                classes.append("col-canal")
+            elif str(coluna).strip().upper().startswith("TEND."):
+                classes.append("col-total-mes")
+            html += f'<td class="{" ".join(classes)}">{valor}</td>'
+        html += "</tr>"
+
+    html += "</tbody></table></div>"
+    return html
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega a base de migracoes PME e padroniza os campos usados na tabela analitica."""
+    _ = file_mtime
+    path_obj = Path(path)
+    colunas_saida = ["CANAL", "MES_ANO", "QTDE"]
+    if not path_obj.exists():
+        return pd.DataFrame(columns=colunas_saida)
+
+    try:
+        header_df = _read_excel_with_copy_fallback(path_obj, nrows=0)
+    except Exception:
+        return pd.DataFrame(columns=colunas_saida)
+
+    coluna_data = encontrar_coluna_por_alias(
+        header_df.columns,
+        "DAT_REFERENCIA",
+        "DATA_REFERENCIA",
+        "DAT REFERENCIA"
+    )
+    coluna_canal = encontrar_coluna_por_alias(
+        header_df.columns,
+        "CANAL",
+        "CANAL_PLAN",
+        "CANAL PLAN"
+    )
+    coluna_qtde = encontrar_coluna_por_alias(
+        header_df.columns,
+        "QTDE",
+        "QTD",
+        "QUANTIDADE"
+    )
+
+    if not coluna_data or not coluna_canal or not coluna_qtde:
+        return pd.DataFrame(columns=colunas_saida)
+
+    try:
+        df = _read_excel_with_copy_fallback(
+            path_obj,
+            usecols=[coluna_data, coluna_canal, coluna_qtde]
+        )
+    except Exception:
+        return pd.DataFrame(columns=colunas_saida)
+
+    if df is None or df.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df = df.rename(
+        columns={
+            coluna_data: "DAT_REFERENCIA",
+            coluna_canal: "CANAL",
+            coluna_qtde: "QTDE",
+        }
+    ).copy()
+
+    df["DAT_REFERENCIA"] = pd.to_datetime(df["DAT_REFERENCIA"], errors="coerce")
+    df["CANAL"] = df["CANAL"].astype("string").str.strip()
+    df["QTDE"] = normalizar_numerico_serie(df["QTDE"]).fillna(0.0)
+
+    canais_norm_map = {
+        normalizar_chave_visual(canal): canal
+        for canal in MIGRACOES_PME_CANAIS
+    }
+    canal_norm = df["CANAL"].map(normalizar_chave_visual)
+    df = df[
+        df["DAT_REFERENCIA"].notna() &
+        canal_norm.isin(canais_norm_map.keys())
+    ].copy()
+
+    if df.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df["CANAL"] = canal_norm.loc[df.index].map(canais_norm_map)
+    df["MES_ANO"] = df["DAT_REFERENCIA"].map(_formatar_mes_ano_backlog)
+    df = df[df["MES_ANO"].notna()].copy()
+
+    compactar_colunas_categoricas(df, ["CANAL", "MES_ANO"])
+    return df[colunas_saida]
+
+def _prever_tendencia_mensal_migracoes(valores_hist: pd.Series | np.ndarray | list[float]) -> float:
+    """
+    Projeta o próximo mês pela média do crescimento dos 2 últimos intervalos mensais.
+    Para a campanha de Migrações PME, prioriza os 3 últimos meses realizados
+    (ex.: dez -> jan -> fev para projetar mar).
+    """
+    serie = pd.Series(valores_hist, dtype="float64").replace([np.inf, -np.inf], np.nan).dropna()
+    if serie.empty:
+        return 0.0
+
+    y = serie.to_numpy(dtype=float)
+    if len(y) == 1:
+        return float(max(y[-1], 0.0))
+
+    janela = y[-min(3, len(y)):]
+    if len(janela) >= 3:
+        val_dez, val_jan, val_fev = [float(v) for v in janela[-3:]]
+        taxas: list[float] = []
+        if val_dez > 0:
+            taxas.append((val_jan / val_dez) - 1.0)
+        if val_jan > 0:
+            taxas.append((val_fev / val_jan) - 1.0)
+
+        if taxas:
+            media_crescimento = float(np.mean(taxas))
+            previsao = val_fev * (1.0 + media_crescimento)
+            return float(max(previsao, 0.0))
+
+        media_deltas = float(np.mean(np.diff(janela))) if len(janela) > 1 else 0.0
+        return float(max(val_fev + media_deltas, 0.0))
+
+    val_anterior = float(janela[-2])
+    val_atual = float(janela[-1])
+    if val_anterior > 0:
+        return float(max(val_atual * (val_atual / val_anterior), 0.0))
+    return float(max(val_atual, 0.0))
+
+def montar_tabela_migracoes_pme_canais(
+    df_migracoes: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Monta a tabela canal x mes para migracoes PME somando QTDE."""
+    colunas_vazias = ["CANAL"]
+    if df_migracoes is None or df_migracoes.empty:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    meses_ordem = sorted(
+        df_migracoes["MES_ANO"].dropna().astype(str).unique().tolist(),
+        key=mes_ano_para_data
+    )
+    if not meses_ordem:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    tabela = pd.pivot_table(
+        df_migracoes,
+        index="CANAL",
+        columns="MES_ANO",
+        values="QTDE",
+        aggfunc="sum",
+        fill_value=0
+    ).reindex(columns=meses_ordem, fill_value=0)
+
+    if tabela.empty:
+        return pd.DataFrame(columns=["CANAL", *meses_ordem]), pd.DataFrame(columns=["CANAL", *meses_ordem])
+
+    canais_ordenados = [canal for canal in MIGRACOES_PME_CANAIS if canal in tabela.index]
+    canais_restantes = [canal for canal in tabela.index.tolist() if canal not in canais_ordenados]
+    tabela = tabela.reindex([*canais_ordenados, *sorted(canais_restantes)], fill_value=0)
+
+    try:
+        data_ref_ult_mes = pd.Timestamp(mes_ano_para_data(meses_ordem[-1]))
+        data_ref_tend = data_ref_ult_mes + pd.DateOffset(months=1)
+        coluna_tendencia = f"TEND. {_formatar_mes_ano_backlog(data_ref_tend)}"
+    except Exception:
+        coluna_tendencia = "TEND."
+
+    tabela[coluna_tendencia] = [
+        _prever_tendencia_mensal_migracoes(
+            pd.to_numeric(tabela.loc[canal, meses_ordem], errors="coerce").fillna(0.0)
+        )
+        for canal in tabela.index
+    ]
+
+    totais_mes = (
+        df_migracoes.groupby("MES_ANO", observed=True)["QTDE"]
+        .sum()
+        .reindex(meses_ordem, fill_value=0)
+    )
+
+    df_num = tabela.reset_index()
+    linha_total = {"CANAL": "TOTAL"}
+    for mes in meses_ordem:
+        linha_total[mes] = float(totais_mes.get(mes, 0))
+    linha_total[coluna_tendencia] = float(pd.to_numeric(tabela[coluna_tendencia], errors="coerce").fillna(0.0).sum())
+    df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
+
+    df_fmt = df_num.copy()
+    for col in df_fmt.columns:
+        if col == "CANAL":
+            continue
+        df_fmt[col] = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0).apply(
+            lambda valor: formatar_numero_brasileiro(valor, 0)
+        )
+    return df_fmt, df_num
+
+def montar_serie_grafico_migracoes_pme(
+    df_tabela_numerica: pd.DataFrame,
+    canal_ref: str = "Todos"
+) -> pd.DataFrame:
+    """Converte a tabela numerica de migracoes PME em serie mensal para o grafico."""
+    if df_tabela_numerica is None or df_tabela_numerica.empty or "CANAL" not in df_tabela_numerica.columns:
+        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
+
+    canal_busca = "TOTAL" if str(canal_ref).strip().lower() in {"", "todos"} else str(canal_ref).strip()
+    linha = df_tabela_numerica[df_tabela_numerica["CANAL"].astype(str).str.strip().eq(canal_busca)].copy()
+    if linha.empty:
+        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
+
+    row = linha.iloc[0]
+    registros: list[dict[str, object]] = []
+    for coluna in df_tabela_numerica.columns:
+        if coluna == "CANAL":
+            continue
+        coluna_str = str(coluna).strip()
+        eh_tendencia = coluna_str.upper().startswith("TEND.")
+        mes_ref = coluna_str.replace("TEND.", "").strip() if eh_tendencia else coluna_str
+        valor = float(pd.to_numeric(pd.Series([row[coluna]]), errors="coerce").fillna(0.0).iloc[0])
+        registros.append(
+            {
+                "MES_ANO": mes_ref,
+                "MES_LABEL": mes_ref.upper(),
+                "QTDE": valor,
+                "TIPO": "TENDENCIA" if eh_tendencia else "REALIZADO",
+            }
+        )
+
+    if not registros:
+        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
+
+    df_serie = pd.DataFrame(registros)
+    df_serie = df_serie.sort_values(
+        by="MES_ANO",
+        key=lambda serie: serie.map(lambda valor: pd.Timestamp(mes_ano_para_data(str(valor))))
+    ).reset_index(drop=True)
+    return df_serie
+
+def criar_grafico_migracoes_pme_mensal(
+    df_serie: pd.DataFrame,
+    canal_ref: str = "Todos",
+    altura: int = 440
+) -> go.Figure:
+    """Cria gráfico mensal de colunas para Migracoes PME com destaque para a tendencia."""
+    if df_serie is None or df_serie.empty:
+        return go.Figure()
+
+    categorias = df_serie["MES_LABEL"].astype(str).tolist()
+    valores = pd.to_numeric(df_serie["QTDE"], errors="coerce").fillna(0.0).astype(float).tolist()
+    tipos = df_serie["TIPO"].astype(str).tolist()
+
+    palette_real = [
+        "#5A0A06", "#63100B", "#6D1511", "#761A16", "#7F1F1B",
+        "#882421", "#922927", "#9B2E2C", "#A43332", "#AE3937"
+    ]
+    cores: list[str] = []
+    idx_real = 0
+    for tipo in tipos:
+        if str(tipo).upper() == "TENDENCIA":
+            cores.append("#D96A5F")
+        else:
+            cores.append(palette_real[min(idx_real, len(palette_real) - 1)])
+            idx_real += 1
+
+    comparacoes: list[dict[str, int]] = []
+    idx_tend = next((idx for idx, tipo in enumerate(tipos) if str(tipo).upper() == "TENDENCIA"), None)
+    if idx_tend is not None and idx_tend > 0:
+        comparacoes.append({"origem": idx_tend - 1, "destino": idx_tend})
+
+    fig = _criar_grafico_barras_resumo_comparativo(
+        categorias=categorias,
+        valores=valores,
+        cores=cores,
+        altura=altura,
+        comparacoes=comparacoes
+    )
+
+    customdata = [
+        [categorias[idx], "Tendência" if str(tipos[idx]).upper() == "TENDENCIA" else "Realizado"]
+        for idx in range(len(categorias))
+    ]
+    fig.update_traces(
+        customdata=customdata,
+        hovertemplate=(
+            "<b>%{customdata[0]}</b><br>"
+            "<b>Tipo:</b> %{customdata[1]}<br>"
+            "<b>QTDE:</b> %{y:,.0f}<extra></extra>"
+        )
+    )
+    fig.update_layout(
+        paper_bgcolor="#FCFCFD",
+        plot_bgcolor="#FFFFFF",
+        margin=dict(l=18, r=18, t=72, b=54),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Segoe UI",
+            bordercolor="#E2E8F0",
+            font_color="#2F3747"
+        )
+    )
+
+    if idx_tend is not None:
+        fig.add_annotation(
+            x=0.995,
+            y=1.11,
+            xref="paper",
+            yref="paper",
+            xanchor="right",
+            yanchor="top",
+            text="<b>Barra clara = Tendência</b>",
+            showarrow=False,
+            font=dict(size=11, color="#A23B36"),
+            bgcolor="rgba(255,255,255,0.96)",
+            bordercolor="rgba(162, 59, 54, 0.34)",
+            borderwidth=1.0,
+            borderpad=5
+        )
+
+    return fig
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
 def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega e normaliza a base bruta de ligações uma única vez para reaproveitamento no app."""
     _ = file_mtime
@@ -4046,32 +4953,36 @@ def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float 
         return pd.DataFrame()
 
     ligacoes_mtime = file_mtime if file_mtime is not None else Path(path).stat().st_mtime
-    df_lig = load_excel_cached(path, ligacoes_mtime)
+    header_df = load_excel_cached(path, ligacoes_mtime, nrows=0)
+    if header_df is None:
+        return pd.DataFrame()
+
+    colunas_disponiveis = set(header_df.columns)
+    req_cols = {'QTD', 'CABEADO'}
+    if not req_cols.issubset(colunas_disponiveis):
+        return pd.DataFrame()
+
+    coluna_data = None
+    for col_ref in ['DATA_MOVIMENTO', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO2', 'PERIODO']:
+        if col_ref in colunas_disponiveis:
+            coluna_data = col_ref
+            break
+    if coluna_data is None:
+        return pd.DataFrame()
+
+    colunas_leitura = ['QTD', 'CABEADO', coluna_data]
+    for col_opcional in ['DSC_REGIONAL_CMV', 'REGIONAL', 'TELEFONE']:
+        if col_opcional in colunas_disponiveis and col_opcional not in colunas_leitura:
+            colunas_leitura.append(col_opcional)
+
+    df_lig = load_excel_cached(path, ligacoes_mtime, usecols=colunas_leitura)
     if df_lig is None or df_lig.empty:
         return pd.DataFrame()
 
-    req_cols = {'QTD', 'CABEADO'}
-    if not req_cols.issubset(set(df_lig.columns)):
-        return pd.DataFrame()
-
-    # Regra da demanda diária: prioriza a data granular do movimento.
-    # `PERIODO` fica como último fallback para não concentrar todo o mês em uma data sintética.
-    coluna_data = None
-    serie_data_ref = None
-    for col_ref in ['DATA_MOVIMENTO', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO2', 'PERIODO']:
-        if col_ref not in df_lig.columns:
-            continue
-        serie_tmp = pd.to_datetime(df_lig[col_ref], errors='coerce')
-        if serie_tmp.notna().any():
-            coluna_data = col_ref
-            serie_data_ref = serie_tmp
-            break
-    if coluna_data is None or serie_data_ref is None:
-        return pd.DataFrame()
-
-    df_work = df_lig.copy()
-    df_work['DAT_MOVIMENTO2'] = serie_data_ref
-    df_work = df_work[df_work['DAT_MOVIMENTO2'].notna()].copy()
+    serie_data_ref = pd.to_datetime(df_lig[coluna_data], errors='coerce')
+    mask_data_valida = serie_data_ref.notna()
+    df_work = df_lig.loc[mask_data_valida].copy()
+    df_work['DAT_MOVIMENTO2'] = serie_data_ref.loc[df_work.index]
     if df_work.empty:
         return pd.DataFrame()
 
@@ -4114,7 +5025,14 @@ def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float 
         'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'QTDE', 'DESAFIO_QTD',
         'CABEADO', 'TIPO_CHAMADA', 'TELEFONE', 'FLAG_FIXA'
     ]
-    return df_work[[c for c in colunas_saida if c in df_work.columns]].copy()
+    df_saida = df_work[[c for c in colunas_saida if c in df_work.columns]]
+    compactar_colunas_categoricas(
+        df_saida,
+        ['mes_ano', 'dat_tratada', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'CABEADO', 'TIPO_CHAMADA']
+    )
+    del df_lig, df_work, serie_data_ref
+    gc.collect()
+    return df_saida
 
 def export_excel(df: pd.DataFrame) -> BytesIO:
     """Exporta DataFrame para Excel"""
@@ -8537,6 +9455,15 @@ components.html(
 # ABA 1: ATIVADOS
 # =========================
 with tab1:
+    st.markdown(
+        build_visual_title_html(
+            "ATIVADOS",
+            "target",
+            subtitle="ANÁLISE DE PERFORMANCE DE ATIVAÇÕES POR CANAL"
+        ),
+        unsafe_allow_html=True
+    )
+
     # Container para o filtro de mês compartilhado
     with st.container():
         st.markdown('<div class="filter-title">📅 SELECIONE O MÊS PARA ANÁLISE</div>', unsafe_allow_html=True)
@@ -10120,30 +11047,38 @@ with tab2:
     # =========================
     # CARREGAR DADOS DE DESATIVADOS
     # =========================
-    @st.cache_data
+    @st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
             file_path = "base_final_churn.xlsx"
             file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
-            df_desativados = load_excel_cached(file_path, file_mtime)
-            
+            header_df = load_excel_cached(file_path, file_mtime, nrows=0)
+            if header_df is None:
+                return pd.DataFrame()
+             
             # Validar colunas necessárias (data pode vir como DAT_MOVIMENTO ou MES_MOVIMENTO)
             required_columns = ['COD_PLATAFORMA', 'DSC_REGIONAL_CMV', 'QTDE_AJUSTADA',
                                'FLG_SILENTE', 'DSC_CANAL_AJUSTADO', 'FLAG_INADIMPLENTE']
-            missing_columns = [col for col in required_columns if col not in df_desativados.columns]
-            
+            colunas_disponiveis = set(header_df.columns)
+            missing_columns = [col for col in required_columns if col not in colunas_disponiveis]
+             
             if missing_columns:
                 st.error(f"Colunas faltando no dataset de desativados: {missing_columns}")
                 return pd.DataFrame()
 
-            col_data = 'DAT_MOVIMENTO' if 'DAT_MOVIMENTO' in df_desativados.columns else (
-                'MES_MOVIMENTO' if 'MES_MOVIMENTO' in df_desativados.columns else None
+            col_data = 'DAT_MOVIMENTO' if 'DAT_MOVIMENTO' in colunas_disponiveis else (
+                'MES_MOVIMENTO' if 'MES_MOVIMENTO' in colunas_disponiveis else None
             )
             if col_data is None:
                 st.error("Coluna de data ausente no dataset de desativados: esperado DAT_MOVIMENTO ou MES_MOVIMENTO")
                 return pd.DataFrame()
-            
+
+            colunas_leitura = list(dict.fromkeys(required_columns + [col_data]))
+            df_desativados = load_excel_cached(file_path, file_mtime, usecols=colunas_leitura)
+            if df_desativados is None or df_desativados.empty:
+                return pd.DataFrame()
+             
             # Tratar coluna de regional (apenas 3 primeiros caracteres)
             df_desativados['REGIONAL'] = (
                 df_desativados['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
@@ -10190,7 +11125,14 @@ with tab2:
             inad_num = pd.to_numeric(df_desativados['INADIMPLENTE'], errors='coerce')
             mask_inad_sim = (inad_num == 1) | inad_raw.isin(['1', 'SIM', 'S', 'TRUE', 'VERDADEIRO'])
             df_desativados['INADIMPLENTE'] = np.where(mask_inad_sim, 'Sim', 'Não')
-            
+
+            compactar_colunas_categoricas(
+                df_desativados,
+                ['COD_PLATAFORMA', 'REGIONAL', 'CANAL_PLAN', 'INADIMPLENTE', 'mes_ano']
+            )
+            del header_df, colunas_disponiveis, colunas_leitura
+            gc.collect()
+             
             return df_desativados
             
         except Exception as e:
@@ -13081,7 +14023,7 @@ with tab4:
     # =========================
     # CARREGAR DADOS DE LIGAÇÕES (BASE REAL) - CORRIGIDO
     # =========================
-    @st.cache_data(ttl=3600)
+    @st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
     def load_ligacoes_base(ligacoes_mtime: float | None = None):
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
@@ -13094,7 +14036,12 @@ with tab4:
                 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 
                 'QTDE', 'DESAFIO_QTD', 'CABEADO', 'TIPO_CHAMADA', 'TELEFONE'
             ]
-            return df_ligacoes[[col for col in colunas_manter if col in df_ligacoes.columns]].copy()
+            df_saida = df_ligacoes[[col for col in colunas_manter if col in df_ligacoes.columns]]
+            compactar_colunas_categoricas(
+                df_saida,
+                ['mes_ano', 'dat_tratada', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'CABEADO', 'TIPO_CHAMADA']
+            )
+            return df_saida
             
         except Exception as e:
             st.error(f"❌ **Erro ao carregar dados de ligações:** {str(e)}")
@@ -13105,7 +14052,7 @@ with tab4:
     # =========================
     # CARREGAR METAS DE LIGAÇÕES (base_final_trt_new3.xlsx) - CORRIGIDO
     # =========================
-    @st.cache_data(ttl=3600)
+    @st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def load_metas_ligacoes():
         """Carrega METAS de ligações a partir da base principal já carregada."""
         try:
@@ -13159,7 +14106,11 @@ with tab4:
             if df_metas.empty:
                 st.warning("⚠️ Nenhuma meta de ligações encontrada no arquivo")
                 return pd.DataFrame()
-            
+             
+            compactar_colunas_categoricas(
+                df_metas,
+                ['REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'mes_ano', 'dat_tratada']
+            )
             return df_metas
             
         except Exception as e:
@@ -13188,27 +14139,20 @@ with tab4:
         try:
             if df_metas.empty:
                 return 0
-            
-            # Filtrar por mês
-            df_filtrado = df_metas[df_metas['mes_ano'] == mes_ano].copy()
-            
-            if df_filtrado.empty:
+
+            mask = df_metas['mes_ano'].eq(mes_ano)
+            if not mask.any():
                 return 0
-            
-            # Filtrar por regional se especificado
+
             if regional and regional != "Todas":
-                df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional]
-            
-            # Filtrar por plataforma se especificado
+                mask &= df_metas['REGIONAL'].eq(regional)
+
             if plataforma:
-                df_filtrado = df_filtrado[df_filtrado['COD_PLATAFORMA'] == plataforma]
+                mask &= df_metas['COD_PLATAFORMA'].eq(plataforma)
             else:
-                # Filtrar apenas FIXA e CONTA (excluir outros)
-                df_filtrado = df_filtrado[df_filtrado['COD_PLATAFORMA'].isin(['FIXA', 'CONTA'])]
-            
-            # Calcular soma da meta
-            meta_total = df_filtrado['DESAFIO_QTD'].sum()
-            
+                mask &= df_metas['COD_PLATAFORMA'].isin(['FIXA', 'CONTA'])
+
+            meta_total = pd.to_numeric(df_metas.loc[mask, 'DESAFIO_QTD'], errors='coerce').fillna(0).sum()
             return meta_total
             
         except Exception as e:
@@ -13239,7 +14183,7 @@ with tab4:
     # Nota: Não vamos mais combinar os dados com as metas no início
     # Em vez disso, vamos calcular as metas dinamicamente quando necessário
 
-    @st.cache_data(ttl=1800, show_spinner=False)
+    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def preparar_agregados_ligacoes_mensais(df_ligacoes: pd.DataFrame) -> pd.DataFrame:
         """Pré-agrega ligações por mês/regional para reduzir groupbys repetidos na aba."""
         colunas_saida = [
@@ -13282,7 +14226,9 @@ with tab4:
             ].sum()
         )
         agg_total['REGIONAL'] = 'Todas'
-        return pd.concat([agg_reg, agg_total], ignore_index=True)[colunas_saida]
+        df_saida = pd.concat([agg_reg, agg_total], ignore_index=True)[colunas_saida]
+        compactar_colunas_categoricas(df_saida, ['REGIONAL', 'mes_ano'])
+        return df_saida
 
     df_lig_agregado = preparar_agregados_ligacoes_mensais(df_lig)
     
@@ -13291,70 +14237,51 @@ with tab4:
     # =========================
     def calcular_total_ligacoes(df, mes, regional_filtro=None):
         """Calcula total de ligações para um mês específico"""
-        df_filtrado = df[df['mes_ano'] == mes].copy()
-        
+        mask = df['mes_ano'].eq(mes)
         if regional_filtro and regional_filtro != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional_filtro]
-        
-        return df_filtrado['QTDE'].sum()
+            mask &= df['REGIONAL'].eq(regional_filtro)
+        return pd.to_numeric(df.loc[mask, 'QTDE'], errors='coerce').fillna(0).sum()
     
     def calcular_ligacoes_fixa(df, mes, regional_filtro=None):
         """Calcula ligações FIXA para um mês específico (CABEADO == 'SIM')"""
-        df_filtrado = df[
-            (df['mes_ano'] == mes) & 
-            (df['CABEADO'].astype(str).str.upper() == 'SIM')
-        ].copy()
-        
+        mask = df['mes_ano'].eq(mes) & df['CABEADO'].astype(str).str.upper().eq('SIM')
         if regional_filtro and regional_filtro != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional_filtro]
-        
-        return df_filtrado['QTDE'].sum()
+            mask &= df['REGIONAL'].eq(regional_filtro)
+        return pd.to_numeric(df.loc[mask, 'QTDE'], errors='coerce').fillna(0).sum()
     
     def calcular_ligacoes_conta(df, mes, regional_filtro=None):
         """Calcula ligações CONTA para um mês específico (TIPO_CHAMADA == 'DEMAIS')"""
-        df_filtrado = df[
-            (df['mes_ano'] == mes) & 
-            (df['TIPO_CHAMADA'] == 'DEMAIS')
-        ].copy()
-        
+        mask = df['mes_ano'].eq(mes) & df['TIPO_CHAMADA'].eq('DEMAIS')
         if regional_filtro and regional_filtro != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional_filtro]
-        
-        return df_filtrado['QTDE'].sum()
+            mask &= df['REGIONAL'].eq(regional_filtro)
+        return pd.to_numeric(df.loc[mask, 'QTDE'], errors='coerce').fillna(0).sum()
     
     def calcular_ligacoes_clicktocall(df, mes, regional_filtro=None):
         """Calcula ligações Click to Call para um mês específico"""
-        df_filtrado = df[
-            (df['mes_ano'] == mes) & 
-            (df['TIPO_CHAMADA'] == 'Click to Call')
-        ].copy()
-        
+        mask = df['mes_ano'].eq(mes) & df['TIPO_CHAMADA'].eq('Click to Call')
         if regional_filtro and regional_filtro != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional_filtro]
-        
-        return df_filtrado['QTDE'].sum()
+            mask &= df['REGIONAL'].eq(regional_filtro)
+        return pd.to_numeric(df.loc[mask, 'QTDE'], errors='coerce').fillna(0).sum()
 
     def calcular_tendencia_ligacoes(df_metas, mes, regional_filtro=None, plataforma=None):
         """Calcula tendência (TEND_QTD) de ligações para o mês/recorte selecionado."""
         if df_metas is None or df_metas.empty or 'TEND_QTD' not in df_metas.columns:
             return 0.0
 
-        df_filtrado = df_metas[df_metas['mes_ano'] == mes].copy()
-        if df_filtrado.empty:
+        mask = df_metas['mes_ano'].eq(mes)
+        if not mask.any():
             return 0.0
 
         if regional_filtro and regional_filtro != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['REGIONAL'] == regional_filtro]
+            mask &= df_metas['REGIONAL'].eq(regional_filtro)
 
         if plataforma:
             plataforma_norm = str(plataforma).strip().upper()
-            df_filtrado = df_filtrado[df_filtrado['COD_PLATAFORMA'].astype(str).str.upper() == plataforma_norm]
+            mask &= df_metas['COD_PLATAFORMA'].astype(str).str.upper().eq(plataforma_norm)
         else:
-            df_filtrado = df_filtrado[
-                df_filtrado['COD_PLATAFORMA'].astype(str).str.upper().isin(['FIXA', 'CONTA'])
-            ]
+            mask &= df_metas['COD_PLATAFORMA'].astype(str).str.upper().isin(['FIXA', 'CONTA'])
 
-        return float(pd.to_numeric(df_filtrado['TEND_QTD'], errors='coerce').fillna(0).sum())
+        return float(pd.to_numeric(df_metas.loc[mask, 'TEND_QTD'], errors='coerce').fillna(0).sum())
     
     # FUNÇÕES DE META CORRIGIDAS
     def calcular_meta_fixa(df_metas, mes, regional_filtro=None):
@@ -14836,7 +15763,16 @@ with tab4:
 # ABA 5: ANALÍTICO
 # =========================
 with tab5:
-    @st.cache_data
+    st.markdown(
+        build_visual_title_html(
+            "ANALÍTICO",
+            "grid",
+            subtitle="VISÃO DETALHADA DE PERFORMANCE DOS CANAIS ESTRATÉGICOS"
+        ),
+        unsafe_allow_html=True
+    )
+
+    @st.cache_data(ttl=900, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_SMALL)
     def load_obs_resultado() -> str:
         obs_path = Path("obs_resultado_canais.txt")
         if obs_path.exists():
@@ -14977,7 +15913,7 @@ with tab5:
         except Exception:
             return mes_ref
 
-    @st.cache_data(ttl=3600, show_spinner=False)
+    @st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def preparar_base_analitica(df_in: pd.DataFrame) -> pd.DataFrame:
         """Normaliza campos de uso recorrente para acelerar filtros/consultas no analítico."""
         if df_in is None or df_in.empty:
@@ -14998,9 +15934,16 @@ with tab5:
             else:
                 df_work[coluna_num] = 0.0
         df_work['DSC_IND_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave) if 'DSC_INDICADOR' in df_work.columns else ""
-        return df_work
+        compactar_colunas_categoricas(
+            df_work,
+            ['dat_tratada', 'DSC_INDICADOR', 'DSC_IND_NORM', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']
+        )
+        df_saida = df_work
+        del df_in
+        gc.collect()
+        return df_saida
 
-    @st.cache_data(ttl=3600, show_spinner=False)
+    @st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def preparar_contexto_evolucao_semanal_analitico(df_base: pd.DataFrame):
         """Prepara a base e os metadados recorrentes usados na evolução semanal/resumo."""
         if df_base is None or df_base.empty:
@@ -15029,9 +15972,14 @@ with tab5:
         regionais_disp_sem = ["Todas"] + sorted(
             df_sem_base['REGIONAL'].dropna().astype(str).str.strip().unique().tolist()
         )
+        compactar_colunas_categoricas(
+            df_sem_base,
+            ['dat_tratada', 'DSC_INDICADOR', 'DSC_IND_NORM', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']
+        )
+        gc.collect()
         return df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem
 
-    @st.cache_data(ttl=3600)
+    @st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def load_ligacoes_para_performance(ligacoes_mtime: float | None = None):
         colunas_saida = [
             'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
@@ -15041,24 +15989,25 @@ with tab5:
             df_lig = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
             if df_lig.empty:
                 return pd.DataFrame(columns=colunas_saida)
-            df_lig = df_lig.copy()
-            df_lig['TEND_QTD'] = df_lig['QTDE']
 
             mask_fixa = df_lig['FLAG_FIXA'].astype(bool)
             mask_conta = df_lig['TIPO_CHAMADA'].eq('DEMAIS')
 
-            df_lig_fixa = df_lig[mask_fixa].copy()
-            df_lig_fixa['COD_PLATAFORMA'] = 'FIXA'
+            df_lig_fixa = df_lig.loc[mask_fixa].assign(COD_PLATAFORMA='FIXA', TEND_QTD=lambda x: x['QTDE'])
+            df_lig_conta = df_lig.loc[mask_conta].assign(COD_PLATAFORMA='CONTA', TEND_QTD=lambda x: x['QTDE'])
 
-            df_lig_conta = df_lig[mask_conta].copy()
-            df_lig_conta['COD_PLATAFORMA'] = 'CONTA'
-
-            df_lig_saida = pd.concat([df_lig_fixa, df_lig_conta], ignore_index=True)
-            return df_lig_saida[colunas_saida]
+            df_lig_saida = pd.concat([df_lig_fixa, df_lig_conta], ignore_index=True, copy=False)[colunas_saida]
+            compactar_colunas_categoricas(
+                df_lig_saida,
+                ['REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada']
+            )
+            del df_lig, df_lig_fixa, df_lig_conta
+            gc.collect()
+            return df_lig_saida
         except Exception:
             return pd.DataFrame(columns=colunas_saida)
 
-    @st.cache_data(ttl=3600, show_spinner=False)
+    @st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def preparar_base_performance(df_base):
         colunas_saida = [
             'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
@@ -15098,7 +16047,7 @@ with tab5:
         if df_work.empty:
             return pd.DataFrame(columns=colunas_saida)
 
-        return (
+        df_saida = (
             df_work.groupby(
                 [
                     'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
@@ -15108,6 +16057,14 @@ with tab5:
                 observed=True
             )[['QTDE', 'DESAFIO_QTD', 'TEND_QTD']].sum()
         )
+        compactar_colunas_categoricas(
+            df_saida,
+            ['REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+             'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF']
+        )
+        del df_work
+        gc.collect()
+        return df_saida
 
     # Overrides robustos para LIGAÇÕES (plataforma/mês), preenchidos após leitura da base principal.
     ligacoes_tend_override = {}
@@ -16050,6 +17007,136 @@ with tab5:
                             table_id=table_id_resultado
                         ),
                         unsafe_allow_html=True
+                    )
+
+        st.markdown(
+            build_visual_title_html(
+                "BACKLOG FIXA PME - CONTRATOS POR CANAL E MÊS",
+                "grid",
+                "subsection-title",
+                extra_style="margin-top:18px;"
+            ),
+            unsafe_allow_html=True
+        )
+
+        backlog_candidates = [
+            BACKLOG_CONSOLIDADO_FILE_PATH,
+            Path(__file__).resolve().parent / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
+        ]
+        backlog_path = next((path for path in backlog_candidates if Path(path).exists()), None)
+
+        if backlog_path is None:
+            st.info("Arquivo `backlog_consolidado.csv` não encontrado no caminho configurado.")
+        else:
+            backlog_mtime = Path(backlog_path).stat().st_mtime if Path(backlog_path).exists() else None
+            df_backlog_consolidado = load_backlog_consolidado_data(str(backlog_path), backlog_mtime)
+            tabela_backlog_fmt, tabela_backlog_num = montar_tabela_backlog_canais(df_backlog_consolidado)
+
+            if tabela_backlog_fmt.empty:
+                st.info("Sem dados disponíveis para montar a tabela de backlog.")
+            else:
+                st.markdown(
+                    criar_tabela_html_backlog_canais(
+                        df_formatado=tabela_backlog_fmt,
+                        df_numerico=tabela_backlog_num,
+                        table_id="tabela-analitico-backlog-fixa-pme"
+                    ),
+                    unsafe_allow_html=True
+                )
+
+        st.markdown(
+            build_visual_title_html(
+                "MIGRAÇÕES PME - QTDE POR CANAL E MÊS",
+                "grid",
+                "subsection-title",
+                extra_style="margin-top:18px;"
+            ),
+            unsafe_allow_html=True
+        )
+
+        migracoes_candidates = [
+            ANALITICO_MIGRACOES_FILE_PATH,
+            Path(__file__).resolve().parent / "ANALITICO_MIGRACOES_fev26.xlsx"
+        ]
+        migracoes_path = next((path for path in migracoes_candidates if Path(path).exists()), None)
+
+        if migracoes_path is None:
+            st.info("Arquivo `ANALITICO_MIGRACOES_fev26.xlsx` não encontrado no caminho configurado.")
+        else:
+            migracoes_mtime = Path(migracoes_path).stat().st_mtime if Path(migracoes_path).exists() else None
+            df_migracoes_pme = load_migracoes_pme_data(str(migracoes_path), migracoes_mtime)
+            tabela_migracoes_fmt, tabela_migracoes_num = montar_tabela_migracoes_pme_canais(df_migracoes_pme)
+
+            if tabela_migracoes_fmt.empty:
+                st.info("Sem dados disponíveis para montar a tabela de Migrações PME.")
+            else:
+                st.markdown(
+                    criar_tabela_html_backlog_canais(
+                        df_formatado=tabela_migracoes_fmt,
+                        df_numerico=tabela_migracoes_num,
+                        table_id="tabela-analitico-migracoes-pme"
+                    ),
+                    unsafe_allow_html=True
+                )
+                st.caption(
+                    "TEND. do próximo mês calculada pela média do crescimento dos 2 últimos intervalos: "
+                    "dez -> jan e jan -> fev, aplicada sobre fev."
+                )
+
+                st.markdown(
+                    build_visual_title_html(
+                        "MIGRAÇÕES PME - EVOLUÇÃO MENSAL",
+                        "trend",
+                        "subsection-title",
+                        extra_style="margin-top:14px;"
+                    ),
+                    unsafe_allow_html=True
+                )
+
+                canais_migracoes_disp = [
+                    canal for canal in tabela_migracoes_num["CANAL"].astype(str).tolist()
+                    if str(canal).strip().upper() != "TOTAL"
+                ]
+                opcoes_canal_migracoes = ["Todos"] + canais_migracoes_disp
+
+                col_mig_filtro, col_mig_info = st.columns([0.95, 2.55], gap="medium")
+                with col_mig_filtro:
+                    render_filter_label("Canal")
+                    canal_migracoes_ref = st.selectbox(
+                        "Selecione o canal de Migrações PME",
+                        options=opcoes_canal_migracoes,
+                        index=0,
+                        key="analitico_migracoes_pme_canal",
+                        label_visibility="collapsed"
+                    )
+                with col_mig_info:
+                    st.markdown(
+                        """
+                        <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
+                                    border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+                                    color: #6B1F1A; font-size: 12px; font-weight: 600;">
+                            Série mensal de migrações em colunas, com destaque claro para a tendência do próximo mês
+                            e ponte de comparação contra o mês anterior.
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                serie_grafico_migracoes = montar_serie_grafico_migracoes_pme(
+                    tabela_migracoes_num,
+                    canal_ref=canal_migracoes_ref
+                )
+                if serie_grafico_migracoes.empty:
+                    st.info("Sem dados disponíveis para montar o gráfico mensal de Migrações PME.")
+                else:
+                    fig_migracoes_mensal = criar_grafico_migracoes_pme_mensal(
+                        serie_grafico_migracoes,
+                        canal_ref=canal_migracoes_ref
+                    )
+                    st.plotly_chart(
+                        fig_migracoes_mensal,
+                        width="stretch",
+                        config={"displayModeBar": False, "displaylogo": False}
                     )
 
 
@@ -17533,13 +18620,15 @@ with tab5:
                         df_out_export = pd.DataFrame(rows_export, columns=colunas_export)
                         return html_out, df_out_export
 
-                    @st.cache_data(ttl=1800)
+                    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_SMALL)
                     def load_ligacoes_demanda_diaria(lig_mtime: float | None = None) -> pd.DataFrame:
                         try:
                             df_lig_raw = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, lig_mtime)
                             if df_lig_raw.empty:
                                 return pd.DataFrame()
-                            return df_lig_raw[['DATA_DIA', 'QTDE', 'TIPO_CHAMADA', 'FLAG_FIXA', 'REGIONAL']]
+                            df_saida = df_lig_raw[['DATA_DIA', 'QTDE', 'TIPO_CHAMADA', 'FLAG_FIXA', 'REGIONAL']]
+                            compactar_colunas_categoricas(df_saida, ['TIPO_CHAMADA', 'REGIONAL'])
+                            return df_saida
                         except Exception:
                             return pd.DataFrame()
 
@@ -17707,14 +18796,19 @@ with tab5:
     if df_reg_base.empty:
         st.warning("Não há dados disponíveis para montar a visão regional.")
     else:
-        @st.cache_data(ttl=1800)
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_SMALL)
         def load_ligacoes_resumo(ligacoes_mtime: float | None = None):
             """Carrega ligações reais (televendas_ligacoes2.xlsx) já tratadas para REGIONAL/mes/plataforma."""
             try:
                 df_lig = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, ligacoes_mtime)
                 if df_lig.empty:
                     return pd.DataFrame()
-                return df_lig[['REGIONAL', 'dat_tratada', 'COD_PLATAFORMA', 'CANAL_PLAN', 'QTDE', 'CABEADO', 'TIPO_CHAMADA']]
+                df_saida = df_lig[['REGIONAL', 'dat_tratada', 'COD_PLATAFORMA', 'CANAL_PLAN', 'QTDE', 'CABEADO', 'TIPO_CHAMADA']]
+                compactar_colunas_categoricas(
+                    df_saida,
+                    ['REGIONAL', 'dat_tratada', 'COD_PLATAFORMA', 'CANAL_PLAN', 'CABEADO', 'TIPO_CHAMADA']
+                )
+                return df_saida
             except Exception:
                 return pd.DataFrame()
 
@@ -18370,25 +19464,73 @@ with tab6:
     if cotacoes_path is None:
         st.warning("Arquivo de COTAÇÕES não encontrado no caminho configurado.")
     else:
-        cotacoes_mtime = Path(cotacoes_path).stat().st_mtime if Path(cotacoes_path).exists() else None
-        df_cotacoes = load_cotacoes_data(str(cotacoes_path), cotacoes_mtime)
+        st.sidebar.markdown("---")
+        if st.sidebar.button(
+            "Atualizar COTAÇÕES",
+            key="refresh_cotacoes_cache",
+            help="Limpa o cache da aba de COTAÇÕES e recarrega a base atual."
+        ):
+            load_cotacoes_data.clear()
+            preparar_agregados_cotacoes.clear()
+            st.rerun()
 
-        if df_cotacoes.empty:
+        cotacoes_mtime = Path(cotacoes_path).stat().st_mtime if Path(cotacoes_path).exists() else None
+        df_cotacoes_agregado = preparar_agregados_cotacoes(
+            str(cotacoes_path),
+            cotacoes_mtime,
+            COTACOES_CACHE_VERSION
+        )
+        diag_cot = None
+
+        if df_cotacoes_agregado.empty:
+            diag_cot = diagnosticar_cotacoes_loader(cotacoes_path)
+            if diag_cot.get("rows_final", 0) > 0:
+                load_cotacoes_data.clear()
+                preparar_agregados_cotacoes.clear()
+                df_cotacoes_base = load_cotacoes_data(
+                    str(cotacoes_path),
+                    cotacoes_mtime,
+                    COTACOES_CACHE_VERSION
+                )
+                df_cotacoes_agregado = _agregar_cotacoes_dataframe(df_cotacoes_base)
+                if not df_cotacoes_agregado.empty:
+                    st.sidebar.success("COTAÇÕES recarregada com sucesso.")
+
+        if df_cotacoes_agregado.empty:
+            if diag_cot is None:
+                diag_cot = diagnosticar_cotacoes_loader(cotacoes_path)
             st.warning("Não foi possível carregar dados válidos de COTAÇÕES.")
+            st.info(
+                f"Caminho usado: `{diag_cot.get('path', '')}`\n\n"
+                f"Arquivo existe: `{diag_cot.get('exists', False)}`\n\n"
+                f"Linhas brutas: `{diag_cot.get('rows_raw', 0)}`\n\n"
+                f"Linhas após a regra: `{diag_cot.get('rows_regra', 0)}`\n\n"
+                f"Linhas válidas com data: `{diag_cot.get('rows_validas', 0)}`\n\n"
+                f"Linhas finais para trabalho: `{diag_cot.get('rows_final', 0)}`\n\n"
+                f"Soma final: `{formatar_numero_brasileiro(diag_cot.get('sum_final', 0), 0)}`"
+            )
+            if diag_cot.get("error"):
+                st.error(f"Detalhe técnico: {diag_cot['error']}")
+            colunas_match = diag_cot.get("matched_columns", {})
+            if colunas_match:
+                st.caption(
+                    "Mapeamento de colunas: " +
+                    ", ".join(f"{chave}={valor}" for chave, valor in colunas_match.items())
+                )
         else:
             st.sidebar.markdown("---")
             st.sidebar.markdown("### 📄 FILTROS COTAÇÕES")
 
-            regionais_cotacoes_disp = sorted(df_cotacoes["REGIONAL"].dropna().astype(str).unique().tolist())
-            canais_cotacoes_disp = sorted(df_cotacoes["CANAL_PLAN"].dropna().astype(str).unique().tolist())
+            regionais_cotacoes_disp = sorted(df_cotacoes_agregado["REGIONAL"].dropna().astype(str).unique().tolist())
+            canais_cotacoes_disp = sorted(df_cotacoes_agregado["CANAL_PLAN"].dropna().astype(str).unique().tolist())
             status_cotacoes_disp = sorted(
                 [
-                    status for status in df_cotacoes["STATUS_ATUAL"].dropna().astype(str).str.strip().unique().tolist()
+                    status for status in df_cotacoes_agregado["STATUS_ATUAL"].dropna().astype(str).str.strip().unique().tolist()
                     if status
                 ]
             )
             meses_cotacoes_disp = sorted(
-                df_cotacoes["mes_ano"].dropna().astype(str).unique().tolist(),
+                df_cotacoes_agregado["mes_ano"].dropna().astype(str).unique().tolist(),
                 key=mes_ano_para_data
             )
 
@@ -18422,22 +19564,25 @@ with tab6:
                     key="filtro_status_cotacoes"
                 )
                 st.markdown("---")
-                st.info(f"**Total de cotações únicas:** {formatar_numero_brasileiro(len(df_cotacoes), 0)}")
+                st.info(
+                    f"**Total de novas linhas a ativar:** "
+                    f"{formatar_numero_brasileiro(pd.to_numeric(df_cotacoes_agregado['VALOR_NOVAS_LINHAS'], errors='coerce').fillna(0).sum(), 0)}"
+                )
 
-            mask_cotacoes = (
-                df_cotacoes["REGIONAL"].isin(regionais_cotacoes_sel) &
-                df_cotacoes["CANAL_PLAN"].isin(canais_cotacoes_sel) &
-                df_cotacoes["mes_ano"].isin(periodos_cotacoes_sel)
+            mask_cotacoes_agregado = (
+                df_cotacoes_agregado["REGIONAL"].isin(regionais_cotacoes_sel) &
+                df_cotacoes_agregado["CANAL_PLAN"].isin(canais_cotacoes_sel) &
+                df_cotacoes_agregado["mes_ano"].isin(periodos_cotacoes_sel)
             )
             if status_cotacoes_sel:
-                mask_cotacoes &= df_cotacoes["STATUS_ATUAL"].isin(status_cotacoes_sel)
-            df_cotacoes_filtrado = df_cotacoes.loc[mask_cotacoes].copy()
+                mask_cotacoes_agregado &= df_cotacoes_agregado["STATUS_ATUAL"].isin(status_cotacoes_sel)
+            df_cotacoes_agregado_filtrado = df_cotacoes_agregado.loc[mask_cotacoes_agregado]
 
-            if df_cotacoes_filtrado.empty:
+            if df_cotacoes_agregado_filtrado.empty:
                 st.info("Sem dados de COTAÇÕES para os filtros selecionados.")
             else:
                 meses_cotacoes_cards = sorted(
-                    df_cotacoes_filtrado["mes_ano"].dropna().astype(str).unique().tolist(),
+                    df_cotacoes_agregado_filtrado["mes_ano"].dropna().astype(str).unique().tolist(),
                     key=mes_ano_para_data
                 )
                 mes_atual_cotacoes = get_mes_atual_formatado()
@@ -18511,28 +19656,27 @@ with tab6:
                         )
 
                 st.markdown(
-                    build_visual_title_html("QUANTIDADE DE COTAÇÕES POR CANAL", "target"),
+                    build_visual_title_html("NOVAS LINHAS A SEREM ATIVADAS POR CANAL", "target"),
                     unsafe_allow_html=True
                 )
 
                 agg_cotacoes_pm = (
-                    df_cotacoes_filtrado.groupby(
+                    df_cotacoes_agregado_filtrado.groupby(
                         ["CANAL_PLAN", "mes_ano"],
                         as_index=False,
                         observed=True
-                    )["COTACAO_ID"]
-                    .nunique()
-                    .rename(columns={"COTACAO_ID": "QTD_COTACOES"})
+                    )["VALOR_NOVAS_LINHAS"]
+                    .sum()
                 )
                 cotacoes_lookup = {
-                    (str(row["CANAL_PLAN"]).strip(), str(row["mes_ano"]).strip()): int(row["QTD_COTACOES"] or 0)
+                    (str(row["CANAL_PLAN"]).strip(), str(row["mes_ano"]).strip()): float(row["VALOR_NOVAS_LINHAS"] or 0)
                     for _, row in agg_cotacoes_pm.iterrows()
                 }
 
                 def calcular_metricas_canal_cotacoes(canal: str, mes_atual: str, mes_anterior: str, mes_yoy: str) -> dict:
-                    atual = int(cotacoes_lookup.get((canal, mes_atual), 0))
-                    anterior = int(cotacoes_lookup.get((canal, mes_anterior), 0))
-                    yoy = int(cotacoes_lookup.get((canal, mes_yoy), 0))
+                    atual = float(cotacoes_lookup.get((canal, mes_atual), 0))
+                    anterior = float(cotacoes_lookup.get((canal, mes_anterior), 0))
+                    yoy = float(cotacoes_lookup.get((canal, mes_yoy), 0))
                     variacao_mom = (((atual - anterior) / anterior) * 100.0) if anterior > 0 else None
                     variacao_yoy = (((atual - yoy) / yoy) * 100.0) if yoy > 0 else None
                     return {
@@ -18558,7 +19702,7 @@ with tab6:
                     "Hospitality"
                 ]
                 canais_cot_presentes = (
-                    df_cotacoes_filtrado["CANAL_PLAN"]
+                    df_cotacoes_agregado_filtrado["CANAL_PLAN"]
                     .dropna()
                     .astype(str)
                     .str.strip()
@@ -18602,7 +19746,7 @@ with tab6:
                             with cols[j]:
                                 st.markdown(
                                     f"""
-                                    <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 88px !important; padding: 9px 10px !important;" title="Resumo de cotações do canal {escape(canal)}" aria-label="Resumo de cotações do canal {escape(canal)}">
+                                    <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 88px !important; padding: 9px 10px !important;" title="Resumo de novas linhas do canal {escape(canal)}" aria-label="Resumo de novas linhas do canal {escape(canal)}">
                                         {build_kpi_title_html(canal, "canal")}
                                         <div style="text-align: center; padding: 4px 0 2px 0;">
                                             <div class="kpi-value-dinamico">{atual_fmt}</div>
@@ -18624,23 +19768,25 @@ with tab6:
                                     unsafe_allow_html=True
                                 )
 
+                    del agg_cotacoes_pm, cotacoes_lookup, df_cotacoes_agregado_filtrado
+
             # =========================
             # GRÁFICO CASCATA POR STATUS
             # =========================
             st.markdown(
-                build_visual_title_html("CASCATA DE COTAÇÕES POR STATUS ATUAL", "trend"),
+                build_visual_title_html("CASCATA DE NOVAS LINHAS POR STATUS ATUAL", "trend"),
                 unsafe_allow_html=True
             )
 
             meses_cascata_disp = sorted(
-                df_cotacoes["mes_ano"].dropna().astype(str).unique().tolist(),
+                df_cotacoes_agregado["mes_ano"].dropna().astype(str).unique().tolist(),
                 key=mes_ano_para_data
             )
             canais_cascata_disp = ["Todos"] + sorted(
-                df_cotacoes["CANAL_PLAN"].dropna().astype(str).str.strip().unique().tolist()
+                df_cotacoes_agregado["CANAL_PLAN"].dropna().astype(str).str.strip().unique().tolist()
             )
             regionais_cascata_disp = ["Todas"] + sorted(
-                df_cotacoes["REGIONAL"].dropna().astype(str).str.strip().unique().tolist()
+                df_cotacoes_agregado["REGIONAL"].dropna().astype(str).str.strip().unique().tolist()
             )
 
             mes_cascata_default = (
@@ -18678,30 +19824,23 @@ with tab6:
                     label_visibility="collapsed"
                 )
 
-            df_cascata = df_cotacoes[df_cotacoes["mes_ano"].eq(mes_cascata_sel)].copy()
+            df_cascata = df_cotacoes_agregado.loc[df_cotacoes_agregado["mes_ano"].eq(mes_cascata_sel)]
             if canal_cascata_sel != "Todos":
-                df_cascata = df_cascata[df_cascata["CANAL_PLAN"].eq(canal_cascata_sel)].copy()
+                df_cascata = df_cascata.loc[df_cascata["CANAL_PLAN"].eq(canal_cascata_sel)]
             if regional_cascata_sel != "Todas":
-                df_cascata = df_cascata[df_cascata["REGIONAL"].eq(regional_cascata_sel)].copy()
+                df_cascata = df_cascata.loc[df_cascata["REGIONAL"].eq(regional_cascata_sel)]
 
             if df_cascata.empty:
                 st.info("Sem dados para o gráfico cascata com os filtros selecionados.")
             else:
-                df_cascata["STATUS_ATUAL"] = (
-                    df_cascata["STATUS_ATUAL"]
-                    .astype(str)
-                    .str.strip()
-                    .replace({"": "Status nao informado", "nan": "Status nao informado"})
-                )
                 df_status_cascata = (
-                    df_cascata.groupby("STATUS_ATUAL", as_index=False, observed=True)["COTACAO_ID"]
-                    .nunique()
-                    .rename(columns={"COTACAO_ID": "QTD_COTACOES"})
-                    .sort_values(["QTD_COTACOES", "STATUS_ATUAL"], ascending=[False, True], ignore_index=True)
+                    df_cascata.groupby("STATUS_ATUAL", as_index=False, observed=True)["VALOR_NOVAS_LINHAS"]
+                    .sum()
+                    .sort_values(["VALOR_NOVAS_LINHAS", "STATUS_ATUAL"], ascending=[False, True], ignore_index=True)
                 )
 
                 status_labels = df_status_cascata["STATUS_ATUAL"].astype(str).tolist()
-                status_values = pd.to_numeric(df_status_cascata["QTD_COTACOES"], errors="coerce").fillna(0).astype(float).tolist()
+                status_values = pd.to_numeric(df_status_cascata["VALOR_NOVAS_LINHAS"], errors="coerce").fillna(0).astype(float).tolist()
                 total_cotacoes_cascata = float(sum(status_values))
                 labels_cascata = status_labels + ["Total"]
                 valores_cascata = status_values + [total_cotacoes_cascata]
@@ -18721,7 +19860,7 @@ with tab6:
                         totals={"marker": {"color": "#5A0A06", "line": {"color": "#FFFFFF", "width": 1.2}}},
                         connector={"line": {"color": "rgba(90, 98, 104, 0.48)", "width": 1.4}},
                         customdata=textos_cascata,
-                        hovertemplate="<b>%{x}</b><br><b>Cotações únicas:</b> %{customdata}<extra></extra>"
+                        hovertemplate="<b>%{x}</b><br><b>Novas linhas a ativar:</b> %{customdata}<extra></extra>"
                     )
                 )
 
@@ -18766,7 +19905,7 @@ with tab6:
                     <div class="info-box" style="margin: 0 0 12px 0; padding: 10px 14px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
                             <div style="font-size:13px; color:#5B6578; font-weight:700;">
-                                Cada barra representa a quantidade única de cotações no <b>STATUS ATUAL</b>, e a última coluna mostra o total do recorte filtrado.
+                                Cada barra representa a soma de <b>novas linhas a serem ativadas</b> no <b>STATUS ATUAL</b>, após aplicar a regra de filtro da base.
                             </div>
                             <div style="font-size:13px; color:#790E09; font-weight:800;">
                                 Total filtrado: {formatar_numero_brasileiro(total_cotacoes_cascata, 0)}
@@ -18781,3 +19920,4 @@ with tab6:
                     width="stretch",
                     config={"displayModeBar": False, "displaylogo": False}
                 )
+                del df_cascata, df_status_cascata
