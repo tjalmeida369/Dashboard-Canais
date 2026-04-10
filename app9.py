@@ -234,9 +234,22 @@ def get_kpi_icon_svg(icon_hint: str | None = None) -> str:
 st.set_page_config(page_title="Dashboard - Canais Estratégicos", layout="wide")
 KPI_PILL_VARIANT = "contrast"  # Opcoes: "clean" ou "contrast"
 
+DASHBOARD_APP_DIR = Path(__file__).resolve().parent
+DASHBOARD_FILES_DIR_PROD = Path(
+    r""
+)
+DASHBOARD_FILES_DIR_LOCAL = DASHBOARD_APP_DIR / ""
+DASHBOARD_FILES_DIR = (
+    DASHBOARD_FILES_DIR_PROD
+    if DASHBOARD_FILES_DIR_PROD.exists()
+    else (DASHBOARD_FILES_DIR_LOCAL if DASHBOARD_FILES_DIR_LOCAL.exists() else DASHBOARD_APP_DIR)
+)
+LOGO_FILE_PATH = DASHBOARD_FILES_DIR / "logo_claro_empresas.png"
+OBS_RESULTADO_FILE_PATH = DASHBOARD_FILES_DIR / "obs_resultado_canais.txt"
+
 def render_header_logo():
     """Render top-right logo if the local PNG file exists."""
-    logo_path = Path(r"C:\Users\F270665\Downloads\logo_claro_empresas.png")
+    logo_path = LOGO_FILE_PATH
     if not logo_path.exists():
         return
 
@@ -4100,17 +4113,12 @@ def load_excel_cached(
     _ = file_mtime
     return pd.read_excel(path, usecols=usecols, nrows=nrows)
 
-DASHBOARD_DATA_DIR = Path(__file__).resolve().parent
-RAW_PRIMARY_BASE_FILE_PATH = Path(
-    "base_final_trt_new3.xlsx"
-)
-RAW_LIGACOES_FILE_PATH = Path(
-    "televendas_ligacoes2.xlsx"
-)
-RAW_COTACOES_FILE_PATH = DASHBOARD_DATA_DIR / "RelatorioFluxoVidaCotacao.xlsx"
-RAW_BACKLOG_CONSOLIDADO_FILE_PATH = (
-    DASHBOARD_DATA_DIR / "backlog_consolidado.csv"
-)
+DASHBOARD_DATA_DIR = DASHBOARD_APP_DIR
+RAW_PRIMARY_BASE_FILE_PATH = DASHBOARD_FILES_DIR / "base_final_trt_new3.xlsx"
+RAW_LIGACOES_FILE_PATH = DASHBOARD_FILES_DIR / "televendas_ligacoes2.xlsx"
+RAW_COTACOES_FILE_PATH = DASHBOARD_FILES_DIR / "RelatorioFluxoVidaCotacao.xlsx"
+RAW_BACKLOG_CONSOLIDADO_FILE_PATH = DASHBOARD_FILES_DIR / "backlog_consolidado.csv"
+CHURN_FILE_PATH = DASHBOARD_FILES_DIR / "base_final_churn.xlsx"
 
 
 def _resolver_primeiro_arquivo_existente(*candidatos: str | Path) -> Path:
@@ -4155,9 +4163,7 @@ LIGACOES_FILE_PATH = RAW_LIGACOES_FILE_PATH
 COTACOES_FILE_PATH = RAW_COTACOES_FILE_PATH
 BACKLOG_CONSOLIDADO_FILE_PATH = RAW_BACKLOG_CONSOLIDADO_FILE_PATH
 PEDIDOS_FILE_PATH = RAW_PRIMARY_BASE_FILE_PATH
-ANALITICO_MIGRACOES_FILE_PATH = Path(
-    "ANALITICO_MIGRACOES_fev26.xlsx"
-)
+ANALITICO_MIGRACOES_FILE_PATH = DASHBOARD_FILES_DIR / "ANALITICO_MIGRACOES_fev26.xlsx"
 BACKLOG_CANAIS_PERMITIDOS = [
     "DAC",
     "DAC Adequacao de Pacote",
@@ -5869,6 +5875,203 @@ def criar_tabela_html_backlog_canais(
     html += "</tbody></table></div>"
     return html
 
+def criar_tabela_html_migracoes_regionais(
+    df_formatado: pd.DataFrame,
+    df_numerico: pd.DataFrame,
+    table_id: str
+) -> str:
+    """Cria tabela regional x mes para migracoes, com destaque de tendencia e MoM."""
+    if df_formatado is None or df_formatado.empty:
+        return ""
+
+    colunas = list(df_formatado.columns)
+    col_regional = colunas[0] if colunas else "REGIONAL"
+    col_mom = "MoM" if "MoM" in colunas else ""
+    colunas_valor = [col for col in colunas if col not in {col_regional, col_mom}]
+    largura_regional_pct = 12.0
+    largura_mom_pct = 9.0 if col_mom else 0.0
+    largura_mes_pct = (100.0 - largura_regional_pct - largura_mom_pct) / max(len(colunas_valor), 1)
+    larguras: list[float] = []
+    for coluna in colunas:
+        if coluna == col_regional:
+            larguras.append(largura_regional_pct)
+        elif coluna == col_mom:
+            larguras.append(largura_mom_pct)
+        else:
+            larguras.append(largura_mes_pct)
+    colgroup_html = "<colgroup>" + "".join(
+        [f'<col style="width:{largura:.4f}%;">' for largura in larguras]
+    ) + "</colgroup>"
+
+    def _classe_mom(valor) -> str:
+        try:
+            valor_float = float(valor)
+        except Exception:
+            valor_float = 0.0
+        if valor_float > 0.05:
+            return "mom-pos"
+        if valor_float < -0.05:
+            return "mom-neg"
+        return "mom-neut"
+
+    html = f"""
+    <style>
+        .{table_id}-container {{
+            width: 100%;
+            overflow-x: auto;
+            border: 2px solid #790E09;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(121,14,9,0.14);
+            margin: 10px 0 14px 0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+        }}
+        table.{table_id} {{
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 820px;
+            table-layout: fixed;
+            font-size: 11.5px;
+            line-height: 1.12;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        .{table_id} thead th {{
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+            color: #fff;
+            padding: 7px 6px;
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: 0.22px;
+            white-space: nowrap;
+            font-size: 10.5px;
+            border-right: 1px solid rgba(255,255,255,0.9);
+            border-bottom: 2px solid #4A0704;
+        }}
+        .{table_id} thead th.col-regional {{
+            position: sticky;
+            left: 0;
+            z-index: 50;
+            background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
+            text-align: left;
+            padding-left: 8px;
+        }}
+        .{table_id} thead th.col-tend {{
+            background: linear-gradient(135deg, #B7443B 0%, #8E211B 100%);
+        }}
+        .{table_id} thead th.col-mom {{
+            background: linear-gradient(135deg, #3D0704 0%, #2A0402 100%);
+        }}
+        .{table_id} tbody td {{
+            padding: 7px 6px;
+            text-align: right;
+            border-bottom: 1px solid #F0E4E2;
+            color: #2F3747;
+            font-size: 11.5px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }}
+        .{table_id} tbody tr:nth-child(odd) td {{
+            background: #FFF9F8;
+        }}
+        .{table_id} tbody tr:nth-child(even) td {{
+            background: #FDF3F2;
+        }}
+        .{table_id} tbody tr:hover td {{
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%);
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+        }}
+        .{table_id} tbody td.col-regional {{
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            text-align: left;
+            padding-left: 8px;
+            color: #5A0A06;
+            font-weight: 600;
+        }}
+        .{table_id} tbody td.col-tend {{
+            background: linear-gradient(180deg, rgba(183, 68, 59, 0.10) 0%, rgba(183, 68, 59, 0.045) 100%) !important;
+            color: #6B1F1A;
+            font-weight: 800;
+        }}
+        .{table_id} tbody td.col-mom {{
+            background: transparent !important;
+            font-weight: 600;
+            text-align: center;
+        }}
+        .{table_id} tbody td.mom-pos {{
+            color: #0F8A4B;
+        }}
+        .{table_id} tbody td.mom-neg {{
+            color: #B42318;
+        }}
+        .{table_id} tbody td.mom-neut {{
+            color: #6B7280;
+        }}
+        .{table_id} tbody tr.linha-total td {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 800;
+            border-bottom: 2px solid #A23B36;
+        }}
+        .{table_id} tbody tr.linha-total td.col-regional {{
+            z-index: 30;
+        }}
+        .{table_id}-container::-webkit-scrollbar {{
+            width: 8px;
+            height: 8px;
+        }}
+        .{table_id}-container::-webkit-scrollbar-track {{
+            background: #F5F5F5;
+            border-radius: 10px;
+        }}
+        .{table_id}-container::-webkit-scrollbar-thumb {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+            border-radius: 10px;
+        }}
+    </style>
+    <div class="{table_id}-container">
+      <table class="{table_id}">
+        {colgroup_html}
+        <thead>
+          <tr>
+    """
+    for idx_col, coluna in enumerate(colunas):
+        classes = []
+        coluna_txt = str(coluna).strip()
+        if idx_col == 0:
+            classes.append("col-regional")
+        elif coluna_txt.upper().startswith("TEND."):
+            classes.append("col-tend")
+        elif coluna == col_mom:
+            classes.append("col-mom")
+        html += f'<th class="{" ".join(classes)}">{escape(coluna_txt)}</th>'
+    html += "</tr></thead><tbody>"
+
+    for idx_linha, row in df_formatado.iterrows():
+        regional_ref = str(df_numerico.iloc[idx_linha, 0]) if idx_linha < len(df_numerico) else str(row.iloc[0])
+        is_total = regional_ref.strip().upper() == "TOTAL"
+        classe_linha = ' class="linha-total"' if is_total else ""
+        html += f"<tr{classe_linha}>"
+        for idx_col, coluna in enumerate(colunas):
+            valor = escape(str(row[coluna]))
+            classes = []
+            coluna_txt = str(coluna).strip()
+            if idx_col == 0:
+                classes.append("col-regional")
+            elif coluna_txt.upper().startswith("TEND."):
+                classes.append("col-tend")
+            elif coluna == col_mom:
+                classes.extend(["col-mom", _classe_mom(df_numerico.iloc[idx_linha][coluna])])
+            html += f'<td class="{" ".join(classes)}">{valor}</td>'
+        html += "</tr>"
+
+    html += "</tbody></table></div>"
+    return html
+
 @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
 def preparar_base_gross_motivo_status(df_base: pd.DataFrame) -> pd.DataFrame:
     """Prepara a base de Gross Liquido Conta por motivo para os graficos do Analitico."""
@@ -5969,7 +6172,7 @@ def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.Da
     """Carrega a base de migracoes PME e padroniza os campos usados na tabela analitica."""
     _ = file_mtime
     path_obj = Path(path)
-    colunas_saida = ["CANAL", "MES_ANO", "QTDE"]
+    colunas_saida = ["REGIONAL", "MES_ANO", "QTDE"]
     if not path_obj.exists():
         return pd.DataFrame(columns=colunas_saida)
 
@@ -5984,26 +6187,31 @@ def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.Da
         "DATA_REFERENCIA",
         "DAT REFERENCIA"
     )
-    coluna_canal = encontrar_coluna_por_alias(
+    coluna_regional = encontrar_coluna_por_alias(
         header_df.columns,
-        "CANAL",
-        "CANAL_PLAN",
-        "CANAL PLAN"
+        "DSC_REGIONAL_CMV",
+        "DSC REGIONAL CMV",
+        "REGIONAL_CMV",
+        "REGIONAL CMV",
+        "DSC_REGIONAL",
+        "REGIONAL"
     )
     coluna_qtde = encontrar_coluna_por_alias(
         header_df.columns,
+        "QTDE_FINAL",
+        "QTDE FINAL",
         "QTDE",
         "QTD",
         "QUANTIDADE"
     )
 
-    if not coluna_data or not coluna_canal or not coluna_qtde:
+    if not coluna_data or not coluna_regional or not coluna_qtde:
         return pd.DataFrame(columns=colunas_saida)
 
     try:
         df = _read_excel_with_copy_fallback(
             path_obj,
-            usecols=[coluna_data, coluna_canal, coluna_qtde]
+            usecols=[coluna_data, coluna_regional, coluna_qtde]
         )
     except Exception:
         return pd.DataFrame(columns=colunas_saida)
@@ -6014,77 +6222,101 @@ def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.Da
     df = df.rename(
         columns={
             coluna_data: "DAT_REFERENCIA",
-            coluna_canal: "CANAL",
+            coluna_regional: "REGIONAL",
             coluna_qtde: "QTDE",
         }
     ).copy()
 
-    df["DAT_REFERENCIA"] = pd.to_datetime(df["DAT_REFERENCIA"], errors="coerce")
-    df["CANAL"] = df["CANAL"].astype("string").str.strip()
+    df["DAT_REFERENCIA"] = pd.to_datetime(df["DAT_REFERENCIA"], errors="coerce", dayfirst=True)
+    df["REGIONAL"] = (
+        df["REGIONAL"]
+        .astype("string")
+        .str.strip()
+        .str.upper()
+        .str[:3]
+        .replace({"": pd.NA, "NAN": pd.NA, "NON": pd.NA, "NUL": pd.NA})
+    )
     df["QTDE"] = normalizar_numerico_serie(df["QTDE"]).fillna(0.0)
 
-    canais_norm_map = {
-        normalizar_chave_visual(canal): canal
-        for canal in MIGRACOES_PME_CANAIS
-    }
-    canal_norm = df["CANAL"].map(normalizar_chave_visual)
     df = df[
         df["DAT_REFERENCIA"].notna() &
-        canal_norm.isin(canais_norm_map.keys())
+        df["REGIONAL"].notna()
     ].copy()
 
     if df.empty:
         return pd.DataFrame(columns=colunas_saida)
 
-    df["CANAL"] = canal_norm.loc[df.index].map(canais_norm_map)
     df["MES_ANO"] = df["DAT_REFERENCIA"].map(_formatar_mes_ano_backlog)
     df = df[df["MES_ANO"].notna()].copy()
 
-    compactar_colunas_categoricas(df, ["CANAL", "MES_ANO"])
+    compactar_colunas_categoricas(df, ["REGIONAL", "MES_ANO"])
     return df[colunas_saida]
 
 def _prever_tendencia_mensal_migracoes(valores_hist: pd.Series | np.ndarray | list[float]) -> float:
     """
-    Projeta o próximo mês pela média do crescimento dos 2 últimos intervalos mensais.
-    Para a campanha de Migrações PME, prioriza os 3 últimos meses realizados
-    (ex.: dez -> jan -> fev para projetar mar).
+    Projeta o próximo mês pela média móvel dos 3 últimos meses realizados.
     """
     serie = pd.Series(valores_hist, dtype="float64").replace([np.inf, -np.inf], np.nan).dropna()
     if serie.empty:
         return 0.0
 
     y = serie.to_numpy(dtype=float)
-    if len(y) == 1:
-        return float(max(y[-1], 0.0))
-
     janela = y[-min(3, len(y)):]
-    if len(janela) >= 3:
-        val_dez, val_jan, val_fev = [float(v) for v in janela[-3:]]
-        taxas: list[float] = []
-        if val_dez > 0:
-            taxas.append((val_jan / val_dez) - 1.0)
-        if val_jan > 0:
-            taxas.append((val_fev / val_jan) - 1.0)
+    return float(max(np.mean(janela), 0.0))
 
-        if taxas:
-            media_crescimento = float(np.mean(taxas))
-            previsao = val_fev * (1.0 + media_crescimento)
-            return float(max(previsao, 0.0))
+def _resolver_coluna_mes_migracoes(colunas_valor: list[str], mes_ref: str | None) -> str:
+    """Resolve mes selecionado para coluna real ou tendencia da tabela de migracoes."""
+    if not colunas_valor:
+        return ""
+    mes_ref_norm = str(mes_ref or "").replace("TEND.", "").strip().lower()
+    for coluna in colunas_valor:
+        coluna_norm = str(coluna).replace("TEND.", "").strip().lower()
+        if coluna_norm == mes_ref_norm:
+            return str(coluna)
+    return str(colunas_valor[-1])
 
-        media_deltas = float(np.mean(np.diff(janela))) if len(janela) > 1 else 0.0
-        return float(max(val_fev + media_deltas, 0.0))
+def _formatar_mom_migracoes(valor: float | int | None) -> str:
+    try:
+        valor_float = float(valor)
+    except Exception:
+        valor_float = 0.0
+    if valor_float > 0.05:
+        seta = "▲"
+    elif valor_float < -0.05:
+        seta = "▼"
+    else:
+        seta = "•"
+    return f"{seta} {valor_float:+.1f}%".replace(".", ",")
 
-    val_anterior = float(janela[-2])
-    val_atual = float(janela[-1])
-    if val_anterior > 0:
-        return float(max(val_atual * (val_atual / val_anterior), 0.0))
-    return float(max(val_atual, 0.0))
+def obter_meses_mom_migracoes(df_migracoes: pd.DataFrame) -> tuple[list[str], str]:
+    """Retorna meses reais + proximo mes de tendencia para o filtro de MoM."""
+    if df_migracoes is None or df_migracoes.empty or "MES_ANO" not in df_migracoes.columns:
+        return [], ""
 
-def montar_tabela_migracoes_pme_canais(
-    df_migracoes: pd.DataFrame
+    meses_reais = sorted(
+        df_migracoes["MES_ANO"].dropna().astype(str).unique().tolist(),
+        key=mes_ano_para_data
+    )
+    if not meses_reais:
+        return [], ""
+
+    try:
+        data_tend = pd.Timestamp(mes_ano_para_data(meses_reais[-1])) + pd.DateOffset(months=1)
+        mes_tendencia = _formatar_mes_ano_backlog(data_tend)
+    except Exception:
+        mes_tendencia = ""
+
+    meses_opcoes = meses_reais.copy()
+    if mes_tendencia and mes_tendencia not in meses_opcoes:
+        meses_opcoes.append(mes_tendencia)
+    return meses_opcoes, str(mes_tendencia or "")
+
+def montar_tabela_migracoes_pme_regionais(
+    df_migracoes: pd.DataFrame,
+    mes_mom_ref: str | None = None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Monta a tabela canal x mes para migracoes PME somando QTDE."""
-    colunas_vazias = ["CANAL"]
+    """Monta a tabela regional x mes para migracoes PME somando QTDE."""
+    colunas_vazias = ["REGIONAL"]
     if df_migracoes is None or df_migracoes.empty:
         return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
 
@@ -6097,7 +6329,7 @@ def montar_tabela_migracoes_pme_canais(
 
     tabela = pd.pivot_table(
         df_migracoes,
-        index="CANAL",
+        index="REGIONAL",
         columns="MES_ANO",
         values="QTDE",
         aggfunc="sum",
@@ -6105,11 +6337,7 @@ def montar_tabela_migracoes_pme_canais(
     ).reindex(columns=meses_ordem, fill_value=0)
 
     if tabela.empty:
-        return pd.DataFrame(columns=["CANAL", *meses_ordem]), pd.DataFrame(columns=["CANAL", *meses_ordem])
-
-    canais_ordenados = [canal for canal in MIGRACOES_PME_CANAIS if canal in tabela.index]
-    canais_restantes = [canal for canal in tabela.index.tolist() if canal not in canais_ordenados]
-    tabela = tabela.reindex([*canais_ordenados, *sorted(canais_restantes)], fill_value=0)
+        return pd.DataFrame(columns=["REGIONAL", *meses_ordem]), pd.DataFrame(columns=["REGIONAL", *meses_ordem])
 
     try:
         data_ref_ult_mes = pd.Timestamp(mes_ano_para_data(meses_ordem[-1]))
@@ -6120,10 +6348,46 @@ def montar_tabela_migracoes_pme_canais(
 
     tabela[coluna_tendencia] = [
         _prever_tendencia_mensal_migracoes(
-            pd.to_numeric(tabela.loc[canal, meses_ordem], errors="coerce").fillna(0.0)
+            pd.to_numeric(tabela.loc[regional, meses_ordem], errors="coerce").fillna(0.0)
         )
-        for canal in tabela.index
+        for regional in tabela.index
     ]
+
+    colunas_valor = [*meses_ordem, coluna_tendencia]
+    coluna_mom_ref = _resolver_coluna_mes_migracoes(colunas_valor, mes_mom_ref)
+    mes_mom_base = str(coluna_mom_ref).replace("TEND.", "").strip()
+    mes_mom_anterior = get_mes_anterior(mes_mom_base)
+    coluna_mom_anterior = _resolver_coluna_mes_migracoes(colunas_valor, mes_mom_anterior)
+    if str(coluna_mom_anterior).replace("TEND.", "").strip().lower() != str(mes_mom_anterior).strip().lower():
+        coluna_mom_anterior = ""
+    try:
+        data_mom_ref = pd.Timestamp(mes_ano_para_data(mes_mom_base)).normalize()
+    except Exception:
+        data_mom_ref = pd.Timestamp(mes_ano_para_data(meses_ordem[-1])).normalize()
+    eh_coluna_tendencia = str(coluna_mom_ref).strip().upper().startswith("TEND.")
+    meses_exibicao = [
+        mes for mes in meses_ordem
+        if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() <= data_mom_ref
+    ]
+    if not meses_exibicao:
+        meses_exibicao = [meses_ordem[0]]
+    colunas_exibicao_valor = meses_exibicao.copy()
+    if eh_coluna_tendencia and coluna_tendencia not in colunas_exibicao_valor:
+        colunas_exibicao_valor.append(coluna_tendencia)
+
+    def _calc_mom(row: pd.Series) -> float:
+        valor_atual = float(pd.to_numeric(pd.Series([row.get(coluna_mom_ref, 0.0)]), errors="coerce").fillna(0.0).iloc[0])
+        valor_anterior = (
+            float(pd.to_numeric(pd.Series([row.get(coluna_mom_anterior, 0.0)]), errors="coerce").fillna(0.0).iloc[0])
+            if coluna_mom_anterior else 0.0
+        )
+        return ((valor_atual / valor_anterior) - 1.0) * 100.0 if valor_anterior > 0 else 0.0
+
+    tabela["MoM"] = tabela.apply(_calc_mom, axis=1)
+    if coluna_mom_ref in tabela.columns:
+        tabela = tabela.sort_values(by=[coluna_mom_ref, "MoM"], ascending=[False, False])
+    else:
+        tabela = tabela.sort_index()
 
     totais_mes = (
         df_migracoes.groupby("MES_ANO", observed=True)["QTDE"]
@@ -6131,39 +6395,46 @@ def montar_tabela_migracoes_pme_canais(
         .reindex(meses_ordem, fill_value=0)
     )
 
-    df_num = tabela.reset_index()
-    linha_total = {"CANAL": "TOTAL"}
-    for mes in meses_ordem:
+    colunas_saida_numericas = [*colunas_exibicao_valor, "MoM"]
+    df_num = tabela[colunas_saida_numericas].reset_index()
+    linha_total = {"REGIONAL": "TOTAL"}
+    for mes in meses_exibicao:
         linha_total[mes] = float(totais_mes.get(mes, 0))
-    linha_total[coluna_tendencia] = float(pd.to_numeric(tabela[coluna_tendencia], errors="coerce").fillna(0.0).sum())
+    if coluna_tendencia in colunas_exibicao_valor:
+        linha_total[coluna_tendencia] = float(pd.to_numeric(tabela[coluna_tendencia], errors="coerce").fillna(0.0).sum())
+    valor_total_atual = float(linha_total.get(coluna_mom_ref, 0.0))
+    valor_total_anterior = float(linha_total.get(coluna_mom_anterior, 0.0)) if coluna_mom_anterior else 0.0
+    linha_total["MoM"] = ((valor_total_atual / valor_total_anterior) - 1.0) * 100.0 if valor_total_anterior > 0 else 0.0
     df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
 
     df_fmt = df_num.copy()
     for col in df_fmt.columns:
-        if col == "CANAL":
+        if col == "REGIONAL":
             continue
-        df_fmt[col] = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0).apply(
-            lambda valor: formatar_numero_brasileiro(valor, 0)
-        )
+        serie_col = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0.0)
+        if col == "MoM":
+            df_fmt[col] = serie_col.apply(_formatar_mom_migracoes)
+        else:
+            df_fmt[col] = serie_col.apply(lambda valor: formatar_numero_brasileiro(valor, 0))
     return df_fmt, df_num
 
 def montar_serie_grafico_migracoes_pme(
     df_tabela_numerica: pd.DataFrame,
-    canal_ref: str = "Todos"
+    regional_ref: str = "Todos"
 ) -> pd.DataFrame:
     """Converte a tabela numerica de migracoes PME em serie mensal para o grafico."""
-    if df_tabela_numerica is None or df_tabela_numerica.empty or "CANAL" not in df_tabela_numerica.columns:
+    if df_tabela_numerica is None or df_tabela_numerica.empty or "REGIONAL" not in df_tabela_numerica.columns:
         return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
 
-    canal_busca = "TOTAL" if str(canal_ref).strip().lower() in {"", "todos"} else str(canal_ref).strip()
-    linha = df_tabela_numerica[df_tabela_numerica["CANAL"].astype(str).str.strip().eq(canal_busca)].copy()
+    regional_busca = "TOTAL" if str(regional_ref).strip().lower() in {"", "todos"} else str(regional_ref).strip()
+    linha = df_tabela_numerica[df_tabela_numerica["REGIONAL"].astype(str).str.strip().eq(regional_busca)].copy()
     if linha.empty:
         return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
 
     row = linha.iloc[0]
     registros: list[dict[str, object]] = []
     for coluna in df_tabela_numerica.columns:
-        if coluna == "CANAL":
+        if coluna in {"REGIONAL", "MoM"}:
             continue
         coluna_str = str(coluna).strip()
         eh_tendencia = coluna_str.upper().startswith("TEND.")
@@ -6190,7 +6461,7 @@ def montar_serie_grafico_migracoes_pme(
 
 def criar_grafico_migracoes_pme_mensal(
     df_serie: pd.DataFrame,
-    canal_ref: str = "Todos",
+    regional_ref: str = "Todos",
     altura: int = 340
 ) -> go.Figure:
     """Cria gráfico mensal de colunas para Migracoes PME com destaque para a tendencia."""
@@ -6218,6 +6489,8 @@ def criar_grafico_migracoes_pme_mensal(
     idx_tend = next((idx for idx, tipo in enumerate(tipos) if str(tipo).upper() == "TENDENCIA"), None)
     if idx_tend is not None and idx_tend > 0:
         comparacoes.append({"origem": idx_tend - 1, "destino": idx_tend})
+    elif len(categorias) >= 2:
+        comparacoes.append({"origem": len(categorias) - 2, "destino": len(categorias) - 1})
 
     fig = _criar_grafico_barras_resumo_comparativo(
         categorias=categorias,
@@ -11347,11 +11620,11 @@ def validate_data(df):
 # BLOCO ADICIONAL - FUNIL FIXA E-COMMERCE
 # ==============================
 FUNIL_FIXA_FILE_PATH = Path(
-    "base_funil_ecomm_fixa.xlsx"
+    DASHBOARD_FILES_DIR / "base_funil_ecomm_fixa.xlsx"
 )
 
 TEND_FUNIL_FIXA_FILE_PATH = Path(
-    "tend_funil_ecom.xlsx"
+    DASHBOARD_FILES_DIR / "tend_funil_ecom.xlsx"
 )
 
 FUNIL_FIXA_INDICADORES_CONFIG = [
@@ -12747,7 +13020,7 @@ tab0, tab1, tab3, tab4, tab5, tab6, tab2 = st.tabs([
     "ATIVADOS",
     "PEDIDOS",
     "LIGAÇÕES",
-    "ANALÍTICO",
+    "FUNIL MÓVEL",
     "FUNIL FIXA",
     "DESATIVAÇÕES"
 ])
@@ -12766,6 +13039,7 @@ components.html(
         PEDIDOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`,
         LIGACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
         ANALITICO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"></rect><rect x="14" y="3" width="7" height="7" rx="1.6"></rect><rect x="3" y="14" width="7" height="7" rx="1.6"></rect><rect x="14" y="14" width="7" height="7" rx="1.6"></rect></svg>`,
+        "FUNIL MOVEL": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"></path><path d="M6.5 10h11"></path><path d="M9 15h6"></path><path d="M11 20h2"></path></svg>`,
         COTACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
         COTACAO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
         "FUNIL FIXA": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`
@@ -14701,7 +14975,7 @@ with tab2:
     def load_desativados_data():
         """Carrega dados de desativados com tratamento especial"""
         try:
-            file_path = "base_final_churn.xlsx"
+            file_path = str(CHURN_FILE_PATH)
             file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
             header_df = load_excel_cached(file_path, file_mtime, nrows=0)
             if header_df is None:
@@ -19507,15 +19781,15 @@ with tab4:
 with tab5:
     st.markdown(
         build_visual_title_html(
-            "ANALÍTICO",
+            "FUNIL MÓVEL",
             "grid",
-            subtitle="VISÃO DETALHADA DE PERFORMANCE DOS CANAIS ESTRATÉGICOS"
+            subtitle="VISÃO ANALÍTICA DOS FUNIS E BLOCOS DE SUPORTE"
         ),
         unsafe_allow_html=True
     )
 
     def load_obs_resultado() -> str:
-        obs_path = Path("obs_resultado_canais.txt")
+        obs_path = OBS_RESULTADO_FILE_PATH
         if obs_path.exists():
             try:
                 return obs_path.read_text(encoding="utf-8")
@@ -19524,13 +19798,29 @@ with tab5:
         return ""
 
     def save_obs_resultado(texto: str):
-        obs_path = Path("obs_resultado_canais.txt")
+        obs_path = OBS_RESULTADO_FILE_PATH
+        obs_path.parent.mkdir(parents=True, exist_ok=True)
         obs_path.write_text(texto, encoding="utf-8")
 
     if "obs_resultado_canais" not in st.session_state:
         st.session_state["obs_resultado_canais"] = load_obs_resultado()
     if "obs_resultado_editor" not in st.session_state:
         st.session_state["obs_resultado_editor"] = st.session_state["obs_resultado_canais"]
+
+    render_blocos_home_only_no_funil_movel = False
+
+    def obter_valor_filtro_estado(key: str, options, default_value=None):
+        opcoes = list(options or [])
+        if not opcoes:
+            if default_value is not None:
+                st.session_state[key] = default_value
+            return default_value
+        valor_default = default_value if default_value in opcoes else opcoes[0]
+        valor = st.session_state.get(key, valor_default)
+        if valor not in opcoes:
+            valor = valor_default
+        st.session_state[key] = valor
+        return valor
 
     st.markdown(
         """
@@ -20658,30 +20948,45 @@ with tab5:
         idx_mes_analitico = 0
 
     if not tem_meses_analitico:
-        st.warning("Não há meses disponíveis para montar a tabela analítica.")
+        if render_blocos_home_only_no_funil_movel:
+            st.warning("Não há meses disponíveis para montar a tabela analítica.")
     else:
-        st.markdown(
-            build_visual_title_html("RESULTADO DOS CANAIS", "grid", "subsection-title", extra_style="margin-top:18px;"),
-            unsafe_allow_html=True
-        )
-        col_res_a1, col_res_a2 = st.columns([1.1, 1.1])
-        with col_res_a1:
-            render_filter_label("SELECIONE O MÊS")
-            mes_resultado = st.selectbox(
-                "Mês de referência",
-                options=meses_analitico,
-                index=idx_mes_analitico,
-                key="analitico_resultado_mes_ref",
-                label_visibility="collapsed"
+        mes_resultado_default = meses_analitico[idx_mes_analitico]
+        regional_resultado_default = regionais_analitico[0]
+        if render_blocos_home_only_no_funil_movel:
+            st.markdown(
+                build_visual_title_html("RESULTADO DOS CANAIS", "grid", "subsection-title", extra_style="margin-top:18px;"),
+                unsafe_allow_html=True
             )
-        with col_res_a2:
-            render_filter_label("REGIONAL")
-            regional_resultado = st.selectbox(
-                "Regional",
-                options=regionais_analitico,
-                index=0,
-                key="analitico_resultado_regional_ref",
-                label_visibility="collapsed"
+            col_res_a1, col_res_a2 = st.columns([1.1, 1.1])
+            with col_res_a1:
+                render_filter_label("SELECIONE O MÊS")
+                mes_resultado = st.selectbox(
+                    "Mês de referência",
+                    options=meses_analitico,
+                    index=idx_mes_analitico,
+                    key="analitico_resultado_mes_ref",
+                    label_visibility="collapsed"
+                )
+            with col_res_a2:
+                render_filter_label("REGIONAL")
+                regional_resultado = st.selectbox(
+                    "Regional",
+                    options=regionais_analitico,
+                    index=0,
+                    key="analitico_resultado_regional_ref",
+                    label_visibility="collapsed"
+                )
+        else:
+            mes_resultado = obter_valor_filtro_estado(
+                "analitico_resultado_mes_ref",
+                meses_analitico,
+                mes_resultado_default
+            )
+            regional_resultado = obter_valor_filtro_estado(
+                "analitico_resultado_regional_ref",
+                regionais_analitico,
+                regional_resultado_default
             )
 
         mes_resultado_m1 = get_mes_anterior(mes_resultado)
@@ -20694,56 +20999,63 @@ with tab5:
             ].copy()
 
         if base_resultado.empty:
-            st.warning("Sem dados para os filtros selecionados em RESULTADO DOS CANAIS.")
+            if render_blocos_home_only_no_funil_movel:
+                st.warning("Sem dados para os filtros selecionados em RESULTADO DOS CANAIS.")
         else:
-            col_res_t1, col_res_t2 = st.columns(2, gap="medium")
-            blocos_resultado = [
-                (col_res_t1, 'CONTA', 'tabela-analitico-resultado-canais-conta'),
-                (col_res_t2, 'FIXA', 'tabela-analitico-resultado-canais-fixa')
-            ]
+            resultados_html: dict[str, str] = {}
+            for produto_resultado, table_id_resultado in [
+                ('CONTA', 'tabela-analitico-resultado-canais-conta'),
+                ('FIXA', 'tabela-analitico-resultado-canais-fixa')
+            ]:
+                tabela_resultado_canais = construir_tabela_resultado_canais(
+                    df_base=base_resultado,
+                    mes_ref=mes_resultado,
+                    produto_ref=produto_resultado
+                )
+                tabela_resultado_canais_fmt = formatar_tabela_resultado_canais(
+                    df_tabela=tabela_resultado_canais,
+                    mes_ref=mes_resultado,
+                    mes_m1=mes_resultado_m1,
+                    mes_m2=mes_resultado_m2,
+                    produto_ref=produto_resultado,
+                    incluir_total=True
+                )
+                tabela_resultado_canais_num = montar_tabela_resultado_canais_exibicao_numerica(
+                    df_tabela=tabela_resultado_canais,
+                    mes_ref=mes_resultado,
+                    mes_m1=mes_resultado_m1,
+                    mes_m2=mes_resultado_m2,
+                    produto_ref=produto_resultado,
+                    incluir_total=True
+                )
+                html_resultado_canais = criar_tabela_html_resultado_canais(
+                    df_formatado=tabela_resultado_canais_fmt,
+                    df_numerico=tabela_resultado_canais_num,
+                    table_id=table_id_resultado
+                )
+                resultados_html[produto_resultado] = html_resultado_canais
+                home_inicio_ctx[f"resultado_{produto_resultado.lower()}"] = html_resultado_canais
 
-            for col_ref, produto_resultado, table_id_resultado in blocos_resultado:
-                with col_ref:
-                    st.markdown(
-                        build_visual_title_html(
-                            produto_resultado,
-                            produto_resultado,
-                            "subsection-title",
-                            extra_style="margin-top:8px;"
-                        ),
-                        unsafe_allow_html=True
-                    )
-                    tabela_resultado_canais = construir_tabela_resultado_canais(
-                        df_base=base_resultado,
-                        mes_ref=mes_resultado,
-                        produto_ref=produto_resultado
-                    )
-                    tabela_resultado_canais_fmt = formatar_tabela_resultado_canais(
-                        df_tabela=tabela_resultado_canais,
-                        mes_ref=mes_resultado,
-                        mes_m1=mes_resultado_m1,
-                        mes_m2=mes_resultado_m2,
-                        produto_ref=produto_resultado,
-                        incluir_total=True
-                    )
-                    tabela_resultado_canais_num = montar_tabela_resultado_canais_exibicao_numerica(
-                        df_tabela=tabela_resultado_canais,
-                        mes_ref=mes_resultado,
-                        mes_m1=mes_resultado_m1,
-                        mes_m2=mes_resultado_m2,
-                        produto_ref=produto_resultado,
-                        incluir_total=True
-                    )
-                    html_resultado_canais = criar_tabela_html_resultado_canais(
-                        df_formatado=tabela_resultado_canais_fmt,
-                        df_numerico=tabela_resultado_canais_num,
-                        table_id=table_id_resultado
-                    )
-                    home_inicio_ctx[f"resultado_{produto_resultado.lower()}"] = html_resultado_canais
-                    st.markdown(
-                        html_resultado_canais,
-                        unsafe_allow_html=True
-                    )
+            if render_blocos_home_only_no_funil_movel:
+                col_res_t1, col_res_t2 = st.columns(2, gap="medium")
+                for col_ref, produto_resultado in [
+                    (col_res_t1, 'CONTA'),
+                    (col_res_t2, 'FIXA')
+                ]:
+                    with col_ref:
+                        st.markdown(
+                            build_visual_title_html(
+                                produto_resultado,
+                                produto_resultado,
+                                "subsection-title",
+                                extra_style="margin-top:8px;"
+                            ),
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(
+                            resultados_html.get(produto_resultado, ""),
+                            unsafe_allow_html=True
+                        )
             home_inicio_ctx["resultado_info"] = f"Mês: {str(mes_resultado).upper()} | Regional: {regional_resultado}"
 
         st.markdown(
@@ -20758,7 +21070,7 @@ with tab5:
 
         backlog_candidates = [
             BACKLOG_CONSOLIDADO_FILE_PATH,
-            Path(__file__).resolve().parent / "backlog_consolidado.csv"
+            Path(__file__).resolve().parent / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
         ]
         backlog_path = next((path for path in backlog_candidates if Path(path).exists()), None)
 
@@ -21115,7 +21427,7 @@ with tab5:
 
         st.markdown(
             build_visual_title_html(
-                "MIGRAÇÕES PME - QTDE POR CANAL E MÊS",
+                "MIGRAÇÕES PME - QTDE POR REGIONAL E MÊS",
                 "grid",
                 "subsection-title",
                 extra_style="margin-top:18px;"
@@ -21134,23 +21446,49 @@ with tab5:
         else:
             migracoes_mtime = Path(migracoes_path).stat().st_mtime if Path(migracoes_path).exists() else None
             df_migracoes_pme = load_migracoes_pme_data(str(migracoes_path), migracoes_mtime)
-            tabela_migracoes_fmt, tabela_migracoes_num = montar_tabela_migracoes_pme_canais(df_migracoes_pme)
 
-            if tabela_migracoes_fmt.empty:
+            if df_migracoes_pme.empty:
                 st.info("Sem dados disponíveis para montar a tabela de Migrações PME.")
             else:
-                st.markdown(
-                    criar_tabela_html_backlog_canais(
-                        df_formatado=tabela_migracoes_fmt,
-                        df_numerico=tabela_migracoes_num,
-                        table_id="tabela-analitico-migracoes-pme"
-                    ),
-                    unsafe_allow_html=True
-                )
-                st.caption(
-                    "TEND. do próximo mês calculada pela média do crescimento dos 2 últimos intervalos: "
-                    "dez -> jan e jan -> fev, aplicada sobre fev."
-                )
+                opcoes_mes_mom_migracoes, mes_tend_migracoes = obter_meses_mom_migracoes(df_migracoes_pme)
+                if not opcoes_mes_mom_migracoes:
+                    st.info("Sem meses disponíveis para montar a tabela de Migrações PME.")
+                    tabela_migracoes_fmt, tabela_migracoes_num = pd.DataFrame(), pd.DataFrame()
+                else:
+                    col_mig_mes_mom, col_mig_mes_spacer = st.columns([0.85, 2.65], gap="medium")
+                    with col_mig_mes_mom:
+                        render_filter_label("Mês MoM")
+                        mes_migracoes_mom_ref = st.selectbox(
+                            "Selecione o mês de referência do MoM de Migrações PME",
+                            options=opcoes_mes_mom_migracoes,
+                            index=max(len(opcoes_mes_mom_migracoes) - 1, 0),
+                            key="funil_movel_migracoes_pme_mes_mom",
+                            label_visibility="collapsed",
+                            format_func=lambda mes: (
+                                f"{str(mes).upper()} (TEND.)"
+                                if str(mes).strip().lower() == str(mes_tend_migracoes).strip().lower()
+                                else str(mes).upper()
+                            )
+                        )
+                    with col_mig_mes_spacer:
+                        st.empty()
+
+                    tabela_migracoes_fmt, tabela_migracoes_num = montar_tabela_migracoes_pme_regionais(
+                        df_migracoes_pme,
+                        mes_mom_ref=mes_migracoes_mom_ref
+                    )
+
+                if tabela_migracoes_fmt.empty:
+                    st.info("Sem dados disponíveis para montar a tabela de Migrações PME.")
+                else:
+                    st.markdown(
+                        criar_tabela_html_migracoes_regionais(
+                            df_formatado=tabela_migracoes_fmt,
+                            df_numerico=tabela_migracoes_num,
+                            table_id="tabela-analitico-migracoes-pme"
+                        ),
+                        unsafe_allow_html=True
+                    )
 
                 st.markdown(
                     build_visual_title_html(
@@ -21162,20 +21500,20 @@ with tab5:
                     unsafe_allow_html=True
                 )
 
-                canais_migracoes_disp = [
-                    canal for canal in tabela_migracoes_num["CANAL"].astype(str).tolist()
-                    if str(canal).strip().upper() != "TOTAL"
+                regionais_migracoes_disp = [
+                    regional for regional in tabela_migracoes_num["REGIONAL"].astype(str).tolist()
+                    if str(regional).strip().upper() != "TOTAL"
                 ]
-                opcoes_canal_migracoes = ["Todos"] + canais_migracoes_disp
+                opcoes_regional_migracoes = ["Todos"] + regionais_migracoes_disp
 
                 col_mig_filtro, col_mig_info = st.columns([0.95, 2.55], gap="medium")
                 with col_mig_filtro:
-                    render_filter_label("Canal")
-                    canal_migracoes_ref = st.selectbox(
-                        "Selecione o canal de Migrações PME",
-                        options=opcoes_canal_migracoes,
+                    render_filter_label("Regional")
+                    regional_migracoes_ref = st.selectbox(
+                        "Selecione a regional de Migrações PME",
+                        options=opcoes_regional_migracoes,
                         index=0,
-                        key="analitico_migracoes_pme_canal",
+                        key="funil_movel_migracoes_pme_regional",
                         label_visibility="collapsed"
                     )
                 with col_mig_info:
@@ -21184,8 +21522,8 @@ with tab5:
                         <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
                                     border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
                                     color: #6B1F1A; font-size: 12px; font-weight: 600;">
-                            Série mensal de migrações em colunas, com destaque claro para a tendência do próximo mês
-                            e ponte de comparação contra o mês anterior.
+                            Série mensal de migrações por regional, limitada ao mês selecionado no filtro de MoM.
+                            Quando o mês selecionado é tendência, ela é calculada pela média móvel dos 3 últimos meses.
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -21193,14 +21531,14 @@ with tab5:
 
                 serie_grafico_migracoes = montar_serie_grafico_migracoes_pme(
                     tabela_migracoes_num,
-                    canal_ref=canal_migracoes_ref
+                    regional_ref=regional_migracoes_ref
                 )
                 if serie_grafico_migracoes.empty:
                     st.info("Sem dados disponíveis para montar o gráfico mensal de Migrações PME.")
                 else:
                     fig_migracoes_mensal = criar_grafico_migracoes_pme_mensal(
                         serie_grafico_migracoes,
-                        canal_ref=canal_migracoes_ref
+                        regional_ref=regional_migracoes_ref
                     )
                     st.plotly_chart(
                         fig_migracoes_mensal,
@@ -21222,49 +21560,72 @@ with tab5:
         )
 
         if not meses_disp_sem:
-            st.info("Nao ha meses disponiveis para o grafico semanal.")
+            if render_blocos_home_only_no_funil_movel:
+                st.info("Nao ha meses disponiveis para o grafico semanal.")
         else:
             mes_sem_default = (
                 get_mes_atual_formatado()
                 if get_mes_atual_formatado() in meses_disp_sem
                 else meses_disp_sem[-1]
             )
-            col_sem_f1, col_sem_f2, col_sem_f3, col_sem_f4 = st.columns([1, 1, 1.0, 1.0])
-            with col_sem_f1:
-                render_filter_label("SELECIONE O MÊS")
-                mes_sem_sel = st.selectbox(
-                    "Mes",
-                    options=meses_disp_sem,
-                    index=meses_disp_sem.index(mes_sem_default) if mes_sem_default in meses_disp_sem else 0,
-                    key="analitico_evolucao_semanal_mes",
-                    label_visibility="collapsed"
+            if render_blocos_home_only_no_funil_movel:
+                col_sem_f1, col_sem_f2, col_sem_f3, col_sem_f4 = st.columns([1, 1, 1.0, 1.0])
+                with col_sem_f1:
+                    render_filter_label("SELECIONE O MÊS")
+                    mes_sem_sel = st.selectbox(
+                        "Mes",
+                        options=meses_disp_sem,
+                        index=meses_disp_sem.index(mes_sem_default) if mes_sem_default in meses_disp_sem else 0,
+                        key="analitico_evolucao_semanal_mes",
+                        label_visibility="collapsed"
+                    )
+                with col_sem_f2:
+                    render_filter_label("CANAL")
+                    canal_sem_sel = st.selectbox(
+                        "Canal",
+                        options=canais_disp_sem,
+                        index=0,
+                        key="analitico_evolucao_semanal_canal",
+                        label_visibility="collapsed"
+                    )
+                with col_sem_f3:
+                    render_filter_label("PRODUTO")
+                    produto_sem_sel = st.selectbox(
+                        "Produto",
+                        options=produtos_disp_sem,
+                        index=0,
+                        key="analitico_evolucao_semanal_produto",
+                        label_visibility="collapsed"
+                    )
+                with col_sem_f4:
+                    render_filter_label("REGIONAL")
+                    regional_sem_sel = st.selectbox(
+                        "Regional",
+                        options=regionais_disp_sem,
+                        index=0,
+                        key="analitico_evolucao_semanal_regional",
+                        label_visibility="collapsed"
+                    )
+            else:
+                mes_sem_sel = obter_valor_filtro_estado(
+                    "analitico_evolucao_semanal_mes",
+                    meses_disp_sem,
+                    mes_sem_default
                 )
-            with col_sem_f2:
-                render_filter_label("CANAL")
-                canal_sem_sel = st.selectbox(
-                    "Canal",
-                    options=canais_disp_sem,
-                    index=0,
-                    key="analitico_evolucao_semanal_canal",
-                    label_visibility="collapsed"
+                canal_sem_sel = obter_valor_filtro_estado(
+                    "analitico_evolucao_semanal_canal",
+                    canais_disp_sem,
+                    canais_disp_sem[0]
                 )
-            with col_sem_f3:
-                render_filter_label("PRODUTO")
-                produto_sem_sel = st.selectbox(
-                    "Produto",
-                    options=produtos_disp_sem,
-                    index=0,
-                    key="analitico_evolucao_semanal_produto",
-                    label_visibility="collapsed"
+                produto_sem_sel = obter_valor_filtro_estado(
+                    "analitico_evolucao_semanal_produto",
+                    produtos_disp_sem,
+                    produtos_disp_sem[0]
                 )
-            with col_sem_f4:
-                render_filter_label("REGIONAL")
-                regional_sem_sel = st.selectbox(
-                    "Regional",
-                    options=regionais_disp_sem,
-                    index=0,
-                    key="analitico_evolucao_semanal_regional",
-                    label_visibility="collapsed"
+                regional_sem_sel = obter_valor_filtro_estado(
+                    "analitico_evolucao_semanal_regional",
+                    regionais_disp_sem,
+                    regionais_disp_sem[0]
                 )
 
             dt_mes_sem = pd.Timestamp(mes_ano_para_data(mes_sem_sel)).normalize()
@@ -21273,9 +21634,10 @@ with tab5:
                 str(mes_sem_sel).strip().lower() == get_mes_atual_formatado().strip().lower()
             )
             if dt_mes_sem.year != 2026:
-                st.info(
-                    "A evolucao diaria detalhada esta disponivel somente para meses de 2026."
-                )
+                if render_blocos_home_only_no_funil_movel:
+                    st.info(
+                        "A evolucao diaria detalhada esta disponivel somente para meses de 2026."
+                    )
             else:
                 mes_sem_m1 = get_mes_anterior(mes_sem_sel)
                 dt_mes_sem_m1 = pd.Timestamp(mes_ano_para_data(mes_sem_m1)).normalize()
@@ -21584,44 +21946,45 @@ with tab5:
                         f"Produto: {produto_sem_sel} | Regional: {regional_sem_sel}"
                     )
 
-                    col_evol_linha, col_evol_coluna = st.columns([2.2, 0.7], gap='medium')
-                    with col_evol_linha:
-                        st.markdown(
-                            build_visual_title_html(
-                                "EVOLUÇÃO SEMANAL",
-                                "trend",
-                                "card-title",
-                                subtitle=f"ATIVADOS • {str(mes_sem_sel).upper()}",
-                                extra_style="margin: 0 0 8px 0;"
-                            ),
-                            unsafe_allow_html=True
-                        )
-                        st.plotly_chart(
-                            fig_semanal,
-                            width='stretch',
-                            config={'displayModeBar': 'hover', 'displaylogo': False}
-                        )
-                    with col_evol_coluna:
-                        st.markdown(
-                            build_visual_title_html(
-                                "RESUMO SEMANAL",
-                                "grid",
-                                "card-title",
-                                subtitle="M-1 • M-0 • ORÇ",
-                                extra_style="margin: 0 0 8px 0;"
-                            ),
-                            unsafe_allow_html=True
-                        )
-                        st.plotly_chart(
-                            fig_totais_sem,
-                            width='stretch',
-                            config={'displayModeBar': 'hover', 'displaylogo': False}
-                        )
+                    if render_blocos_home_only_no_funil_movel:
+                        col_evol_linha, col_evol_coluna = st.columns([2.2, 0.7], gap='medium')
+                        with col_evol_linha:
+                            st.markdown(
+                                build_visual_title_html(
+                                    "EVOLUÇÃO SEMANAL",
+                                    "trend",
+                                    "card-title",
+                                    subtitle=f"ATIVADOS • {str(mes_sem_sel).upper()}",
+                                    extra_style="margin: 0 0 8px 0;"
+                                ),
+                                unsafe_allow_html=True
+                            )
+                            st.plotly_chart(
+                                fig_semanal,
+                                width='stretch',
+                                config={'displayModeBar': 'hover', 'displaylogo': False}
+                            )
+                        with col_evol_coluna:
+                            st.markdown(
+                                build_visual_title_html(
+                                    "RESUMO SEMANAL",
+                                    "grid",
+                                    "card-title",
+                                    subtitle="M-1 • M-0 • ORÇ",
+                                    extra_style="margin: 0 0 8px 0;"
+                                ),
+                                unsafe_allow_html=True
+                            )
+                            st.plotly_chart(
+                                fig_totais_sem,
+                                width='stretch',
+                                config={'displayModeBar': 'hover', 'displaylogo': False}
+                            )
 
-                    st.markdown(
-                        build_visual_title_html("RESUMO SEMANAL", "grid", "subsection-title", extra_style="margin-top:14px;"),
-                        unsafe_allow_html=True
-                    )
+                        st.markdown(
+                            build_visual_title_html("RESUMO SEMANAL", "grid", "subsection-title", extra_style="margin-top:14px;"),
+                            unsafe_allow_html=True
+                        )
 
                     canais_demanda = ['Televendas Receptivo', 'E-Commerce']
                     canais_base = [
@@ -22837,10 +23200,6 @@ with tab5:
                             df_lig_demanda_sem_m1['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
                         ].copy()
 
-                    st.markdown(
-                        build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
-                        unsafe_allow_html=True
-                    )
                     html_tabela_conta, df_export_conta = construir_tabela_resumo_semanal(
                         df_mes_ref=df_resumo_sem,
                         df_mes_m1_ref=df_resumo_sem_m1,
@@ -22850,12 +23209,6 @@ with tab5:
                     )
                     home_inicio_ctx["resumo_semanal_conta"] = html_tabela_conta
 
-                    st.markdown(html_tabela_conta, unsafe_allow_html=True)
-
-                    st.markdown(
-                        build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:1px;"),
-                        unsafe_allow_html=True
-                    )
                     html_tabela_fixa, df_export_fixa = construir_tabela_resumo_semanal(
                         df_mes_ref=df_resumo_sem,
                         df_mes_m1_ref=df_resumo_sem_m1,
@@ -22868,22 +23221,35 @@ with tab5:
                         f"Mês: {str(mes_sem_sel).upper()} | Canal: {canal_sem_sel} | "
                         f"Produto: {produto_sem_sel} | Regional: {regional_sem_sel}"
                     )
-                    st.markdown(html_tabela_fixa, unsafe_allow_html=True)
+                    if render_blocos_home_only_no_funil_movel:
+                        st.markdown(
+                            build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(html_tabela_conta, unsafe_allow_html=True)
+
+                        st.markdown(
+                            build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:1px;"),
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(html_tabela_fixa, unsafe_allow_html=True)
 
 
-    st.markdown(
-        build_visual_title_html(
-            "PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES",
-            "grid",
-            "subsection-title",
-            extra_style="margin-top:12px;"
-        ),
-        unsafe_allow_html=True
-    )
+    if render_blocos_home_only_no_funil_movel:
+        st.markdown(
+            build_visual_title_html(
+                "PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES",
+                "grid",
+                "subsection-title",
+                extra_style="margin-top:12px;"
+            ),
+            unsafe_allow_html=True
+        )
 
     df_reg_base = base_analitica.copy()
     if df_reg_base.empty:
-        st.warning("Não há dados disponíveis para montar a visão regional.")
+        if render_blocos_home_only_no_funil_movel:
+            st.warning("Não há dados disponíveis para montar a visão regional.")
     else:
         def load_ligacoes_resumo(ligacoes_mtime: float | None = None):
             """Carrega ligações reais (televendas_ligacoes2.xlsx) já tratadas para REGIONAL/mes/plataforma."""
@@ -22912,25 +23278,29 @@ with tab5:
         canal_disp_reg = ["Todos"] + sorted(df_reg_base['CANAL_PLAN'].dropna().unique().tolist())
 
         mes_reg_default = get_mes_atual_formatado() if get_mes_atual_formatado() in meses_disp_reg else (meses_disp_reg[-1] if meses_disp_reg else "")
-        col_f_reg1, col_f_reg2 = st.columns([1, 1], gap="small")
-        with col_f_reg1:
-            render_filter_label("SELECIONE O MÊS")
-            mes_reg_sel = st.selectbox(
-                "Mês da visão regional",
-                options=meses_disp_reg,
-                index=meses_disp_reg.index(mes_reg_default) if mes_reg_default in meses_disp_reg else 0,
-                key="reg_viz_mes",
-                label_visibility="collapsed"
-            )
-        with col_f_reg2:
-            render_filter_label("CANAL")
-            canal_reg_sel = st.selectbox(
-                "Canal da visão regional",
-                options=canal_disp_reg,
-                index=0,
-                key="reg_viz_canal",
-                label_visibility="collapsed"
-            )
+        if render_blocos_home_only_no_funil_movel:
+            col_f_reg1, col_f_reg2 = st.columns([1, 1], gap="small")
+            with col_f_reg1:
+                render_filter_label("SELECIONE O MÊS")
+                mes_reg_sel = st.selectbox(
+                    "Mês da visão regional",
+                    options=meses_disp_reg,
+                    index=meses_disp_reg.index(mes_reg_default) if mes_reg_default in meses_disp_reg else 0,
+                    key="reg_viz_mes",
+                    label_visibility="collapsed"
+                )
+            with col_f_reg2:
+                render_filter_label("CANAL")
+                canal_reg_sel = st.selectbox(
+                    "Canal da visão regional",
+                    options=canal_disp_reg,
+                    index=0,
+                    key="reg_viz_canal",
+                    label_visibility="collapsed"
+                )
+        else:
+            mes_reg_sel = obter_valor_filtro_estado("reg_viz_mes", meses_disp_reg, mes_reg_default)
+            canal_reg_sel = obter_valor_filtro_estado("reg_viz_canal", canal_disp_reg, canal_disp_reg[0])
 
         aliases_ped = {'PEDIDOS'}
         aliases_lig = {'LIGACOES'}
@@ -23434,74 +23804,102 @@ with tab5:
             </div>
             """
 
-        col_reg_conta, col_reg_fixa = st.columns(2, gap="medium")
         blocos_resumo_regional = [
-            (col_reg_conta, 'CONTA'),
-            (col_reg_fixa, 'FIXA')
+            ('CONTA'),
+            ('FIXA')
         ]
         qtd_renderizadas = 0
-        for col_ref, produto_ref in blocos_resumo_regional:
-            with col_ref:
-                st.markdown(
-                    build_visual_title_html(
-                        produto_ref,
-                        produto_ref,
-                        "subsection-title",
-                        extra_style="margin-top:8px;"
-                    ),
-                    unsafe_allow_html=True
-                )
-                html_tabela_reg = montar_html_resumo_regional_produto(produto_ref)
-                if html_tabela_reg:
-                    home_inicio_ctx[f"regional_{produto_ref.lower()}"] = html_tabela_reg
-                    st.markdown(html_tabela_reg, unsafe_allow_html=True)
-                    qtd_renderizadas += 1
-                else:
-                    st.info(f"Sem dados para {produto_ref} com os filtros selecionados.")
+        html_regional_produtos: dict[str, str] = {}
+        for produto_ref in blocos_resumo_regional:
+            html_tabela_reg = montar_html_resumo_regional_produto(produto_ref)
+            if html_tabela_reg:
+                html_regional_produtos[produto_ref] = html_tabela_reg
+                home_inicio_ctx[f"regional_{produto_ref.lower()}"] = html_tabela_reg
+                qtd_renderizadas += 1
+
+        if render_blocos_home_only_no_funil_movel:
+            col_reg_conta, col_reg_fixa = st.columns(2, gap="medium")
+            for col_ref, produto_ref in [
+                (col_reg_conta, 'CONTA'),
+                (col_reg_fixa, 'FIXA')
+            ]:
+                with col_ref:
+                    st.markdown(
+                        build_visual_title_html(
+                            produto_ref,
+                            produto_ref,
+                            "subsection-title",
+                            extra_style="margin-top:8px;"
+                        ),
+                        unsafe_allow_html=True
+                    )
+                    html_tabela_reg = html_regional_produtos.get(produto_ref, "")
+                    if html_tabela_reg:
+                        st.markdown(html_tabela_reg, unsafe_allow_html=True)
+                    else:
+                        st.info(f"Sem dados para {produto_ref} com os filtros selecionados.")
 
         if qtd_renderizadas == 0:
-            st.warning("Sem dados para os filtros selecionados.")
+            if render_blocos_home_only_no_funil_movel:
+                st.warning("Sem dados para os filtros selecionados.")
         else:
             home_inicio_ctx["regional_info"] = f"Mês: {str(mes_reg_sel).upper()} | Canal: {canal_reg_sel}"
 
 
     if tem_meses_analitico:
-        st.markdown(
-            build_visual_title_html(
-                "NECESSIDADE DIÁRIA POR CANAL/PRODUTO",
-                "target",
-                "subsection-title",
-                extra_style="margin-top:22px;"
-            ),
-            unsafe_allow_html=True
-        )
-        col_f_a1, col_f_a2, col_f_a3 = st.columns([1.0, 1.0, 1.2])
-        with col_f_a1:
-            render_filter_label("SELECIONE O MÊS")
-            mes_analitico = st.selectbox(
-                "Mês de referência",
-                options=meses_analitico,
-                index=idx_mes_analitico,
-                key="analitico_mes_ref",
-                label_visibility="collapsed"
+        if render_blocos_home_only_no_funil_movel:
+            st.markdown(
+                build_visual_title_html(
+                    "NECESSIDADE DIÁRIA POR CANAL/PRODUTO",
+                    "target",
+                    "subsection-title",
+                    extra_style="margin-top:22px;"
+                ),
+                unsafe_allow_html=True
             )
-        with col_f_a2:
-            render_filter_label("REGIONAL")
-            regional_analitico = st.selectbox(
-                "Regional",
-                options=regionais_analitico,
-                index=0,
-                key="analitico_regional_ref",
-                label_visibility="collapsed"
+            col_f_a1, col_f_a2, col_f_a3 = st.columns([1.0, 1.0, 1.2])
+            with col_f_a1:
+                render_filter_label("SELECIONE O MÊS")
+                mes_analitico = st.selectbox(
+                    "Mês de referência",
+                    options=meses_analitico,
+                    index=idx_mes_analitico,
+                    key="analitico_mes_ref",
+                    label_visibility="collapsed"
+                )
+            with col_f_a2:
+                render_filter_label("REGIONAL")
+                regional_analitico = st.selectbox(
+                    "Regional",
+                    options=regionais_analitico,
+                    index=0,
+                    key="analitico_regional_ref",
+                    label_visibility="collapsed"
+                )
+            with col_f_a3:
+                render_filter_label("CANAL")
+                canal_analitico = st.selectbox(
+                    "Canal",
+                    options=canais_analitico,
+                    index=0,
+                    key="analitico_canal_ref",
+                    label_visibility="collapsed"
+                )
+        else:
+            mes_analitico = obter_valor_filtro_estado(
+                "analitico_mes_ref",
+                meses_analitico,
+                meses_analitico[idx_mes_analitico]
             )
-        with col_f_a3:
-            render_filter_label("CANAL")
-            canal_analitico = st.selectbox(
-                "Canal",
-                options=canais_analitico,
-                index=0,
-                key="analitico_canal_ref",
-                label_visibility="collapsed"
+            regional_analitico = obter_valor_filtro_estado(
+                "analitico_regional_ref",
+                regionais_analitico,
+                regionais_analitico[0]
+            )
+            canal_analitico = obter_valor_filtro_estado(
+                "analitico_canal_ref",
+                canais_analitico,
+                canais_analitico[0]
             )
 
         html_conta, _ctx_conta = criar_tabela_html_necessidade_diaria_produto(
@@ -23515,8 +23913,9 @@ with tab5:
         home_inicio_ctx["necessidade_conta"] = html_conta
 
         if not html_conta:
-            st.warning("Sem dados para a tabela de necessidade diária de CONTA com os filtros selecionados.")
-        else:
+            if render_blocos_home_only_no_funil_movel:
+                st.warning("Sem dados para a tabela de necessidade diária de CONTA com os filtros selecionados.")
+        elif render_blocos_home_only_no_funil_movel:
             st.markdown(
                 html_conta,
                 unsafe_allow_html=True
@@ -23536,8 +23935,9 @@ with tab5:
         )
 
         if not html_fixa:
-            st.warning("Sem dados para a tabela de necessidade diária de FIXA com os filtros selecionados.")
-        else:
+            if render_blocos_home_only_no_funil_movel:
+                st.warning("Sem dados para a tabela de necessidade diária de FIXA com os filtros selecionados.")
+        elif render_blocos_home_only_no_funil_movel:
             st.markdown(
                 html_fixa,
                 unsafe_allow_html=True
@@ -23776,471 +24176,247 @@ with tab6:
                             unsafe_allow_html=True
                         )
 
+                base_funil_cotacoes = globals().get("df_perf_base", pd.DataFrame())
+                if (base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True)) and "preparar_base_performance" in globals():
+                    try:
+                        base_funil_cotacoes = preparar_base_performance(df)
+                    except Exception:
+                        base_funil_cotacoes = pd.DataFrame()
+
                 st.markdown(
-                    build_visual_title_html("NOVAS LINHAS A SEREM ATIVADAS POR CANAL", "target"),
+                    build_visual_title_html("FUNIL FIXA - PEDIDOS X VENDA BRUTA X INSTALADOS", "grid"),
                     unsafe_allow_html=True
                 )
 
-                agg_cotacoes_pm = (
-                    df_cotacoes_agregado_filtrado.groupby(
-                        ["CANAL_PLAN", "mes_ano"],
-                        as_index=False,
-                        observed=True
-                    )["VALOR_NOVAS_LINHAS"]
-                    .sum()
-                )
-                cotacoes_lookup = {
-                    (str(row["CANAL_PLAN"]).strip(), str(row["mes_ano"]).strip()): float(row["VALOR_NOVAS_LINHAS"] or 0)
-                    for _, row in agg_cotacoes_pm.iterrows()
-                }
-
-                def calcular_metricas_canal_cotacoes(canal: str, mes_atual: str, mes_anterior: str, mes_yoy: str) -> dict:
-                    atual = float(cotacoes_lookup.get((canal, mes_atual), 0))
-                    anterior = float(cotacoes_lookup.get((canal, mes_anterior), 0))
-                    yoy = float(cotacoes_lookup.get((canal, mes_yoy), 0))
-                    variacao_mom = (((atual - anterior) / anterior) * 100.0) if anterior > 0 else None
-                    variacao_yoy = (((atual - yoy) / yoy) * 100.0) if yoy > 0 else None
-                    return {
-                        "atual": atual,
-                        "anterior": anterior,
-                        "yoy": yoy,
-                        "variacao_mom": variacao_mom,
-                        "variacao_yoy": variacao_yoy
-                    }
-
-                def montar_variacao_card(valor: float | None, label: str) -> tuple[str, str]:
-                    if valor is None:
-                        return "variacao-neutra", f"{label} N/A"
-                    classe = "variacao-positiva" if float(valor) >= 0 else "variacao-negativa"
-                    return classe, f"{float(valor):+.0f}% {label}"
-
-                canais_cot_presentes = (
-                    df_cotacoes_agregado_filtrado["CANAL_PLAN"]
-                    .dropna()
-                    .astype(str)
-                    .str.strip()
-                    .unique()
-                    .tolist()
-                )
-                canais_cot_list = [canal for canal in COTACOES_ORDEM_CANAIS if canal in canais_cot_presentes]
-                for canal in canais_cot_presentes:
-                    if canal not in canais_cot_list:
-                        canais_cot_list.append(canal)
-
-                if not canais_cot_list:
-                    st.info("Sem canais disponíveis para exibir os cards de COTAÇÕES.")
-                else:
-                    for i in range(0, len(canais_cot_list), 3):
-                        cols = st.columns(3, gap="medium")
-                        canais_linha = canais_cot_list[i:i + 3]
-
-                        for j, canal in enumerate(canais_linha):
-                            metricas_cot = calcular_metricas_canal_cotacoes(
-                                canal,
-                                mes_selecionado_cot,
-                                mes_anterior_cot,
-                                mes_yoy_cot
-                            )
-
-                            atual_fmt = formatar_numero_brasileiro(metricas_cot["atual"], 0)
-                            anterior_fmt = formatar_numero_brasileiro(metricas_cot["anterior"], 0)
-                            yoy_fmt = formatar_numero_brasileiro(metricas_cot["yoy"], 0)
-                            classe_mom_cot, texto_mom_cot = montar_variacao_card(metricas_cot["variacao_mom"], "vs M-1")
-                            classe_yoy_cot, texto_yoy_cot = montar_variacao_card(metricas_cot["variacao_yoy"], "vs M-12")
-                            chip_yoy = (
-                                f'<span class="kpi-meta-chip kpi-meta-chip-silentes" '
-                                f'title="M-12: referente ao mês {escape(mes_yoy_cot)}" '
-                                f'aria-label="M-12: referente ao mês {escape(mes_yoy_cot)}">'
-                                f'<span class="kpi-meta-label">M-12</span>'
-                                f'<span class="kpi-meta-value">{yoy_fmt}</span>'
-                                f'</span>'
-                            )
-
-                            with cols[j]:
-                                st.markdown(
-                                    f"""
-                                    <div class="kpi-card-dinamico animate-fade-in-up" style="margin: 0 auto 12px auto; max-width: 360px; min-height: 88px !important; padding: 9px 10px !important;" title="Resumo de novas linhas do canal {escape(canal)}" aria-label="Resumo de novas linhas do canal {escape(canal)}">
-                                        {build_kpi_title_html(canal, "canal")}
-                                        <div style="text-align: center; padding: 4px 0 2px 0;">
-                                            <div class="kpi-value-wrap"><div class="kpi-value-dinamico">{atual_fmt}</div></div>
-                                            <div class="kpi-meta-line" style="margin: 6px 0; white-space: nowrap;">
-                                                {build_kpi_meta_line(anterior_fmt, mes_anterior_ref=mes_anterior_cot)}
-                                                {chip_yoy}
-                                            </div>
-                                            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
-                                                <div class="kpi-variacao-item {classe_mom_cot}" style="font-size: 10px !important;">
-                                                    {texto_mom_cot}
-                                                </div>
-                                                <div class="kpi-variacao-item {classe_yoy_cot}" style="font-size: 10px !important;">
-                                                    {texto_yoy_cot}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    """,
-                                    unsafe_allow_html=True
-                                )
-
-                    del agg_cotacoes_pm, cotacoes_lookup
-
-            st.markdown(
-                build_visual_title_html("COTAÇÕES - VALOR MÊS A MÊS POR CANAL", "grid"),
-                unsafe_allow_html=True
-            )
-
-            tabela_cotacoes_fmt, tabela_cotacoes_num = montar_tabela_cotacoes_canais_mensal(df_cotacoes_tabela)
-            if tabela_cotacoes_fmt.empty:
-                st.info("Sem dados disponíveis para montar a tabela mensal de COTAÇÕES.")
-            else:
-                st.markdown(
-                    criar_tabela_html_backlog_canais(
-                        df_formatado=tabela_cotacoes_fmt,
-                        df_numerico=tabela_cotacoes_num,
-                        table_id="tabela-cotacoes-valor-mensal-canal"
-                    ),
-                    unsafe_allow_html=True
-                )
-                st.caption("Tabela consolidada por canal e mês, sem aplicar o filtro de regional.")
-
-            st.markdown(
-                build_visual_title_html("FUNIL CONTA - PEDIDOS X COTAÇÃO X ATIVAÇÃO", "grid"),
-                unsafe_allow_html=True
-            )
-
-            base_funil_cotacoes = globals().get("df_perf_base", pd.DataFrame())
-            if (base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True)) and "preparar_base_performance" in globals():
-                try:
-                    base_funil_cotacoes = preparar_base_performance(df)
-                except Exception:
-                    base_funil_cotacoes = pd.DataFrame()
-
-            canais_funil_lista: list[str] = []
-            if base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True) and "CANAL_PLAN" in base_funil_cotacoes.columns:
-                canais_funil_lista.extend(
-                    [
-                        canal for canal in
-                        base_funil_cotacoes["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
-                        if canal
-                    ]
-                )
-            if df_cotacoes_base is not None and not getattr(df_cotacoes_base, "empty", True) and "CANAL_PLAN" in df_cotacoes_base.columns:
-                canais_funil_lista.extend(
-                    [
-                        canal for canal in
-                        df_cotacoes_base["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
-                        if canal
-                    ]
-                )
-            canais_funil_disp = _ordenar_canais_funil_cotacoes(list(set(canais_funil_lista)))
-            opcoes_canal_funil = ["Todos"] + canais_funil_disp if canais_funil_disp else ["Todos"]
-            meses_funil_cotacoes_lista: list[str] = []
-            if base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True) and "dat_tratada" in base_funil_cotacoes.columns:
-                meses_funil_cotacoes_lista.extend(
-                    base_funil_cotacoes["dat_tratada"].dropna().astype(str).str.strip().str.lower().tolist()
-                )
-            if df_cotacoes_base is not None and not getattr(df_cotacoes_base, "empty", True):
-                col_mes_funil_cot = "mes_ano" if "mes_ano" in df_cotacoes_base.columns else (
-                    "dat_tratada" if "dat_tratada" in df_cotacoes_base.columns else None
-                )
-                if col_mes_funil_cot:
-                    meses_funil_cotacoes_lista.extend(
-                        df_cotacoes_base[col_mes_funil_cot].dropna().astype(str).str.strip().str.lower().tolist()
+                canais_funil_fixa_lista: list[str] = []
+                if base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True) and "CANAL_PLAN" in base_funil_cotacoes.columns:
+                    canais_funil_fixa_lista.extend(
+                        [
+                            canal for canal in
+                            base_funil_cotacoes["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
+                            if canal
+                        ]
                     )
-            meses_funil_cotacoes_disp = sorted(
-                list({
-                    mes for mes in meses_funil_cotacoes_lista
-                    if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
-                }),
-                key=mes_ano_para_data
-            )
-            if not meses_funil_cotacoes_disp:
-                meses_funil_cotacoes_disp = [get_mes_atual_formatado().strip().lower()]
-            mes_funil_cotacoes_default = (
-                get_mes_atual_formatado().strip().lower()
-                if get_mes_atual_formatado().strip().lower() in meses_funil_cotacoes_disp
-                else meses_funil_cotacoes_disp[-1]
-            )
+                canais_funil_fixa_disp = _ordenar_canais_funil_cotacoes(list(set(canais_funil_fixa_lista)))
+                opcoes_canal_funil_fixa = ["Todos"] + canais_funil_fixa_disp if canais_funil_fixa_disp else ["Todos"]
 
-            col_funil_filtro, col_funil_mes, col_funil_info = st.columns([0.85, 0.85, 2.10], gap="medium")
-            with col_funil_filtro:
-                render_filter_label("Canal")
-                canal_funil_cotacoes = st.selectbox(
-                    "Selecione o canal do funil de cotações",
-                    options=opcoes_canal_funil,
-                    index=0,
-                    key="cotacoes_funil_canal",
-                    label_visibility="collapsed"
-                )
-            with col_funil_mes:
-                render_filter_label("Mês Atual")
-                mes_funil_cotacoes_sel = st.selectbox(
-                    "Selecione o mês atual do funil de cotações",
-                    options=meses_funil_cotacoes_disp,
-                    index=meses_funil_cotacoes_disp.index(mes_funil_cotacoes_default),
-                    key="cotacoes_funil_mes",
-                    label_visibility="collapsed"
-                )
-            with col_funil_info:
-                mes_funil_cotacoes_m1 = get_mes_anterior(mes_funil_cotacoes_sel)
-                st.markdown(
-                    f"""
-                    <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
-                                border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-                                color: #6B1F1A; font-size: 12px; font-weight: 600;">
-                        Mês atual: {mes_funil_cotacoes_sel.upper()} | MoM: {mes_funil_cotacoes_sel.upper()} vs {mes_funil_cotacoes_m1.upper()}.
-                        A tabela carrega a série até o mês selecionado. Se o mês selecionado for o atual, o funil usa
-                        tendência nas bases que já trazem projeção e, em COTAÇÃO, aplica pace por dias úteis.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-            tabela_funil_fmt, tabela_funil_num = montar_tabela_funil_cotacoes(
-                df_base_principal=base_funil_cotacoes,
-                df_cotacoes_base=df_cotacoes_base,
-                canal_ref=canal_funil_cotacoes,
-                mes_ref=mes_funil_cotacoes_sel
-            )
-            if tabela_funil_fmt.empty:
-                st.info("Sem dados disponíveis para montar a tabela do funil de COTAÇÕES.")
-            else:
-                st.markdown(
-                    criar_tabela_html_funil_cotacoes(
-                        df_formatado=tabela_funil_fmt,
-                        df_numerico=tabela_funil_num,
-                        table_id="tabela-cotacoes-funil-integrado"
-                    ),
-                    unsafe_allow_html=True
-                )
-                st.caption(
-                    "Série exibida do mesmo mês do ano anterior até o mês atual selecionado. "
-                    "ATIVAÇÃO considera apenas o produto CONTA; para Televendas Receptivo, a entrada passa a ser LIGAÇÕES. "
-                    "Nos demais canais sem demanda de entrada, as linhas de PEDIDOS/LIGAÇÕES e da conversão inicial ficam ocultas. "
-                    "A coluna MoM passa a comparar exatamente o mês atual escolhido contra o M-1 correspondente."
-                )
-
-            st.markdown(
-                build_visual_title_html("FUNIL FIXA - PEDIDOS X VENDA BRUTA X INSTALADOS", "grid"),
-                unsafe_allow_html=True
-            )
-
-            meses_funil_fixa_disp: list[str] = []
-            if base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True) and "dat_tratada" in base_funil_cotacoes.columns:
-                meses_funil_fixa_disp = sorted(
-                    list({
-                        mes for mes in
-                        base_funil_cotacoes["dat_tratada"].dropna().astype(str).str.strip().str.lower().tolist()
-                        if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
-                    }),
-                    key=mes_ano_para_data
-                )
-            if not meses_funil_fixa_disp:
-                meses_funil_fixa_disp = [get_mes_atual_formatado().strip().lower()]
-            mes_funil_fixa_default = (
-                mes_funil_cotacoes_sel
-                if mes_funil_cotacoes_sel in meses_funil_fixa_disp
-                else (
+                meses_funil_fixa_disp: list[str] = []
+                if base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True) and "dat_tratada" in base_funil_cotacoes.columns:
+                    meses_funil_fixa_disp = sorted(
+                        list({
+                            mes for mes in
+                            base_funil_cotacoes["dat_tratada"].dropna().astype(str).str.strip().str.lower().tolist()
+                            if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
+                        }),
+                        key=mes_ano_para_data
+                    )
+                if not meses_funil_fixa_disp:
+                    meses_funil_fixa_disp = [get_mes_atual_formatado().strip().lower()]
+                mes_funil_fixa_default = (
                     get_mes_atual_formatado().strip().lower()
                     if get_mes_atual_formatado().strip().lower() in meses_funil_fixa_disp
                     else meses_funil_fixa_disp[-1]
                 )
-            )
 
-            col_funil_fixa_mes, col_funil_fixa_info = st.columns([0.85, 3.15], gap="medium")
-            with col_funil_fixa_mes:
-                render_filter_label("Mês Atual")
-                mes_funil_fixa_sel = st.selectbox(
-                    "Selecione o mês atual do funil fixa",
-                    options=meses_funil_fixa_disp,
-                    index=meses_funil_fixa_disp.index(mes_funil_fixa_default),
-                    key="cotacoes_funil_fixa_mes",
-                    label_visibility="collapsed"
-                )
-            with col_funil_fixa_info:
-                mes_funil_fixa_m1 = get_mes_anterior(mes_funil_fixa_sel)
-                st.markdown(
-                    f"""
-                    <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
-                                border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-                                color: #6B1F1A; font-size: 12px; font-weight: 600;">
-                        Mês atual: {mes_funil_fixa_sel.upper()} | MoM: {mes_funil_fixa_sel.upper()} vs {mes_funil_fixa_m1.upper()}.
-                        A tabela do funil FIXA também respeita o mês selecionado para encerrar a série e calcular a variação mensal.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                col_funil_fixa_canal, col_funil_fixa_mes, col_funil_fixa_info = st.columns([0.95, 0.85, 2.20], gap="medium")
+                with col_funil_fixa_canal:
+                    render_filter_label("Canal")
+                    canal_funil_fixa_sel = st.selectbox(
+                        "Selecione o canal do funil fixa",
+                        options=opcoes_canal_funil_fixa,
+                        index=0,
+                        key="funil_fixa_legado_canal",
+                        label_visibility="collapsed"
+                    )
+                with col_funil_fixa_mes:
+                    render_filter_label("Mês Atual")
+                    mes_funil_fixa_sel = st.selectbox(
+                        "Selecione o mês atual do funil fixa",
+                        options=meses_funil_fixa_disp,
+                        index=meses_funil_fixa_disp.index(mes_funil_fixa_default),
+                        key="funil_fixa_legado_mes",
+                        label_visibility="collapsed"
+                    )
+                with col_funil_fixa_info:
+                    mes_funil_fixa_m1 = get_mes_anterior(mes_funil_fixa_sel)
+                    st.markdown(
+                        f"""
+                        <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
+                                    border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+                                    color: #6B1F1A; font-size: 12px; font-weight: 600;">
+                            Mês atual: {mes_funil_fixa_sel.upper()} | MoM: {mes_funil_fixa_sel.upper()} vs {mes_funil_fixa_m1.upper()}.
+                            A tabela do funil FIXA também respeita o mês selecionado para encerrar a série e calcular a variação mensal.
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
-            tabela_funil_fixa_fmt, tabela_funil_fixa_num = montar_tabela_funil_fixa(
-                df_base_principal=base_funil_cotacoes,
-                canal_ref=canal_funil_cotacoes,
-                mes_ref=mes_funil_fixa_sel
-            )
-            if tabela_funil_fixa_fmt.empty:
-                st.info("Sem dados disponíveis para montar a tabela do funil FIXA.")
-            else:
-                st.markdown(
-                    criar_tabela_html_funil_cotacoes(
-                        df_formatado=tabela_funil_fixa_fmt,
-                        df_numerico=tabela_funil_fixa_num,
-                        table_id="tabela-cotacoes-funil-fixa"
-                    ),
-                    unsafe_allow_html=True
+                tabela_funil_fixa_fmt, tabela_funil_fixa_num = montar_tabela_funil_fixa(
+                    df_base_principal=base_funil_cotacoes,
+                    canal_ref=canal_funil_fixa_sel,
+                    mes_ref=mes_funil_fixa_sel
                 )
-                st.caption(
-                    "Série exibida do mesmo mês do ano anterior até o mês foco selecionado. "
-                    "No funil FIXA, os indicadores vêm da base principal do produto FIXA; para Televendas Receptivo, a entrada passa a ser LIGAÇÕES. "
-                    "Nos demais canais sem demanda de entrada, as linhas de PEDIDOS/LIGAÇÕES e da conversão inicial ficam ocultas. "
-                    "A coluna MoM passa a comparar exatamente o mês foco escolhido contra o M-1 correspondente."
-                )
+                if tabela_funil_fixa_fmt.empty:
+                    st.info("Sem dados disponíveis para montar a tabela do funil FIXA.")
+                else:
+                    st.markdown(
+                        criar_tabela_html_funil_cotacoes(
+                            df_formatado=tabela_funil_fixa_fmt,
+                            df_numerico=tabela_funil_fixa_num,
+                            table_id="tabela-cotacoes-funil-fixa"
+                        ),
+                        unsafe_allow_html=True
+                    )
+                    st.caption(
+                        "Série exibida do mesmo mês do ano anterior até o mês foco selecionado. "
+                        "No funil FIXA, os indicadores vêm da base principal do produto FIXA; para Televendas Receptivo, a entrada passa a ser LIGAÇÕES. "
+                        "Nos demais canais sem demanda de entrada, as linhas de PEDIDOS/LIGAÇÕES e da conversão inicial ficam ocultas. "
+                        "A coluna MoM passa a comparar exatamente o mês foco escolhido contra o M-1 correspondente."
+                    )
 
+with tab5:
+    df_cotacoes_base_movel = globals().get("df_cotacoes_base", pd.DataFrame())
+    df_cotacoes_tabela_movel = globals().get("df_cotacoes_tabela", pd.DataFrame())
+
+    if df_cotacoes_tabela_movel is not None and not getattr(df_cotacoes_tabela_movel, "empty", True):
+        st.markdown(
+            build_visual_title_html("COTAÇÕES - VALOR MÊS A MÊS POR CANAL", "grid", "subsection-title", extra_style="margin-top:18px;"),
+            unsafe_allow_html=True
+        )
+        tabela_cotacoes_fmt, tabela_cotacoes_num = montar_tabela_cotacoes_canais_mensal(df_cotacoes_tabela_movel)
+        if tabela_cotacoes_fmt.empty:
+            st.info("Sem dados disponíveis para montar a tabela mensal de COTAÇÕES.")
+        else:
             st.markdown(
-                build_visual_title_html("CASCATA DE NOVAS LINHAS POR STATUS ATUAL", "trend"),
+                criar_tabela_html_backlog_canais(
+                    df_formatado=tabela_cotacoes_fmt,
+                    df_numerico=tabela_cotacoes_num,
+                    table_id="tabela-funil-movel-cotacoes-valor-mensal"
+                ),
+                unsafe_allow_html=True
+            )
+            st.caption("Tabela consolidada por canal e mês, sem aplicar o filtro de regional.")
+
+    base_funil_cotacoes = globals().get("df_perf_base", pd.DataFrame())
+    if (base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True)) and "preparar_base_performance" in globals():
+        try:
+            base_funil_cotacoes = preparar_base_performance(df)
+        except Exception:
+            base_funil_cotacoes = pd.DataFrame()
+
+    if (
+        base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True)
+        and df_cotacoes_base_movel is not None and not getattr(df_cotacoes_base_movel, "empty", True)
+    ):
+        st.markdown(
+            build_visual_title_html("FUNIL CONTA - PEDIDOS X COTAÇÃO X ATIVAÇÃO", "grid", "subsection-title", extra_style="margin-top:18px;"),
+            unsafe_allow_html=True
+        )
+
+        canais_funil_lista: list[str] = []
+        if "CANAL_PLAN" in base_funil_cotacoes.columns:
+            canais_funil_lista.extend(
+                [
+                    canal for canal in
+                    base_funil_cotacoes["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
+                    if canal
+                ]
+            )
+        if "CANAL_PLAN" in df_cotacoes_base_movel.columns:
+            canais_funil_lista.extend(
+                [
+                    canal for canal in
+                    df_cotacoes_base_movel["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
+                    if canal
+                ]
+            )
+        canais_funil_disp = _ordenar_canais_funil_cotacoes(list(set(canais_funil_lista)))
+        opcoes_canal_funil = ["Todos"] + canais_funil_disp if canais_funil_disp else ["Todos"]
+
+        meses_funil_cotacoes_lista: list[str] = []
+        if "dat_tratada" in base_funil_cotacoes.columns:
+            meses_funil_cotacoes_lista.extend(
+                base_funil_cotacoes["dat_tratada"].dropna().astype(str).str.strip().str.lower().tolist()
+            )
+        col_mes_funil_cot = "mes_ano" if "mes_ano" in df_cotacoes_base_movel.columns else (
+            "dat_tratada" if "dat_tratada" in df_cotacoes_base_movel.columns else None
+        )
+        if col_mes_funil_cot:
+            meses_funil_cotacoes_lista.extend(
+                df_cotacoes_base_movel[col_mes_funil_cot].dropna().astype(str).str.strip().str.lower().tolist()
+            )
+        meses_funil_cotacoes_disp = sorted(
+            list({
+                mes for mes in meses_funil_cotacoes_lista
+                if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
+            }),
+            key=mes_ano_para_data
+        )
+        if not meses_funil_cotacoes_disp:
+            meses_funil_cotacoes_disp = [get_mes_atual_formatado().strip().lower()]
+        mes_funil_cotacoes_default = (
+            get_mes_atual_formatado().strip().lower()
+            if get_mes_atual_formatado().strip().lower() in meses_funil_cotacoes_disp
+            else meses_funil_cotacoes_disp[-1]
+        )
+
+        col_funil_filtro, col_funil_mes, col_funil_info = st.columns([0.85, 0.85, 2.10], gap="medium")
+        with col_funil_filtro:
+            render_filter_label("Canal")
+            canal_funil_cotacoes = st.selectbox(
+                "Selecione o canal do funil de cotações",
+                options=opcoes_canal_funil,
+                index=0,
+                key="funil_movel_cotacoes_funil_canal",
+                label_visibility="collapsed"
+            )
+        with col_funil_mes:
+            render_filter_label("Mês Atual")
+            mes_funil_cotacoes_sel = st.selectbox(
+                "Selecione o mês atual do funil de cotações",
+                options=meses_funil_cotacoes_disp,
+                index=meses_funil_cotacoes_disp.index(mes_funil_cotacoes_default),
+                key="funil_movel_cotacoes_funil_mes",
+                label_visibility="collapsed"
+            )
+        with col_funil_info:
+            mes_funil_cotacoes_m1 = get_mes_anterior(mes_funil_cotacoes_sel)
+            st.markdown(
+                f"""
+                <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
+                            border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+                            color: #6B1F1A; font-size: 12px; font-weight: 600;">
+                    Mês atual: {mes_funil_cotacoes_sel.upper()} | MoM: {mes_funil_cotacoes_sel.upper()} vs {mes_funil_cotacoes_m1.upper()}.
+                    A tabela carrega a série até o mês selecionado. Se o mês selecionado for o atual, o funil usa
+                    tendência nas bases que já trazem projeção e, em COTAÇÃO, aplica pace por dias úteis.
+                </div>
+                """,
                 unsafe_allow_html=True
             )
 
-            meses_cascata_disp = sorted(
-                df_cotacoes_agregado["mes_ano"].dropna().astype(str).unique().tolist(),
-                key=mes_ano_para_data
+        tabela_funil_fmt, tabela_funil_num = montar_tabela_funil_cotacoes(
+            df_base_principal=base_funil_cotacoes,
+            df_cotacoes_base=df_cotacoes_base_movel,
+            canal_ref=canal_funil_cotacoes,
+            mes_ref=mes_funil_cotacoes_sel
+        )
+        if tabela_funil_fmt.empty:
+            st.info("Sem dados disponíveis para montar a tabela do funil de COTAÇÕES.")
+        else:
+            st.markdown(
+                criar_tabela_html_funil_cotacoes(
+                    df_formatado=tabela_funil_fmt,
+                    df_numerico=tabela_funil_num,
+                    table_id="tabela-funil-movel-cotacoes-funil-integrado"
+                ),
+                unsafe_allow_html=True
             )
-            canais_cascata_disp = ["Todos"] + sorted(
-                df_cotacoes_agregado["CANAL_PLAN"].dropna().astype(str).str.strip().unique().tolist()
+            st.caption(
+                "Série exibida do mesmo mês do ano anterior até o mês atual selecionado. "
+                "ATIVAÇÃO considera apenas o produto CONTA; para Televendas Receptivo, a entrada passa a ser LIGAÇÕES. "
+                "Nos demais canais sem demanda de entrada, as linhas de PEDIDOS/LIGAÇÕES e da conversão inicial ficam ocultas. "
+                "A coluna MoM passa a comparar exatamente o mês atual escolhido contra o M-1 correspondente."
             )
-            regionais_cascata_disp = ["Todas"] + sorted(
-                df_cotacoes_agregado["REGIONAL"].dropna().astype(str).str.strip().unique().tolist()
-            )
-
-            mes_cascata_default = (
-                get_mes_atual_formatado()
-                if get_mes_atual_formatado() in meses_cascata_disp
-                else (meses_cascata_disp[-1] if meses_cascata_disp else "")
-            )
-
-            col_cascata_f1, col_cascata_f2, col_cascata_f3 = st.columns([1.0, 1.0, 1.0], gap="medium")
-            with col_cascata_f1:
-                render_filter_label("Mês")
-                mes_cascata_sel = st.selectbox(
-                    "Mês da cascata",
-                    options=meses_cascata_disp,
-                    index=meses_cascata_disp.index(mes_cascata_default) if mes_cascata_default in meses_cascata_disp else 0,
-                    key="cotacoes_cascata_mes",
-                    label_visibility="collapsed"
-                )
-            with col_cascata_f2:
-                render_filter_label("Canal")
-                canal_cascata_sel = st.selectbox(
-                    "Canal da cascata",
-                    options=canais_cascata_disp,
-                    index=0,
-                    key="cotacoes_cascata_canal",
-                    label_visibility="collapsed"
-                )
-            with col_cascata_f3:
-                render_filter_label("Regional")
-                regional_cascata_sel = st.selectbox(
-                    "Regional da cascata",
-                    options=regionais_cascata_disp,
-                    index=0,
-                    key="cotacoes_cascata_regional",
-                    label_visibility="collapsed"
-                )
-
-            df_cascata = df_cotacoes_agregado.loc[df_cotacoes_agregado["mes_ano"].eq(mes_cascata_sel)]
-            if canal_cascata_sel != "Todos":
-                df_cascata = df_cascata.loc[df_cascata["CANAL_PLAN"].eq(canal_cascata_sel)]
-            if regional_cascata_sel != "Todas":
-                df_cascata = df_cascata.loc[df_cascata["REGIONAL"].eq(regional_cascata_sel)]
-
-            if df_cascata.empty:
-                st.info("Sem dados para o gráfico cascata com os filtros selecionados.")
-            else:
-                df_status_cascata = (
-                    df_cascata.groupby("STATUS_ATUAL", as_index=False, observed=True)["VALOR_NOVAS_LINHAS"]
-                    .sum()
-                    .sort_values(["VALOR_NOVAS_LINHAS", "STATUS_ATUAL"], ascending=[False, True], ignore_index=True)
-                )
-
-                status_labels = df_status_cascata["STATUS_ATUAL"].astype(str).tolist()
-                status_values = pd.to_numeric(df_status_cascata["VALOR_NOVAS_LINHAS"], errors="coerce").fillna(0).astype(float).tolist()
-                total_cotacoes_cascata = float(sum(status_values))
-                labels_cascata = status_labels + ["Total"]
-                valores_cascata = status_values + [total_cotacoes_cascata]
-                medidas_cascata = ["relative"] * len(status_values) + ["total"]
-                textos_cascata = [formatar_numero_brasileiro(v, 0) for v in valores_cascata]
-
-                fig_cascata = go.Figure(
-                    go.Waterfall(
-                        orientation="v",
-                        measure=medidas_cascata,
-                        x=labels_cascata,
-                        y=valores_cascata,
-                        text=textos_cascata,
-                        textposition="outside",
-                        increasing={"marker": {"color": "#FF2800", "line": {"color": "#FFFFFF", "width": 1.2}}},
-                        decreasing={"marker": {"color": "#790E09", "line": {"color": "#FFFFFF", "width": 1.2}}},
-                        totals={"marker": {"color": "#5A0A06", "line": {"color": "#FFFFFF", "width": 1.2}}},
-                        connector={"line": {"color": "rgba(90, 98, 104, 0.48)", "width": 1.4}},
-                        customdata=textos_cascata,
-                        hovertemplate="<b>%{x}</b><br><b>Novas linhas a ativar:</b> %{customdata}<extra></extra>"
-                    )
-                )
-
-                fig_cascata.update_layout(
-                    plot_bgcolor="#FFFFFF",
-                    paper_bgcolor="#F4F7FB",
-                    font=dict(family="Segoe UI", size=13, color="#2F3747"),
-                    margin=dict(l=28, r=22, t=68, b=110),
-                    xaxis=dict(
-                        title="",
-                        tickangle=-24,
-                        tickfont=dict(size=11, color="#5B6578"),
-                        showgrid=False,
-                        linecolor="#E2E8F0",
-                        linewidth=1.2,
-                        ticks="outside",
-                        ticklen=5
-                    ),
-                    yaxis=dict(
-                        title="",
-                        tickfont=dict(size=12, color="#5B6578"),
-                        showgrid=True,
-                        gridcolor="rgba(226, 232, 240, 0.76)",
-                        gridwidth=1,
-                        linecolor="#E2E8F0",
-                        linewidth=1.2,
-                        zeroline=False
-                    ),
-                    showlegend=False,
-                    hoverlabel=dict(
-                        bgcolor="white",
-                        bordercolor="#E2E8F0",
-                        font_size=12,
-                        font_family="Segoe UI",
-                        font_color="#2F3747"
-                    )
-                )
-                apply_standard_title_style(fig_cascata, size=16)
-
-                st.markdown(
-                    f"""
-                    <div class="info-box" style="margin: 0 0 12px 0; padding: 10px 14px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                            <div style="font-size:13px; color:#5B6578; font-weight:700;">
-                                Cada barra representa a soma de <b>novas linhas a serem ativadas</b> no <b>STATUS ATUAL</b>, após aplicar a regra de filtro da base.
-                            </div>
-                            <div style="font-size:13px; color:#790E09; font-weight:800;">
-                                Total filtrado: {formatar_numero_brasileiro(total_cotacoes_cascata, 0)}
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-                st.plotly_chart(
-                    fig_cascata,
-                    width="stretch",
-                    config={"displayModeBar": False, "displaylogo": False}
-                )
-                del df_cascata, df_status_cascata
 
 def build_home_source_filters_html(info_text: object, titulo: str = "Filtros de Origem") -> str:
     partes = [
