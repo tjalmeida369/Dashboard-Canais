@@ -238,7 +238,7 @@ DASHBOARD_APP_DIR = Path(__file__).resolve().parent
 DASHBOARD_FILES_DIR_PROD = Path(
     r""
 )
-DASHBOARD_FILES_DIR_LOCAL = DASHBOARD_APP_DIR / ""
+DASHBOARD_FILES_DIR_LOCAL = DASHBOARD_APP_DIR / "Arquivos_Dashboard"
 DASHBOARD_FILES_DIR = (
     DASHBOARD_FILES_DIR_PROD
     if DASHBOARD_FILES_DIR_PROD.exists()
@@ -12741,14 +12741,14 @@ def criar_grafico_funil_segmentado_fixa(
 def render_visual_funil_fixa_ecommerce() -> None:
     funil_candidates = [
         FUNIL_FIXA_FILE_PATH,
-        Path("base_funil_ecomm_fixa.xlsx"),
+        Path(r"base_funil_ecomm_fixa.xlsx"),
         Path(__file__).with_name('base_funil_ecomm_fixa.xlsx')
     ]
     funil_path = next((path for path in funil_candidates if Path(path).exists()), None)
     tend_candidates = [
         TEND_FUNIL_FIXA_FILE_PATH,
         Path(__file__).with_name('tend_funil_ecom.xlsx'),
-        Path("tend_funil_ecom.xlsx")
+        Path(r"tend_funil_ecom.xlsx")
     ]
     tend_path = next((path for path in tend_candidates if Path(path).exists()), None)
 
@@ -21506,7 +21506,7 @@ with tab5:
                 ]
                 opcoes_regional_migracoes = ["Todos"] + regionais_migracoes_disp
 
-                col_mig_filtro, col_mig_info = st.columns([0.95, 2.55], gap="medium")
+                col_mig_filtro, col_mig_spacer = st.columns([0.95, 2.55], gap="medium")
                 with col_mig_filtro:
                     render_filter_label("Regional")
                     regional_migracoes_ref = st.selectbox(
@@ -21516,18 +21516,8 @@ with tab5:
                         key="funil_movel_migracoes_pme_regional",
                         label_visibility="collapsed"
                     )
-                with col_mig_info:
-                    st.markdown(
-                        """
-                        <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
-                                    border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-                                    color: #6B1F1A; font-size: 12px; font-weight: 600;">
-                            Série mensal de migrações por regional, limitada ao mês selecionado no filtro de MoM.
-                            Quando o mês selecionado é tendência, ela é calculada pela média móvel dos 3 últimos meses.
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                with col_mig_spacer:
+                    st.empty()
 
                 serie_grafico_migracoes = montar_serie_grafico_migracoes_pme(
                     tabela_migracoes_num,
