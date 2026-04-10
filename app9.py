@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit.components.v1 as components
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -4277,7 +4278,7 @@ def load_cotacoes_data(
     except Exception:
         return pd.DataFrame()
 
-    coluna_cotacao = encontrar_coluna_por_alias(header_df.columns, "COTAÇÃO", "COTACAO")
+    coluna_cotacao = encontrar_coluna_por_alias(header_df.columns, "FÚNIL FIXA", "COTACAO")
     coluna_data = encontrar_coluna_por_alias(
         header_df.columns,
         "DATA CRIAÇÃO COTAÇÃO",
@@ -6941,8 +6942,8 @@ def build_visual_title_html(
     subtitle: str | None = None,
     extra_style: str | None = None
 ) -> str:
-    """Monta t?tulos visuais no mesmo HTML estrutural usado pelo app10."""
-    title_limpo = limpar_texto_visual(title, default=limpar_texto_visual(icon_hint, default="VIS?O"))
+    """Monta títulos visuais no mesmo HTML estrutural usado pelo app10."""
+    title_limpo = limpar_texto_visual(title, default=limpar_texto_visual(icon_hint, default="VISÃO"))
     subtitle_limpo = limpar_texto_visual(subtitle)
     title_txt = escape(title_limpo)
     icon_svg = get_kpi_icon_svg(icon_hint or title_limpo)
@@ -7507,7 +7508,7 @@ def compactar_resumo_evolucao_mensal(fig: go.Figure, altura: int) -> go.Figure:
         return fig
 
     fig.update_layout(
-        height=max(int(altura * 1.18), altura + 26),
+        height=int(altura),
         margin=dict(l=8, r=6, t=18, b=24)
     )
     return fig
@@ -8223,14 +8224,16 @@ def criar_grafico_barras_resumo_evolucao_semanal(
     categorias_totais: list[str],
     valores_totais: list[float],
     cores_totais: list[str],
-    altura: int = 460
+    altura: int = 460,
+    comparacoes: list[dict[str, int]] | None = None
 ) -> go.Figure:
     """Cria o grafico lateral semanal no mesmo padrao visual dos resumos mensais."""
     return _criar_grafico_barras_resumo_comparativo(
         categorias=categorias_totais,
         valores=valores_totais,
         cores=cores_totais,
-        altura=altura
+        altura=altura,
+        comparacoes=comparacoes
     )
 
 def criar_grafico_barras_resumo_evolucao_mensal(
@@ -11338,6 +11341,1306 @@ def validate_data(df):
     
     return True
 
+
+
+# ==============================
+# BLOCO ADICIONAL - FUNIL FIXA E-COMMERCE
+# ==============================
+FUNIL_FIXA_FILE_PATH = Path(
+    "base_funil_ecomm_fixa.xlsx"
+)
+
+TEND_FUNIL_FIXA_FILE_PATH = Path(
+    "tend_funil_ecom.xlsx"
+)
+
+FUNIL_FIXA_INDICADORES_CONFIG = [
+    ("INVESTIMENTO", "INVESTIMENTO", 1),
+    ("SESSOES", "SESSÕES", 2),
+    ("PORTEIRA_CEP", "PORTEIRA CEP", 3),
+    ("DADOS_PESSOAIS", "DADOS PESSOAIS", 4),
+    ("ENDERECO", "ENDEREÇO", 5),
+    ("PAGAMENTO", "PAGAMENTO", 6),
+    ("PEDIDOS_TOTAL", "PEDIDOS_TOTAL", 7),
+    ("VENDA_BRUTA", "VENDA BRUTA", 8),
+    ("INSTALACAO", "INSTALAÇÃO", 9),
+]
+FUNIL_FIXA_INDICADOR_LABELS = {
+    chave: label for chave, label, _ in FUNIL_FIXA_INDICADORES_CONFIG
+}
+FUNIL_FIXA_INDICADOR_ORDENS = {
+    chave: ordem for chave, _, ordem in FUNIL_FIXA_INDICADORES_CONFIG
+}
+
+
+def _normalizar_chave_funil_fixa(valor) -> str:
+    if pd.isna(valor):
+        return ""
+    texto = unicodedata.normalize("NFKD", str(valor))
+    texto = texto.encode("ASCII", "ignore").decode("ASCII")
+    texto = texto.strip().upper()
+    texto = re.sub(r"[^A-Z0-9]+", "_", texto)
+    return re.sub(r"_+", "_", texto).strip("_")
+
+
+def _encontrar_coluna_funil_fixa(colunas, *aliases: str) -> str | None:
+    mapa = {}
+    # Normalizar entrada: garantir que podemos iterar sobre `colunas`.
+    # Evitar avaliar a truthiness de objetos como pandas.Index (causa ValueError).
+    if colunas is None:
+        iterable_colunas = []
+    else:
+        try:
+            iterable_colunas = list(colunas)
+        except Exception:
+            # Tentativa de recuperar via tolist (Index/array-like)
+            try:
+                iterable_colunas = list(colunas.tolist())
+            except Exception:
+                iterable_colunas = []
+
+    for coluna in iterable_colunas:
+        try:
+            chave = _normalizar_chave_funil_fixa(coluna)
+        except Exception:
+            chave = ""
+        if chave and chave not in mapa:
+            mapa[chave] = coluna
+    for alias in aliases:
+        chave_alias = _normalizar_chave_funil_fixa(alias)
+        if chave_alias in mapa:
+            return mapa[chave_alias]
+    return None
+
+
+def _formatar_mes_ano_funil_fixa(data_ref) -> str:
+    try:
+        ts = pd.Timestamp(data_ref)
+        if pd.isna(ts):
+            return ""
+        meses_pt = {
+            1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+            7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+        }
+        return f"{meses_pt.get(int(ts.month), 'jan')}/{str(int(ts.year))[-2:]}"
+    except Exception:
+        return ""
+
+
+def _normalizar_segmento_funil_fixa(valor) -> str:
+    chave = _normalizar_chave_funil_fixa(valor)
+    if chave == "RESIDENCIAL_CABO":
+        return "PF"
+    if chave == "PF":
+        return "PF"
+    if chave == "PME":
+        return "PME"
+    return str(valor).strip()
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    _ = file_mtime
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    df_raw = pd.read_excel(path_obj, engine='openpyxl')
+    if df_raw is None or df_raw.empty:
+        return pd.DataFrame()
+
+    col_segmento = _encontrar_coluna_funil_fixa(df_raw.columns, 'SEGMENTO')
+    col_indicador = _encontrar_coluna_funil_fixa(df_raw.columns, 'INDICADOR')
+    col_periodo = _encontrar_coluna_funil_fixa(df_raw.columns, 'PERIODO', 'PERIODO_MES', 'PERIODO MES')
+    col_qtde = _encontrar_coluna_funil_fixa(df_raw.columns, 'QTDE')
+    obrigatorias = [col_segmento, col_indicador, col_periodo, col_qtde]
+    if any(col is None for col in obrigatorias):
+        return pd.DataFrame()
+
+    df = df_raw.rename(columns={
+        col_segmento: 'SEGMENTO',
+        col_indicador: 'INDICADOR',
+        col_periodo: 'PERIODO_MES',
+        col_qtde: 'QTDE',
+    })[['SEGMENTO', 'INDICADOR', 'PERIODO_MES', 'QTDE']].copy()
+
+    df['SEGMENTO'] = df['SEGMENTO'].map(_normalizar_segmento_funil_fixa)
+    df['INDICADOR_CHAVE'] = df['INDICADOR'].map(_normalizar_chave_funil_fixa)
+    df = df[df['SEGMENTO'].isin(['PF', 'PME'])].copy()
+    df = df[df['INDICADOR_CHAVE'].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
+    df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(999.0)
+    df['PERIODO_MES'] = pd.to_datetime(df['PERIODO_MES'], errors='coerce', dayfirst=True)
+    df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0.0)
+    df = df[df['PERIODO_MES'].notna()].copy()
+    df['MES_ANO'] = df['PERIODO_MES'].apply(_formatar_mes_ano_funil_fixa).astype(str).str.strip().str.lower()
+    df['MES_ANO_ORDEM'] = (df['PERIODO_MES'].dt.year * 100 + df['PERIODO_MES'].dt.month).astype(int)
+    return df
+
+
+def _calcular_pesos_origem_tend_funil_fixa(
+    df_base: pd.DataFrame,
+    segmento_ref: str,
+    indicador_ref: str,
+    mes_ref_ordem: int,
+    qtd_meses_hist: int = 3
+) -> pd.Series:
+    if df_base is None or df_base.empty:
+        return pd.Series(dtype=float)
+
+    base_ref = df_base[
+        df_base['SEGMENTO'].astype(str).eq(str(segmento_ref)) &
+        df_base['INDICADOR'].astype(str).eq(str(indicador_ref))
+    ].copy()
+    if base_ref.empty:
+        return pd.Series(dtype=float)
+
+    meses_hist = sorted(
+        base_ref.loc[
+            pd.to_numeric(base_ref['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).lt(int(mes_ref_ordem)),
+            'MES_ANO_ORDEM'
+        ].dropna().astype(int).unique().tolist()
+    )[-max(int(qtd_meses_hist), 1):]
+
+    base_hist = base_ref[base_ref['MES_ANO_ORDEM'].isin(meses_hist)].copy()
+    if not base_hist.empty:
+        tabela_hist = base_hist.pivot_table(
+            index='ORIGEM_AGG',
+            columns='MES_ANO_ORDEM',
+            values='QTDE',
+            aggfunc='sum',
+            fill_value=0.0
+        )
+        pesos = pd.to_numeric(tabela_hist.mean(axis=1), errors='coerce').fillna(0.0)
+        pesos = pesos[pesos.gt(0)]
+        if not pesos.empty and float(pesos.sum()) > 0:
+            return pesos / float(pesos.sum())
+
+    base_prev = base_ref[
+        pd.to_numeric(base_ref['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).lt(int(mes_ref_ordem))
+    ].copy()
+    if not base_prev.empty:
+        pesos = pd.to_numeric(
+            base_prev.groupby('ORIGEM_AGG', observed=True)['QTDE'].sum(),
+            errors='coerce'
+        ).fillna(0.0)
+        pesos = pesos[pesos.gt(0)]
+        if not pesos.empty and float(pesos.sum()) > 0:
+            return pesos / float(pesos.sum())
+
+    base_mes = base_ref[
+        pd.to_numeric(base_ref['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).eq(int(mes_ref_ordem))
+    ].copy()
+    if not base_mes.empty:
+        pesos = pd.to_numeric(
+            base_mes.groupby('ORIGEM_AGG', observed=True)['QTDE'].sum(),
+            errors='coerce'
+        ).fillna(0.0)
+        pesos = pesos[pesos.gt(0)]
+        if not pesos.empty and float(pesos.sum()) > 0:
+            return pesos / float(pesos.sum())
+
+    origens_hist = sorted(base_ref['ORIGEM_AGG'].dropna().astype(str).str.strip().unique().tolist())
+    if origens_hist:
+        peso_uniforme = 1.0 / float(len(origens_hist))
+        return pd.Series({origem: peso_uniforme for origem in origens_hist}, dtype=float)
+
+    return pd.Series({'DEMAIS': 1.0}, dtype=float)
+
+
+def _aplicar_tend_funil_fixa(df_funil: pd.DataFrame, df_tend: pd.DataFrame) -> pd.DataFrame:
+    if df_funil is None or df_funil.empty:
+        return pd.DataFrame()
+
+    base = df_funil.copy()
+    base['EH_TEND'] = pd.to_numeric(base.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
+    if df_tend is None or df_tend.empty:
+        return base
+
+    base_sem_tend = base.copy()
+    chaves_tend = (
+        df_tend[['SEGMENTO', 'INDICADOR', 'MES_ANO_ORDEM']]
+        .drop_duplicates()
+        .to_dict('records')
+    )
+    for chave in chaves_tend:
+        segmento_ref = str(chave['SEGMENTO']).strip()
+        indicador_ref = str(chave['INDICADOR']).strip()
+        mes_ref_ordem = int(chave['MES_ANO_ORDEM'])
+        base_sem_tend = base_sem_tend[
+            ~(
+                base_sem_tend['SEGMENTO'].astype(str).eq(segmento_ref) &
+                base_sem_tend['INDICADOR'].astype(str).eq(indicador_ref) &
+                pd.to_numeric(base_sem_tend['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).eq(mes_ref_ordem)
+            )
+        ].copy()
+
+    linhas_tend = []
+    for _, linha_tend in df_tend.iterrows():
+        segmento_ref = str(linha_tend.get('SEGMENTO', '')).strip()
+        indicador_ref = str(linha_tend.get('INDICADOR', '')).strip()
+        indicador_chave = str(linha_tend.get('INDICADOR_CHAVE', '')).strip()
+        indicador_ordem = float(pd.to_numeric(pd.Series([linha_tend.get('INDICADOR_ORDEM', 999.0)]), errors='coerce').fillna(999.0).iloc[0])
+        mes_ref_ordem = int(pd.to_numeric(pd.Series([linha_tend.get('MES_ANO_ORDEM', 0)]), errors='coerce').fillna(0).iloc[0])
+        qtde_tend = float(pd.to_numeric(pd.Series([linha_tend.get('QTDE', 0.0)]), errors='coerce').fillna(0.0).iloc[0])
+        if qtde_tend <= 0 or mes_ref_ordem <= 0:
+            continue
+
+        pesos_origem = _calcular_pesos_origem_tend_funil_fixa(
+            df_base=base,
+            segmento_ref=segmento_ref,
+            indicador_ref=indicador_ref,
+            mes_ref_ordem=mes_ref_ordem,
+            qtd_meses_hist=3
+        )
+        pesos_origem = pd.to_numeric(pesos_origem, errors='coerce').fillna(0.0)
+        pesos_origem = pesos_origem[pesos_origem.gt(0)]
+        if pesos_origem.empty:
+            continue
+        pesos_origem = pesos_origem / float(pesos_origem.sum())
+
+        origens_lista = pesos_origem.index.astype(str).tolist()
+        valores_alloc = [qtde_tend * float(pesos_origem.loc[origem]) for origem in origens_lista]
+        if valores_alloc:
+            ajuste_final = qtde_tend - float(np.sum(valores_alloc))
+            idx_maior = int(np.argmax(valores_alloc))
+            valores_alloc[idx_maior] += ajuste_final
+
+        periodo_ref = pd.Timestamp(linha_tend.get('PERIODO_MES'))
+        mes_rotulo = str(linha_tend.get('MES_ANO', '')).strip().lower() or _formatar_mes_ano_funil_fixa(periodo_ref)
+        for origem_ref, qtde_alloc in zip(origens_lista, valores_alloc):
+            linhas_tend.append({
+                'SEGMENTO': segmento_ref,
+                'ORIGEM_AGG': str(origem_ref).strip(),
+                'INDICADOR': indicador_ref,
+                'PERIODO_MES': periodo_ref,
+                'QTDE': float(qtde_alloc),
+                'INDICADOR_ORDEM': indicador_ordem,
+                'MES_ANO': mes_rotulo,
+                'MES_ANO_ORDEM': mes_ref_ordem,
+                'INDICADOR_CHAVE': indicador_chave,
+                'EH_TEND': 1,
+            })
+
+    if not linhas_tend:
+        return base
+
+    df_tend_alloc = pd.DataFrame(linhas_tend)
+    for coluna in base_sem_tend.columns:
+        if coluna not in df_tend_alloc.columns:
+            df_tend_alloc[coluna] = np.nan
+    df_tend_alloc = df_tend_alloc[base_sem_tend.columns.tolist()]
+
+    df_out = pd.concat([base_sem_tend, df_tend_alloc], ignore_index=True, sort=False)
+    df_out['QTDE'] = normalizar_numerico_serie(df_out['QTDE']).fillna(0.0)
+    df_out['MES_ANO_ORDEM'] = normalizar_numerico_serie(df_out['MES_ANO_ORDEM']).fillna(0).astype(int)
+    df_out['INDICADOR_ORDEM'] = normalizar_numerico_serie(df_out['INDICADOR_ORDEM']).fillna(999.0)
+    df_out['EH_TEND'] = pd.to_numeric(df_out.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
+    return df_out
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+def load_funil_fixa_ecommerce_data(
+    path: str,
+    file_mtime: float | None = None,
+    tend_path: str | None = None,
+    tend_file_mtime: float | None = None
+) -> pd.DataFrame:
+    _ = file_mtime
+    _ = tend_file_mtime
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    df_raw = pd.read_excel(path_obj, engine='openpyxl')
+    if df_raw is None or df_raw.empty:
+        return pd.DataFrame()
+
+    col_segmento = _encontrar_coluna_funil_fixa(df_raw.columns, 'SEGMENTO')
+    col_origem = _encontrar_coluna_funil_fixa(df_raw.columns, 'ORIGEM_AGG', 'ORIGEM AGG')
+    col_indicador = _encontrar_coluna_funil_fixa(df_raw.columns, 'INDICADOR')
+    col_indicador_ordem = _encontrar_coluna_funil_fixa(df_raw.columns, 'INDICADOR_ORDEM', 'INDICADOR ORDEM')
+    col_periodo = _encontrar_coluna_funil_fixa(df_raw.columns, 'PERIODO_MES', 'PERIODO MES')
+    col_mes_ano = _encontrar_coluna_funil_fixa(df_raw.columns, 'MES_ANO', 'MÊS_ANO')
+    col_mes_ordem = _encontrar_coluna_funil_fixa(df_raw.columns, 'MES_ANO_ORDEM', 'MES ANO ORDEM')
+    col_qtde = _encontrar_coluna_funil_fixa(df_raw.columns, 'QTDE')
+
+    obrigatorias = [col_segmento, col_origem, col_indicador, col_periodo, col_qtde]
+    if any(col is None for col in obrigatorias):
+        return pd.DataFrame()
+
+    rename_map = {
+        col_segmento: 'SEGMENTO',
+        col_origem: 'ORIGEM_AGG',
+        col_indicador: 'INDICADOR',
+        col_periodo: 'PERIODO_MES',
+        col_qtde: 'QTDE',
+    }
+    if col_indicador_ordem:
+        rename_map[col_indicador_ordem] = 'INDICADOR_ORDEM'
+    if col_mes_ano:
+        rename_map[col_mes_ano] = 'MES_ANO'
+    if col_mes_ordem:
+        rename_map[col_mes_ordem] = 'MES_ANO_ORDEM'
+
+    df = df_raw.rename(columns=rename_map)[list(rename_map.values())].copy()
+
+    for coluna_txt in ['SEGMENTO', 'ORIGEM_AGG', 'INDICADOR']:
+        df[coluna_txt] = df[coluna_txt].astype(str).str.strip()
+        df = df[df[coluna_txt].ne('')]
+
+    df['SEGMENTO'] = df['SEGMENTO'].map(_normalizar_segmento_funil_fixa)
+    df['INDICADOR_CHAVE'] = df['INDICADOR'].map(_normalizar_chave_funil_fixa)
+    df = df[df['SEGMENTO'].isin(['PF', 'PME'])].copy()
+    df = df[df['INDICADOR_CHAVE'].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
+    df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
+
+    df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0.0)
+    if 'INDICADOR_ORDEM' not in df.columns:
+        df['INDICADOR_ORDEM'] = 999.0
+    df['INDICADOR_ORDEM'] = normalizar_numerico_serie(df['INDICADOR_ORDEM']).fillna(999.0)
+    df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(df['INDICADOR_ORDEM'])
+
+    df['PERIODO_MES'] = pd.to_datetime(df['PERIODO_MES'], errors='coerce', dayfirst=True)
+    if 'MES_ANO_ORDEM' in df.columns:
+        df['MES_ANO_ORDEM'] = normalizar_numerico_serie(df['MES_ANO_ORDEM'])
+    else:
+        df['MES_ANO_ORDEM'] = np.nan
+
+    if 'MES_ANO' not in df.columns:
+        df['MES_ANO'] = ''
+    df['MES_ANO'] = df['MES_ANO'].fillna('').astype(str).str.strip().str.lower()
+
+    mask_periodo = df['PERIODO_MES'].notna()
+    df.loc[mask_periodo, 'MES_ANO'] = df.loc[mask_periodo, 'PERIODO_MES'].apply(_formatar_mes_ano_funil_fixa)
+    df.loc[mask_periodo, 'MES_ANO_ORDEM'] = df.loc[mask_periodo, 'PERIODO_MES'].dt.year * 100 + df.loc[mask_periodo, 'PERIODO_MES'].dt.month
+
+    df['MES_ANO'] = df['MES_ANO'].astype(str).str.strip().str.lower()
+    df['MES_ANO_ORDEM'] = normalizar_numerico_serie(df['MES_ANO_ORDEM']).fillna(0).astype(int)
+    df = df[df['MES_ANO_ORDEM'] > 0].copy()
+    df['EH_TEND'] = 0
+
+    tend_candidates = []
+    if tend_path:
+        tend_candidates.append(Path(tend_path))
+    tend_candidates.extend([
+        TEND_FUNIL_FIXA_FILE_PATH,
+        path_obj.with_name('tend_funil_ecom.xlsx'),
+        Path(__file__).with_name('tend_funil_ecom.xlsx'),
+    ])
+    tend_path_obj = next((cand for cand in tend_candidates if Path(cand).exists()), None)
+    if tend_path_obj is not None:
+        df_tend = load_tend_funil_fixa_data(str(tend_path_obj), tend_file_mtime)
+        if not df_tend.empty:
+            df = _aplicar_tend_funil_fixa(df, df_tend)
+
+    return df
+
+
+def _calcular_janela_meses_funil_fixa(
+    df_funil: pd.DataFrame,
+    qtd_meses: int = 13,
+    mes_foco_ordem: int | None = None
+) -> list[int]:
+    if df_funil is None or df_funil.empty or 'MES_ANO_ORDEM' not in df_funil.columns:
+        return []
+    meses = sorted(df_funil['MES_ANO_ORDEM'].dropna().astype(int).unique().tolist())
+    if mes_foco_ordem is not None:
+        meses = [mes for mes in meses if int(mes) <= int(mes_foco_ordem)]
+    if not meses:
+        return []
+    return meses[-max(int(qtd_meses), 1):]
+
+
+def _obter_mes_tend_funil_fixa(df_funil: pd.DataFrame) -> int | None:
+    if df_funil is None or df_funil.empty or 'EH_TEND' not in df_funil.columns:
+        return None
+    meses_tend = sorted(
+        df_funil.loc[
+            pd.to_numeric(df_funil.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int).gt(0),
+            'MES_ANO_ORDEM'
+        ].dropna().astype(int).unique().tolist()
+    )
+    return int(meses_tend[-1]) if meses_tend else None
+
+
+def _formatar_valor_funil_fixa(valor: float) -> str:
+    return formatar_numero_brasileiro(float(pd.to_numeric(pd.Series([valor]), errors='coerce').fillna(0.0).iloc[0]), 0)
+
+
+def _calcular_mom_funil_fixa(valor_atual: float, valor_anterior: float) -> float:
+    atual = float(valor_atual or 0.0)
+    anterior = float(valor_anterior or 0.0)
+    if anterior == 0:
+        return np.nan
+    return ((atual / anterior) - 1.0) * 100.0
+
+
+def _render_mom_badge_funil_fixa(valor_mom: float) -> str:
+    if pd.isna(valor_mom):
+        return '<span class="mom-pill mom-flat">• n/d</span>'
+    if valor_mom > 0:
+        classe = 'mom-up'
+        seta = '▲'
+    elif valor_mom < 0:
+        classe = 'mom-down'
+        seta = '▼'
+    else:
+        classe = 'mom-flat'
+        seta = '•'
+    texto = f"{seta} {valor_mom:+.1f}%".replace('.', ',')
+    return f'<span class="mom-pill {classe}">{texto}</span>'
+
+
+def montar_estrutura_funil_fixa_ecommerce(
+    df_funil: pd.DataFrame,
+    segmentos_sel: list[str] | None = None,
+    origens_sel: list[str] | None = None,
+    indicadores_sel: list[str] | None = None,
+    mes_ref_ordem: int | None = None,
+    qtd_meses: int = 13
+) -> dict:
+    estrutura_vazia = {
+        'meses_ordem': [],
+        'meses_rotulos': [],
+        'mes_atual_rotulo': '',
+        'meses_base_mm3': [],
+        'mes_tend_ordem': None,
+        'rows': [],
+        'observacao_mm3': ''
+    }
+    if df_funil is None or df_funil.empty:
+        return estrutura_vazia
+
+    base = df_funil.copy()
+    if segmentos_sel:
+        base = base[base['SEGMENTO'].isin(segmentos_sel)].copy()
+    if origens_sel:
+        base = base[base['ORIGEM_AGG'].isin(origens_sel)].copy()
+    if indicadores_sel:
+        base = base[base['INDICADOR'].isin(indicadores_sel)].copy()
+    if base.empty:
+        return estrutura_vazia
+
+    mapa_meses = (
+        base[['MES_ANO_ORDEM', 'MES_ANO']]
+        .drop_duplicates()
+        .sort_values(['MES_ANO_ORDEM', 'MES_ANO'])
+        .drop_duplicates(subset=['MES_ANO_ORDEM'], keep='last')
+    )
+    mapa_ordem_rotulo = {int(linha['MES_ANO_ORDEM']): str(linha['MES_ANO']).strip().upper() for _, linha in mapa_meses.iterrows()}
+    mes_tend_ordem = _obter_mes_tend_funil_fixa(base)
+    meses_ordem = _calcular_janela_meses_funil_fixa(
+        base,
+        qtd_meses=qtd_meses,
+        mes_foco_ordem=mes_ref_ordem
+    )
+    if not meses_ordem:
+        return estrutura_vazia
+    meses_rotulos = [mapa_ordem_rotulo.get(ordem, str(ordem)) for ordem in meses_ordem]
+
+    agg = (
+        base.groupby(['INDICADOR', 'ORIGEM_AGG', 'INDICADOR_ORDEM', 'MES_ANO_ORDEM'], observed=True)['QTDE']
+        .sum()
+        .reset_index()
+    )
+    if agg.empty:
+        return estrutura_vazia
+
+    tabela_child = agg.pivot_table(
+        index=['INDICADOR', 'ORIGEM_AGG', 'INDICADOR_ORDEM'],
+        columns='MES_ANO_ORDEM',
+        values='QTDE',
+        aggfunc='sum',
+        fill_value=0.0
+    )
+    tabela_child = tabela_child.reindex(columns=meses_ordem, fill_value=0.0)
+
+    mes_atual_ordem = meses_ordem[-1]
+    mes_mais_recente_disponivel = max(mapa_ordem_rotulo.keys()) if mapa_ordem_rotulo else None
+    meses_mm3 = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
+    aplicar_mm3_mes_atual = bool(
+        meses_mm3 and
+        mes_mais_recente_disponivel is not None and
+        int(mes_atual_ordem) == int(mes_mais_recente_disponivel) and
+        (mes_tend_ordem is None or int(mes_atual_ordem) != int(mes_tend_ordem))
+    )
+    if aplicar_mm3_mes_atual:
+        tabela_child[mes_atual_ordem] = tabela_child[meses_mm3].mean(axis=1)
+
+    tabela_parent = tabela_child.groupby(level=['INDICADOR', 'INDICADOR_ORDEM']).sum()
+    tabela_child_reset = tabela_child.reset_index()
+
+    rows = []
+    indicadores_ordenados = sorted(
+        [(idx[0], float(idx[1] if not pd.isna(idx[1]) else 999.0)) for idx in tabela_parent.index],
+        key=lambda item: (item[1], str(item[0]).upper())
+    )
+
+    for idx_pai, (indicador, indicador_ordem) in enumerate(indicadores_ordenados, start=1):
+        serie_pai = tabela_parent.loc[(indicador, indicador_ordem)]
+        atual_pai = float(serie_pai.get(mes_atual_ordem, 0.0))
+        anterior_pai = float(serie_pai.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
+        row_id = f"funil-pai-{idx_pai}"
+        filhos = []
+
+        filhos_df = tabela_child_reset[
+            tabela_child_reset['INDICADOR'].astype(str).eq(str(indicador)) &
+            pd.to_numeric(tabela_child_reset['INDICADOR_ORDEM'], errors='coerce').fillna(999.0).eq(float(indicador_ordem))
+        ].copy()
+        filhos_df['_ordem_total'] = filhos_df[meses_ordem].sum(axis=1)
+        filhos_df['_ordem_mes_ref'] = pd.to_numeric(filhos_df[mes_atual_ordem], errors='coerce').fillna(0.0)
+        filhos_df = filhos_df.sort_values(
+            by=['_ordem_total', '_ordem_mes_ref', 'ORIGEM_AGG'],
+            ascending=[False, False, True],
+            na_position='last'
+        )
+
+        for idx_filho, (_, linha_filho) in enumerate(filhos_df.iterrows(), start=1):
+            origem = str(linha_filho.get('ORIGEM_AGG', '')).strip()
+            atual_filho = float(linha_filho.get(mes_atual_ordem, 0.0))
+            anterior_filho = float(linha_filho.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
+            raw_values_filho = [float(linha_filho.get(mes, 0.0)) for mes in meses_ordem]
+            filhos.append({
+                'id': f'{row_id}-filho-{idx_filho}',
+                'parent_id': row_id,
+                'label': str(origem),
+                'level': 1,
+                'values': [_formatar_valor_funil_fixa(valor) for valor in raw_values_filho],
+                'raw_values': raw_values_filho,
+                'sort_mes_ref': float(raw_values_filho[-1]) if raw_values_filho else 0.0,
+                'sort_total': float(sum(raw_values_filho)) if raw_values_filho else 0.0,
+                'sort_vector': [float(v) for v in raw_values_filho[::-1]],
+                'mom_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_filho, anterior_filho)),
+            })
+
+        filhos = sorted(
+            filhos,
+            key=lambda item: (
+                *tuple(-float(v) for v in item.get('sort_vector', [])),
+                -float(item.get('sort_total', 0.0)),
+                str(item.get('label', '')).upper(),
+            )
+        )
+
+        raw_values_pai = [float(serie_pai.get(mes, 0.0)) for mes in meses_ordem]
+        rows.append({
+            'id': row_id,
+            'label': str(indicador),
+            'level': 0,
+            'values': [_formatar_valor_funil_fixa(valor) for valor in raw_values_pai],
+            'raw_values': raw_values_pai,
+            'mom_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_pai, anterior_pai)),
+            'children': filhos,
+        })
+
+    observacao_mm3 = ''
+    if mes_tend_ordem is not None and int(mes_atual_ordem) == int(mes_tend_ordem):
+        meses_ref_tend = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
+        rotulos_ref_tend = ', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_ref_tend) if meses_ref_tend else ''
+        complemento = f" pela proporcao media dos ultimos 3 meses ({rotulos_ref_tend})." if rotulos_ref_tend else '.'
+        observacao_mm3 = (
+            f"O mes {mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem))} foi carregado pelo arquivo de tend"
+            f"{complemento}"
+        )
+    elif aplicar_mm3_mes_atual and meses_mm3:
+        observacao_mm3 = (
+            f"O mês {mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem))} foi preenchido com média móvel "
+            f"dos últimos {len(meses_mm3)} meses ({', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3)})."
+        )
+
+    return {
+        'meses_ordem': meses_ordem,
+        'meses_rotulos': meses_rotulos,
+        'mes_atual_rotulo': mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem)),
+        'meses_base_mm3': [mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3] if aplicar_mm3_mes_atual else [],
+        'mes_tend_ordem': mes_tend_ordem,
+        'rows': rows,
+        'observacao_mm3': observacao_mm3,
+    }
+
+
+def criar_tabela_html_funil_fixa_ecommerce(
+    estrutura: dict,
+    table_id: str,
+    max_body_height: int = 760
+) -> str:
+    if not estrutura or not estrutura.get('rows'):
+        return ''
+
+    qtd_meses = max(len(estrutura.get('meses_rotulos', [])), 1)
+    largura_primeira_coluna = 148
+    largura_coluna_mom = 72
+    mes_tend_ordem = estrutura.get('mes_tend_ordem')
+    colgroup_html = (
+        '<colgroup>'
+        f'<col style="width:{largura_primeira_coluna}px;">'
+        + ''.join(
+            f'<col style="width:calc((100% - {largura_primeira_coluna + largura_coluna_mom}px) / {qtd_meses});">'
+            for _ in range(qtd_meses)
+        )
+        + f'<col style="width:{largura_coluna_mom}px;">'
+        + '</colgroup>'
+    )
+
+    def _render_databar_cell(valor_bruto: float, valor_formatado: str, max_coluna: float, eh_col_tend: bool = False) -> str:
+        valor_num = float(pd.to_numeric(pd.Series([valor_bruto]), errors='coerce').fillna(0.0).iloc[0])
+        max_ref = float(pd.to_numeric(pd.Series([max_coluna]), errors='coerce').fillna(0.0).iloc[0])
+        if max_ref <= 0 or valor_num <= 0:
+            largura = 0.0
+        else:
+            largura = max(8.0, min(100.0, (valor_num / max_ref) * 100.0))
+
+        return (
+            f'<td class="ff-data-cell{" ff-col-tend" if eh_col_tend else ""}">'
+            '<div class="ff-data-bar-wrap">'
+            f'<div class="ff-data-bar-fill" style="width:{largura:.1f}%;"></div>'
+            f'<span class="ff-data-bar-text">{escape(str(valor_formatado))}</span>'
+            '</div>'
+            '</td>'
+        )
+
+    cabecalhos_meses = ''.join(
+        f'<th class="ff-col-mes{" ff-col-tend" if estrutura.get("meses_ordem", [])[idx] == mes_tend_ordem else ""}">{escape(str(rotulo))}</th>'
+        for idx, rotulo in enumerate(estrutura.get('meses_rotulos', []))
+    )
+
+    linhas_html = []
+    for row in estrutura.get('rows', []):
+        possui_filhos = bool(row.get('children'))
+        btn_toggle = (
+            f'<button class="ff-toggle" data-target="{escape(str(row.get("id")), quote=True)}" aria-label="Expandir {escape(str(row.get("label")))}">+</button>'
+            if possui_filhos else '<span class="ff-toggle ff-toggle-placeholder"></span>'
+        )
+        valores_html = ''.join(
+            f'<td class="{"ff-col-tend" if estrutura.get("meses_ordem", [])[idx_coluna] == mes_tend_ordem else ""}">{escape(str(valor))}</td>'
+            for idx_coluna, valor in enumerate(row.get('values', []))
+        )
+        linhas_html.append(
+            f'<tr class="ff-row ff-row-parent" data-row-id="{escape(str(row.get("id")), quote=True)}">'
+            f'<td class="ff-sticky ff-row-label">{btn_toggle}<span class="ff-label-text">{escape(str(row.get("label")))}</span></td>'
+            f'{valores_html}'
+            f'<td class="ff-mom-cell">{row.get("mom_html", "")}</td>'
+            f'</tr>'
+        )
+        maximos_filhos = []
+        if row.get('children'):
+            qtd_colunas = len(row.get('values', []))
+            for idx_coluna in range(qtd_colunas):
+                max_coluna = max(
+                    [
+                        float(pd.to_numeric(pd.Series([child.get('raw_values', [0.0] * qtd_colunas)[idx_coluna]]), errors='coerce').fillna(0.0).iloc[0])
+                        for child in row.get('children', [])
+                    ] or [0.0]
+                )
+                maximos_filhos.append(max_coluna)
+        for child in row.get('children', []):
+            child_values_html = ''.join(
+                _render_databar_cell(
+                    valor_bruto=child.get('raw_values', [0.0] * len(child.get('values', [])))[idx_coluna],
+                    valor_formatado=child.get('values', [''])[idx_coluna],
+                    max_coluna=maximos_filhos[idx_coluna] if idx_coluna < len(maximos_filhos) else 0.0,
+                    eh_col_tend=estrutura.get("meses_ordem", [])[idx_coluna] == mes_tend_ordem
+                )
+                for idx_coluna in range(len(child.get('values', [])))
+            )
+            linhas_html.append(
+                f'<tr class="ff-row ff-row-child" data-parent-row="{escape(str(row.get("id")), quote=True)}" style="display:none;">'
+                f'<td class="ff-sticky ff-row-label ff-row-label-child"><span class="ff-child-indent"></span><span class="ff-label-text">{escape(str(child.get("label")))}</span></td>'
+                f'{child_values_html}'
+                f'<td class="ff-mom-cell">{child.get("mom_html", "")}</td>'
+                f'</tr>'
+            )
+
+    observacao = ''
+
+    return f'''
+    <div id="{escape(table_id, quote=True)}" class="ff-wrapper">
+      <style>
+        #{table_id}.ff-wrapper {{font-family: 'Segoe UI', Arial, sans-serif; color:#312B2A;}}
+        #{table_id} .ff-note {{margin:0 0 6px 2px; font-size:11px; color:#6B5C59;}}
+        #{table_id} .ff-table-box {{border:1px solid rgba(121,14,9,0.16); border-radius:18px; overflow-y:auto; overflow-x:hidden; max-height:{int(max_body_height)}px; background:linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%); box-shadow:0 12px 30px rgba(121, 14, 9, 0.08);}}
+        #{table_id} table {{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed;}}
+        #{table_id} thead th {{position:sticky; top:0; z-index:3; background:linear-gradient(180deg, #790E09 0%, #5A0A06 100%); color:#FFFFFF; font-size:9px; letter-spacing:0.14px; text-transform:uppercase; padding:7px 5px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}}
+        #{table_id} thead th:first-child {{left:0; z-index:4; border-top-left-radius:16px;}}
+        #{table_id} thead th:last-child {{border-top-right-radius:16px;}}
+        #{table_id} thead th.ff-col-tend {{background:linear-gradient(180deg, #B65C56 0%, #92403A 100%); color:#FFFFFF;}}
+        #{table_id} tbody td {{padding:6px 5px; font-size:10.6px; border-bottom:1px solid rgba(121,14,9,0.08); white-space:nowrap; text-align:right; color:#312B2A; background:#FFFFFF; overflow:hidden; text-overflow:ellipsis;}}
+        #{table_id} tbody td.ff-col-tend {{background:linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%); color:#6B1F1A;}}
+        #{table_id} tbody tr.ff-row-parent td {{background:linear-gradient(180deg, rgba(255,248,247,0.95) 0%, rgba(255,255,255,1) 100%); font-weight:700;}}
+        #{table_id} tbody tr.ff-row-child td {{background:#FFFDFC;}}
+        #{table_id} tbody tr.ff-row-child td.ff-col-tend {{background:linear-gradient(180deg, rgba(121, 14, 9, 0.08) 0%, rgba(121, 14, 9, 0.030) 100%); color:#6B1F1A;}}
+        #{table_id} tbody tr:hover td {{background:#FFF5F4;}}
+        #{table_id} tbody tr:hover td.ff-col-tend {{background:linear-gradient(180deg, rgba(121, 14, 9, 0.10) 0%, rgba(121, 14, 9, 0.040) 100%);}}
+        #{table_id} .ff-sticky {{position:sticky; left:0; z-index:2; text-align:left !important; min-width:{largura_primeira_coluna}px; max-width:{largura_primeira_coluna}px; width:{largura_primeira_coluna}px;}}
+        #{table_id} .ff-row-parent .ff-sticky {{z-index:3;}}
+        #{table_id} .ff-row-label {{display:flex; align-items:center; gap:5px;}}
+        #{table_id} .ff-label-text {{overflow:hidden; text-overflow:ellipsis;}}
+        #{table_id} .ff-row-label-child {{padding-left:8px;}}
+        #{table_id} .ff-child-indent {{display:inline-block; width:8px; height:1px; background:rgba(121,14,9,0.30); margin-right:1px;}}
+        #{table_id} .ff-toggle {{width:18px; height:18px; border-radius:999px; border:1px solid rgba(121,14,9,0.22); background:#FFF1EF; color:#790E09; font-weight:900; line-height:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:12px; padding:0; flex:0 0 auto;}}
+        #{table_id} .ff-toggle:hover {{background:#FFE4E0;}}
+        #{table_id} .ff-toggle-placeholder {{border-color:transparent; background:transparent; cursor:default;}}
+        #{table_id} .ff-col-mes {{min-width:0;}}
+        #{table_id} .ff-mom-cell {{text-align:center !important; width:{largura_coluna_mom}px; min-width:{largura_coluna_mom}px;}}
+        #{table_id} .ff-data-cell {{padding:3px 2px;}}
+        #{table_id} .ff-data-bar-wrap {{position:relative; width:100%; min-width:0; height:17px; border-radius:6px; background:linear-gradient(180deg, rgba(121,14,9,0.04) 0%, rgba(121,14,9,0.08) 100%); overflow:hidden;}}
+        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-wrap {{background:linear-gradient(180deg, rgba(121,14,9,0.08) 0%, rgba(121,14,9,0.14) 100%);}}
+        #{table_id} .ff-data-bar-fill {{position:absolute; inset:0 auto 0 0; background:linear-gradient(90deg, rgba(121,14,9,0.18) 0%, rgba(208,36,5,0.28) 100%); border-right:1px solid rgba(121,14,9,0.10);}}
+        #{table_id} .ff-data-bar-text {{position:relative; z-index:1; display:flex; align-items:center; justify-content:flex-end; height:100%; padding:0 4px; font-size:9.6px; color:#312B2A; letter-spacing:-0.05px;}}
+        #{table_id} .mom-pill {{display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:0; border-radius:0; font-size:10.4px; font-weight:800; letter-spacing:0.10px; border:none; background:transparent;}}
+        #{table_id} .mom-up {{color:#14532D; background:transparent; border:none;}}
+        #{table_id} .mom-down {{color:#991B1B; background:transparent; border:none;}}
+        #{table_id} .mom-flat {{color:#334155; background:transparent; border:none;}}
+        #{table_id} ::-webkit-scrollbar {{height:10px; width:10px;}}
+        #{table_id} ::-webkit-scrollbar-thumb {{background:rgba(121,14,9,0.26); border-radius:999px;}}
+        #{table_id} ::-webkit-scrollbar-track {{background:rgba(121,14,9,0.04);}}
+      </style>
+      {observacao}
+      <div class="ff-table-box">
+        <table>
+          {colgroup_html}
+          <thead>
+            <tr>
+              <th class="ff-sticky">Indicador / Origem</th>
+              {cabecalhos_meses}
+              <th>MoM</th>
+            </tr>
+          </thead>
+          <tbody>
+            {''.join(linhas_html)}
+          </tbody>
+        </table>
+      </div>
+      <script>
+        (function() {{
+          const root = document.getElementById({table_id!r});
+          if (!root) return;
+          root.querySelectorAll('.ff-toggle[data-target]').forEach((btn) => {{
+            btn.addEventListener('click', () => {{
+              const target = btn.getAttribute('data-target');
+              const children = root.querySelectorAll(`[data-parent-row="${{target}}"]`);
+              const expanded = btn.getAttribute('data-expanded') === 'true';
+              children.forEach((row) => {{ row.style.display = expanded ? 'none' : ''; }});
+              btn.setAttribute('data-expanded', expanded ? 'false' : 'true');
+              btn.textContent = expanded ? '+' : '−';
+            }});
+          }});
+        }})();
+      </script>
+    </div>
+    '''
+
+
+def _preparar_base_mes_funil_segmentado_fixa(
+    df_funil: pd.DataFrame,
+    origens_sel: list[str] | None = None,
+    indicadores_sel: list[str] | None = None,
+    qtd_meses: int | None = None
+) -> tuple[pd.DataFrame, dict[int, str], int | None, list[int], int | None]:
+    base_vazia = (pd.DataFrame(), {}, None, [], None)
+    if df_funil is None or df_funil.empty:
+        return base_vazia
+
+    base = df_funil.copy()
+    if origens_sel:
+        base = base[base['ORIGEM_AGG'].isin(origens_sel)].copy()
+    if indicadores_sel:
+        base = base[base['INDICADOR'].isin(indicadores_sel)].copy()
+    if base.empty:
+        return base_vazia
+
+    if qtd_meses is None:
+        meses_ordem = sorted(base['MES_ANO_ORDEM'].dropna().astype(int).unique().tolist())
+    else:
+        meses_ordem = _calcular_janela_meses_funil_fixa(base, qtd_meses=qtd_meses)
+    if not meses_ordem:
+        return base_vazia
+
+    mapa_meses = (
+        base[['MES_ANO_ORDEM', 'MES_ANO']]
+        .drop_duplicates()
+        .sort_values(['MES_ANO_ORDEM', 'MES_ANO'])
+        .drop_duplicates(subset=['MES_ANO_ORDEM'], keep='last')
+    )
+    mapa_ordem_rotulo = {
+        int(linha['MES_ANO_ORDEM']): str(linha['MES_ANO']).strip().upper()
+        for _, linha in mapa_meses.iterrows()
+    }
+    mes_tend_ordem = _obter_mes_tend_funil_fixa(base)
+
+    agg = (
+        base.groupby(['SEGMENTO', 'INDICADOR', 'INDICADOR_ORDEM', 'MES_ANO_ORDEM'], as_index=False, observed=True)['QTDE']
+        .sum()
+    )
+    if agg.empty:
+        return base_vazia
+
+    tabela = agg.pivot_table(
+        index=['SEGMENTO', 'INDICADOR', 'INDICADOR_ORDEM'],
+        columns='MES_ANO_ORDEM',
+        values='QTDE',
+        aggfunc='sum',
+        fill_value=0.0
+    )
+    tabela = tabela.reindex(columns=meses_ordem, fill_value=0.0)
+
+    mes_atual_ordem = meses_ordem[-1]
+    meses_mm3 = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
+    aplicar_mm3 = bool(meses_mm3 and (mes_tend_ordem is None or int(mes_atual_ordem) != int(mes_tend_ordem)))
+    if aplicar_mm3:
+        tabela[mes_atual_ordem] = tabela[meses_mm3].mean(axis=1)
+
+    base_mes = (
+        tabela.reset_index()
+        .melt(
+            id_vars=['SEGMENTO', 'INDICADOR', 'INDICADOR_ORDEM'],
+            value_vars=meses_ordem,
+            var_name='MES_ANO_ORDEM',
+            value_name='QTDE'
+        )
+    )
+    base_mes['MES_ANO_ORDEM'] = normalizar_numerico_serie(base_mes['MES_ANO_ORDEM']).fillna(0).astype(int)
+    base_mes['QTDE'] = normalizar_numerico_serie(base_mes['QTDE']).fillna(0.0)
+    return base_mes, mapa_ordem_rotulo, mes_atual_ordem, (meses_mm3 if aplicar_mm3 else []), mes_tend_ordem
+
+
+def _resolver_mes_ordem_funil_segmentado_fixa(
+    mapa_ordem_rotulo: dict[int, str],
+    mes_ref,
+    fallback_ordem: int | None = None
+) -> int | None:
+    if not mapa_ordem_rotulo:
+        return fallback_ordem
+
+    mes_norm = normalizar_chave_visual(str(mes_ref or ""))
+    for mes_ordem, rotulo in mapa_ordem_rotulo.items():
+        if normalizar_chave_visual(rotulo) == mes_norm:
+            return int(mes_ordem)
+
+    try:
+        mes_num = int(float(mes_ref))
+        if mes_num in mapa_ordem_rotulo:
+            return mes_num
+    except Exception:
+        pass
+
+    return fallback_ordem
+
+
+def _formatar_valor_real_funil_segmentado(indicador: str, valor: float) -> str:
+    valor_num = float(pd.to_numeric(pd.Series([valor]), errors='coerce').fillna(0.0).iloc[0])
+    if normalizar_chave_visual(indicador) == 'investimento':
+        return f"R$ {formatar_numero_brasileiro(valor_num, 0)}"
+    return formatar_numero_brasileiro(valor_num, 0)
+
+
+def _formatar_percentual_step_funil_segmentado(valor_atual: float, valor_anterior: float | None) -> str:
+    atual = float(pd.to_numeric(pd.Series([valor_atual]), errors='coerce').fillna(0.0).iloc[0])
+    if valor_anterior is None:
+        return ''
+
+    anterior = float(pd.to_numeric(pd.Series([valor_anterior]), errors='coerce').fillna(0.0).iloc[0])
+    if anterior <= 0:
+        return 'n/d'
+
+    percentual = (atual / anterior) * 100.0
+    return f"{formatar_numero_brasileiro(percentual, 1)}%"
+
+
+def _gerar_larguras_visuais_funil_segmentado(qtd_etapas: int) -> list[float]:
+    if qtd_etapas <= 0:
+        return []
+    if qtd_etapas == 1:
+        return [100.0]
+    return np.linspace(100.0, 40.0, qtd_etapas).tolist()
+
+
+def criar_grafico_funil_segmentado_fixa(
+    df_funil: pd.DataFrame,
+    mes_ref: str,
+    origens_sel: list[str] | None = None,
+    indicadores_sel: list[str] | None = None
+) -> tuple[go.Figure, str]:
+    figura_vazia = go.Figure()
+    if df_funil is None or df_funil.empty:
+        return figura_vazia, ''
+
+    indicadores_plot = [
+        label for _, label, _ in FUNIL_FIXA_INDICADORES_CONFIG
+        if (not indicadores_sel) or (label in indicadores_sel)
+    ]
+    if not indicadores_plot:
+        return figura_vazia, ''
+
+    base_mes, mapa_ordem_rotulo, mes_atual_ordem, meses_mm3, mes_tend_ordem = _preparar_base_mes_funil_segmentado_fixa(
+        df_funil=df_funil,
+        origens_sel=origens_sel,
+        indicadores_sel=indicadores_sel,
+        qtd_meses=None
+    )
+    if base_mes.empty or not mapa_ordem_rotulo:
+        return figura_vazia, ''
+
+    mes_ref_ordem = _resolver_mes_ordem_funil_segmentado_fixa(
+        mapa_ordem_rotulo=mapa_ordem_rotulo,
+        mes_ref=mes_ref,
+        fallback_ordem=mes_atual_ordem
+    )
+    if mes_ref_ordem is None:
+        return figura_vazia, ''
+
+    base_mes = base_mes[base_mes['MES_ANO_ORDEM'].eq(int(mes_ref_ordem))].copy()
+    if base_mes.empty:
+        return figura_vazia, ''
+
+    base_mes['SEGMENTO'] = base_mes['SEGMENTO'].astype(str).str.strip()
+    base_mes['INDICADOR'] = base_mes['INDICADOR'].astype(str).str.strip()
+
+    base_skeleton = pd.MultiIndex.from_product(
+        [['PME', 'PF'], indicadores_plot],
+        names=['SEGMENTO', 'INDICADOR']
+    ).to_frame(index=False)
+    base_skeleton['INDICADOR_ORDEM'] = base_skeleton['INDICADOR'].map(
+        {label: ordem for _, label, ordem in FUNIL_FIXA_INDICADORES_CONFIG}
+    ).fillna(999.0)
+
+    base_plot = base_skeleton.merge(
+        base_mes[['SEGMENTO', 'INDICADOR', 'QTDE']],
+        on=['SEGMENTO', 'INDICADOR'],
+        how='left'
+    )
+    base_plot['QTDE'] = normalizar_numerico_serie(base_plot['QTDE']).fillna(0.0)
+
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        specs=[[{'type': 'funnel'}, {'type': 'funnel'}]],
+        horizontal_spacing=0.12,
+        subplot_titles=('PME', 'PF')
+    )
+
+    segmentos_plot = [
+        (1, 'PME', '#790E09', 'rgba(121,14,9,0.16)', '#FFFFFF'),
+        (2, 'PF', '#AEAFAF', 'rgba(174,175,175,0.28)', '#312B2A'),
+    ]
+
+    for coluna_ref, segmento_ref, cor_ref, cor_conector, cor_texto in segmentos_plot:
+        df_seg = (
+            base_plot[base_plot['SEGMENTO'].eq(segmento_ref)]
+            .sort_values(['INDICADOR_ORDEM', 'INDICADOR'])
+            .copy()
+        )
+        valores = []
+        textos = []
+        customdata = []
+        larguras_visuais = _gerar_larguras_visuais_funil_segmentado(len(df_seg))
+        valores_reais = df_seg['QTDE'].astype(float).tolist()
+        valor_anterior_real = None
+        etapa_anterior = ''
+
+        for idx_seg, (_, linha_seg) in enumerate(df_seg.iterrows()):
+            indicador_ref = str(linha_seg.get('INDICADOR', '')).strip()
+            valor_real = float(linha_seg.get('QTDE', 0.0))
+            valor_rotulo = _formatar_valor_real_funil_segmentado(indicador_ref, valor_real)
+            percentual_step = _formatar_percentual_step_funil_segmentado(valor_real, valor_anterior_real)
+
+            largura_plot = float(larguras_visuais[idx_seg]) if valor_real > 0 else 0.0
+            valores.append(largura_plot)
+            texto_label = valor_rotulo if not percentual_step else f"{valor_rotulo} | {percentual_step}"
+            texto_hover_step = (
+                f"<br><b>% vs etapa anterior ({etapa_anterior}):</b> {percentual_step}"
+                if percentual_step and etapa_anterior else ""
+            )
+            textos.append(texto_label)
+            customdata.append([
+                segmento_ref,
+                valor_rotulo,
+                percentual_step,
+                etapa_anterior,
+                texto_hover_step,
+            ])
+
+            valor_anterior_real = valor_real
+            etapa_anterior = indicador_ref
+
+        fig.add_trace(go.Funnel(
+            name=segmento_ref,
+            y=df_seg['INDICADOR'].tolist(),
+            x=valores,
+            text=textos,
+            textinfo='text',
+            textposition='auto',
+            textfont=dict(size=14, color=cor_texto, family='Segoe UI'),
+            marker=dict(
+                color=cor_ref,
+                line=dict(color='rgba(255,255,255,0.96)', width=1.2)
+            ),
+            connector=dict(
+                line=dict(color=cor_conector, width=1.0)
+            ),
+            opacity=0.98,
+            customdata=customdata,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "<b>Etapa:</b> %{y}<br>"
+                "<b>Valor:</b> %{customdata[1]}%{customdata[4]}<extra></extra>"
+            )
+        ), row=1, col=coluna_ref)
+
+        if sum(valores_reais) <= 0:
+            x_pos = 0.22 if segmento_ref == 'PME' else 0.78
+            fig.add_annotation(
+                x=x_pos,
+                y=0.5,
+                xref='paper',
+                yref='paper',
+                text='Sem dados',
+                showarrow=False,
+                font=dict(size=12, color='#6B5C59', family='Segoe UI')
+            )
+
+    fig.update_layout(
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+        margin=dict(l=16, r=16, t=58, b=14),
+        height=max(540, 56 * len(indicadores_plot)),
+        showlegend=False,
+        funnelgap=0.08,
+        funnelmode='overlay',
+        uniformtext=dict(minsize=12, mode='hide'),
+        hoverlabel=dict(
+            bgcolor='white',
+            bordercolor='#E2E8F0',
+            font_size=12,
+            font_family='Segoe UI',
+            font_color='#2F3747'
+        )
+    )
+    fig.update_yaxes(
+        tickfont=dict(size=14, color='#000000', family='Segoe UI'),
+        showticklabels=True
+    )
+    fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+    for anotacao in fig.layout.annotations:
+        texto_anotacao = normalizar_chave_visual(getattr(anotacao, 'text', ''))
+        if texto_anotacao == 'pme':
+            anotacao.font = dict(size=19, family='Sora', color='#201717')
+            anotacao.bgcolor = 'rgba(121,14,9,0.08)'
+            anotacao.bordercolor = 'rgba(121,14,9,0.18)'
+            anotacao.borderwidth = 1
+            anotacao.borderpad = 5
+            anotacao.yshift = 4
+        elif texto_anotacao == 'pf':
+            anotacao.font = dict(size=19, family='Sora', color='#201717')
+            anotacao.bgcolor = 'rgba(148,163,184,0.18)'
+            anotacao.bordercolor = 'rgba(107,114,128,0.22)'
+            anotacao.borderwidth = 1
+            anotacao.borderpad = 5
+            anotacao.yshift = 4
+        else:
+            anotacao.font = dict(size=15, family='Segoe UI', color='#312B2A')
+
+    observacao_mm3 = ''
+    if mes_tend_ordem is not None and int(mes_ref_ordem) == int(mes_tend_ordem):
+        meses_ref_tend = sorted(
+            [m for m in mapa_ordem_rotulo.keys() if int(m) < int(mes_tend_ordem)]
+        )[-3:]
+        meses_base = ', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_ref_tend) if meses_ref_tend else ''
+        complemento = f" pela proporcao media dos ultimos 3 meses ({meses_base})." if meses_base else '.'
+        observacao_mm3 = (
+            f"O mes {mapa_ordem_rotulo.get(int(mes_ref_ordem), str(mes_ref_ordem))} foi carregado pelo arquivo de tend"
+            f"{complemento}"
+        )
+    elif mes_atual_ordem is not None and int(mes_ref_ordem) == int(mes_atual_ordem) and meses_mm3:
+        meses_base = ', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3)
+        observacao_mm3 = (
+            f"O mes {mapa_ordem_rotulo.get(int(mes_ref_ordem), str(mes_ref_ordem))} foi ajustado pela media "
+            f"movel dos ultimos {len(meses_mm3)} meses ({meses_base})."
+        )
+
+    return fig, observacao_mm3
+
+
+def render_visual_funil_fixa_ecommerce() -> None:
+    funil_candidates = [
+        FUNIL_FIXA_FILE_PATH,
+        Path("base_funil_ecomm_fixa.xlsx"),
+        Path(__file__).with_name('base_funil_ecomm_fixa.xlsx')
+    ]
+    funil_path = next((path for path in funil_candidates if Path(path).exists()), None)
+    tend_candidates = [
+        TEND_FUNIL_FIXA_FILE_PATH,
+        Path(__file__).with_name('tend_funil_ecom.xlsx'),
+        Path("tend_funil_ecom.xlsx")
+    ]
+    tend_path = next((path for path in tend_candidates if Path(path).exists()), None)
+
+    st.markdown(
+        build_visual_title_html(
+            'FUNIL DE VENDAS - E-COMMERCE',
+            'cart',
+            subtitle='Acompanhamento da jornada do cliente no e-commerce da Fixa.'
+        ),
+        unsafe_allow_html=True
+    )
+
+    if funil_path is None:
+        st.warning('Arquivo do FUNIL FIXA não encontrado no caminho configurado.')
+        st.code(str(FUNIL_FIXA_FILE_PATH))
+        return
+
+    funil_mtime = Path(funil_path).stat().st_mtime if Path(funil_path).exists() else None
+    tend_mtime = Path(tend_path).stat().st_mtime if tend_path is not None and Path(tend_path).exists() else None
+    df_funil = load_funil_fixa_ecommerce_data(
+        str(funil_path),
+        funil_mtime,
+        str(tend_path) if tend_path is not None else None,
+        tend_mtime
+    )
+    if df_funil.empty:
+        st.warning('Não foi possível carregar dados válidos do funil FIXA/E-Commerce.')
+        return
+
+    segmentos_disp = [
+        segmento for segmento in ['PF', 'PME']
+        if segmento in set(df_funil['SEGMENTO'].dropna().astype(str).str.strip().unique().tolist())
+    ]
+    opcoes_segmento = ['Todos'] + segmentos_disp
+    indice_padrao_segmento = opcoes_segmento.index('PME') if 'PME' in opcoes_segmento else 0
+    meses_funil_disp = (
+        df_funil[['MES_ANO_ORDEM', 'MES_ANO']]
+        .drop_duplicates()
+        .sort_values(['MES_ANO_ORDEM', 'MES_ANO'])
+        .drop_duplicates(subset=['MES_ANO_ORDEM'], keep='last')
+    )
+    meses_funil_labels = meses_funil_disp['MES_ANO'].astype(str).str.strip().str.lower().tolist()
+    mapa_mes_funil_ordem = {
+        str(linha['MES_ANO']).strip().lower(): int(linha['MES_ANO_ORDEM'])
+        for _, linha in meses_funil_disp.iterrows()
+    }
+    mes_funil_default = meses_funil_labels[-1] if meses_funil_labels else get_mes_atual_formatado().strip().lower()
+
+    col_f1, col_f2, col_f3, col_f4 = st.columns([0.9, 1.05, 1.2, 0.95], gap="medium")
+
+    with col_f1:
+        render_filter_label('Segmento')
+        segmento_sel = st.selectbox(
+            'Filtro de segmento do funil fixa',
+            options=opcoes_segmento,
+            index=indice_padrao_segmento,
+            key='funil_fixa_segmento_v2',
+            label_visibility='collapsed'
+        )
+
+    base_origem_ref = (
+        df_funil.copy()
+        if segmento_sel == 'Todos'
+        else df_funil[df_funil['SEGMENTO'].astype(str).eq(str(segmento_sel))].copy()
+    )
+    origens_disp = sorted(base_origem_ref['ORIGEM_AGG'].dropna().astype(str).str.strip().unique().tolist())
+    opcoes_origem = ['Todos'] + origens_disp
+    with col_f2:
+        render_filter_label('Origem')
+        origem_sel = st.selectbox(
+            'Filtro de origem do funil fixa',
+            options=opcoes_origem,
+            index=0,
+            key='funil_fixa_origem_v2',
+            label_visibility='collapsed'
+        )
+
+    base_indicador_ref = (
+        base_origem_ref.copy()
+        if origem_sel == 'Todos'
+        else base_origem_ref[base_origem_ref['ORIGEM_AGG'].astype(str).eq(str(origem_sel))].copy()
+    )
+    indicadores_disp = (
+        base_indicador_ref[['INDICADOR', 'INDICADOR_ORDEM']]
+        .drop_duplicates()
+        .sort_values(['INDICADOR_ORDEM', 'INDICADOR'])['INDICADOR']
+        .astype(str)
+        .tolist()
+    )
+    opcoes_indicador = ['Todos'] + indicadores_disp
+    with col_f3:
+        render_filter_label('Indicador')
+        indicador_sel = st.selectbox(
+            'Filtro de indicador do funil fixa',
+            options=opcoes_indicador,
+            index=0,
+            key='funil_fixa_indicador_v2',
+            label_visibility='collapsed'
+        )
+    with col_f4:
+        render_filter_label('Mês do gráfico')
+        mes_grafico_sel = st.selectbox(
+            'Filtro de mês do gráfico do funil fixa',
+            options=meses_funil_labels,
+            index=meses_funil_labels.index(mes_funil_default) if mes_funil_default in meses_funil_labels else 0,
+            key='funil_fixa_mes_grafico_v1',
+            label_visibility='collapsed'
+        )
+
+    segmentos_sel = None if segmento_sel == 'Todos' else [segmento_sel]
+    origens_sel = None if origem_sel == 'Todos' else [origem_sel]
+    indicadores_sel = None if indicador_sel == 'Todos' else [indicador_sel]
+    mes_ref_ordem_sel = mapa_mes_funil_ordem.get(str(mes_grafico_sel).strip().lower())
+
+    estrutura = montar_estrutura_funil_fixa_ecommerce(
+        df_funil=df_funil,
+        segmentos_sel=segmentos_sel,
+        origens_sel=origens_sel,
+        indicadores_sel=indicadores_sel,
+        mes_ref_ordem=mes_ref_ordem_sel,
+        qtd_meses=13
+    )
+
+    if not estrutura.get('rows'):
+        st.info('Sem dados para os filtros selecionados.')
+        return
+
+    altura_tabela = max(520, 118 + 36 * len(estrutura.get('rows', [])))
+    altura_corpo_tabela = min(max(altura_tabela - 84, 360), 840)
+    html_tabela = criar_tabela_html_funil_fixa_ecommerce(
+        estrutura,
+        table_id='funil-fixa-ecommerce',
+        max_body_height=altura_corpo_tabela
+    )
+    components.html(
+        html_tabela,
+        height=min(altura_corpo_tabela + 52, 900),
+        scrolling=False
+    )
+
+    st.markdown(
+        build_visual_title_html(
+            'FUNIL POR SEGMENTO - PME X PF',
+            'cart',
+            'subsection-title',
+            subtitle=f"MÊS: {str(mes_grafico_sel).upper()}",
+            extra_style='margin-top:-10px;'
+        ),
+        unsafe_allow_html=True
+    )
+    fig_funil_segmentado, observacao_funil_segmentado = criar_grafico_funil_segmentado_fixa(
+        df_funil=df_funil,
+        mes_ref=mes_grafico_sel,
+        origens_sel=origens_sel,
+        indicadores_sel=indicadores_sel
+    )
+    if not fig_funil_segmentado.data:
+        st.info('Sem dados disponíveis para montar o gráfico do funil no mês selecionado.')
+    else:
+        st.plotly_chart(
+            fig_funil_segmentado,
+            width='stretch',
+            config={'displayModeBar': False, 'displaylogo': False}
+        )
+
 file_path = str(RAW_PRIMARY_BASE_FILE_PATH)
 file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
 df = load_data(file_path, file_mtime)
@@ -11445,7 +12748,7 @@ tab0, tab1, tab3, tab4, tab5, tab6, tab2 = st.tabs([
     "PEDIDOS",
     "LIGAÇÕES",
     "ANALÍTICO",
-    "COTAÇÃO",
+    "FUNIL FIXA",
     "DESATIVAÇÕES"
 ])
 
@@ -11464,7 +12767,8 @@ components.html(
         LIGACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
         ANALITICO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"></rect><rect x="14" y="3" width="7" height="7" rx="1.6"></rect><rect x="3" y="14" width="7" height="7" rx="1.6"></rect><rect x="14" y="14" width="7" height="7" rx="1.6"></rect></svg>`,
         COTACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
-        COTACAO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`
+        COTACAO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
+        "FUNIL FIXA": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`
       };
 
       function normalizeTabLabel(value) {
@@ -12709,9 +14013,9 @@ with tab1:
                 return '54px'
             if 'Tend' in col_txt:
                 return '54px'
-            if 'OrÃ§' in col_txt and col_txt != 'TEND vs ORÃ‡':
+            if 'Orç' in col_txt and col_txt != 'TEND vs ORÇ':
                 return '54px'
-            if col_txt in {'MOM', 'TEND vs ORÃ‡'} or 'Alcance' in col_txt or 'Var' in col_txt:
+            if col_txt in {'MOM', 'TEND vs ORÇ'} or 'Alcance' in col_txt or 'Var' in col_txt:
                 return '58px'
             return '54px'
 
@@ -20255,18 +21559,22 @@ with tab5:
                     total_mes_anterior = float(pd.to_numeric(serie_atual['REAL_M1_DIA'], errors='coerce').fillna(0).sum())
                     total_meta_mes = float(pd.to_numeric(serie_atual['META_DIA'], errors='coerce').fillna(0).sum())
 
-                    categorias_totais = ['M-0', 'M-1', 'ORÇ']
-                    valores_totais = [total_real_mes, total_mes_anterior, total_meta_mes]
+                    categorias_totais = ['M-1', 'M-0', 'ORÇ']
+                    valores_totais = [total_mes_anterior, total_real_mes, total_meta_mes]
                     cores_totais = [
-                        cores_evolucao_semanal['REAL_ATUAL'],
                         cores_evolucao_semanal['REAL_M1'],
+                        cores_evolucao_semanal['REAL_ATUAL'],
                         cores_evolucao_semanal['META']
                     ]
                     fig_totais_sem = criar_grafico_barras_resumo_evolucao_semanal(
                         categorias_totais=categorias_totais,
                         valores_totais=valores_totais,
                         cores_totais=cores_totais,
-                        altura=460
+                        altura=460,
+                        comparacoes=[
+                            {'origem': 0, 'destino': 1},
+                            {'origem': 2, 'destino': 1}
+                        ]
                     )
                     home_inicio_ctx["evolucao_semanal_fig"] = fig_semanal
                     home_inicio_ctx["evolucao_semanal_resumo_fig"] = fig_totais_sem
@@ -20299,7 +21607,7 @@ with tab5:
                                 "RESUMO SEMANAL",
                                 "grid",
                                 "card-title",
-                                subtitle="M-0 • M-1 • ORÇ",
+                                subtitle="M-1 • M-0 • ORÇ",
                                 extra_style="margin: 0 0 8px 0;"
                             ),
                             unsafe_allow_html=True
@@ -22238,10 +23546,20 @@ with tab5:
 with tab6:
     st.markdown(
         build_visual_title_html(
-            "COTAÇÕES",
+            "FUNIL FIXA",
             "cart",
-            subtitle="ANÁLISE DO FLUXO DE VIDA DA COTAÇÃO"
+            subtitle="FUNIL DE VENDAS - E-COMMERCE"
         ),
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div style="margin-top:0.35rem;"></div>',
+        unsafe_allow_html=True
+    )
+    render_visual_funil_fixa_ecommerce()
+    st.markdown(
+        '<div style="margin:0.65rem 0 1.05rem 0; height:1px; background:linear-gradient(90deg, rgba(121,14,9,0.05), rgba(121,14,9,0.16), rgba(121,14,9,0.05));"></div>',
         unsafe_allow_html=True
     )
 
@@ -22256,7 +23574,7 @@ with tab6:
     else:
         st.sidebar.markdown("---")
         if st.sidebar.button(
-            "Atualizar COTAÇÕES",
+            "Atualizar Bloco Legado",
             key="refresh_cotacoes_cache",
             help="Limpa o cache da aba de COTAÇÕES e recarrega a base atual."
         ):
@@ -22314,7 +23632,7 @@ with tab6:
                 )
         else:
             st.sidebar.markdown("---")
-            st.sidebar.markdown("### 📄 FILTROS COTAÇÕES")
+            st.sidebar.markdown("### 📄 FILTROS - BLOCO LEGADO")
 
             regionais_cotacoes_disp = sorted(df_cotacoes_agregado["REGIONAL"].dropna().astype(str).unique().tolist())
             canais_cotacoes_disp = sorted(df_cotacoes_agregado["CANAL_PLAN"].dropna().astype(str).unique().tolist())
@@ -22924,6 +24242,100 @@ with tab6:
                 )
                 del df_cascata, df_status_cascata
 
+def build_home_source_filters_html(info_text: object, titulo: str = "Filtros de Origem") -> str:
+    partes = [
+        str(parte).strip()
+        for parte in str(info_text or "").split("|")
+        if str(parte).strip()
+    ]
+    if not partes:
+        return ""
+
+    chips = "".join(
+        f"""
+        <span style="
+            display:inline-flex;
+            align-items:center;
+            padding:0.34rem 0.72rem;
+            border-radius:999px;
+            border:1px solid rgba(121,14,9,0.16);
+            background:linear-gradient(135deg, rgba(121,14,9,0.09), rgba(121,14,9,0.03));
+            color:#6D201A;
+            font-size:12px;
+            font-weight:600;
+            line-height:1.1;
+            white-space:nowrap;
+        ">{escape(parte)}</span>
+        """
+        for parte in partes
+    )
+    return f"""
+    <div style="
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:8px;
+        margin:0.15rem 0 0.8rem 0;
+    ">
+        <span style="
+            font-size:11px;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:0.08em;
+            color:#790E09;
+        ">{escape(str(titulo))}</span>
+        {chips}
+    </div>
+    """
+
+def render_home_synced_selectbox(
+    filter_label_text: str,
+    widget_label: str,
+    options,
+    source_key: str,
+    home_key: str,
+    default_value=None
+):
+    opcoes = list(options or [])
+    if not opcoes:
+        return None
+
+    valor_padrao = default_value if default_value in opcoes else opcoes[0]
+    valor_source = st.session_state.get(source_key, valor_padrao)
+    if valor_source not in opcoes:
+        valor_source = valor_padrao
+
+    sync_key = f"{home_key}__last_synced"
+    if home_key not in st.session_state:
+        st.session_state[home_key] = valor_source
+        st.session_state[sync_key] = valor_source
+    else:
+        ultimo_sync = st.session_state.get(sync_key)
+        valor_home = st.session_state.get(home_key)
+        if valor_home not in opcoes:
+            st.session_state[home_key] = valor_source
+            st.session_state[sync_key] = valor_source
+        elif valor_source != ultimo_sync and valor_home == ultimo_sync:
+            st.session_state[home_key] = valor_source
+            st.session_state[sync_key] = valor_source
+
+    render_filter_label(filter_label_text)
+    selecionado = st.selectbox(
+        widget_label,
+        options=opcoes,
+        index=opcoes.index(st.session_state.get(home_key, valor_source)),
+        key=home_key,
+        label_visibility="collapsed"
+    )
+
+    if selecionado != valor_source:
+        st.session_state[source_key] = selecionado
+        st.session_state[sync_key] = selecionado
+        st.rerun()
+
+    st.session_state[sync_key] = valor_source
+    return selecionado
+
 with tab0:
     st.markdown(
         build_visual_title_html(
@@ -22938,11 +24350,32 @@ with tab0:
         build_visual_title_html("RESULTADO DOS CANAIS", "grid", "subsection-title"),
         unsafe_allow_html=True
     )
-    if home_inicio_ctx.get("resultado_info"):
-        st.markdown(
-            f'<div class="analitico-corte-info">{escape(str(home_inicio_ctx.get("resultado_info")))}</div>',
-            unsafe_allow_html=True
+    meses_analitico_home = list(globals().get("meses_analitico", []) or [])
+    regionais_analitico_home = list(globals().get("regionais_analitico", []) or [])
+    if meses_analitico_home and regionais_analitico_home:
+        resultado_mes_default = st.session_state.get(
+            "analitico_resultado_mes_ref",
+            meses_analitico_home[-1]
         )
+        col_home_res_f1, col_home_res_f2 = st.columns([1.1, 1.1])
+        with col_home_res_f1:
+            render_home_synced_selectbox(
+                "SELECIONE O MÊS",
+                "Mês de referência na capa",
+                meses_analitico_home,
+                "analitico_resultado_mes_ref",
+                "home_resultado_mes_ref_widget",
+                default_value=resultado_mes_default
+            )
+        with col_home_res_f2:
+            render_home_synced_selectbox(
+                "REGIONAL",
+                "Regional na capa",
+                regionais_analitico_home,
+                "analitico_resultado_regional_ref",
+                "home_resultado_regional_ref_widget",
+                default_value=st.session_state.get("analitico_resultado_regional_ref", regionais_analitico_home[0])
+            )
     html_resultado_conta_home = home_inicio_ctx.get("resultado_conta", "")
     html_resultado_fixa_home = home_inicio_ctx.get("resultado_fixa", "")
     if html_resultado_conta_home or html_resultado_fixa_home:
@@ -22968,11 +24401,49 @@ with tab0:
         build_visual_title_html("EVOLUÇÃO SEMANAL", "trend", "subsection-title", extra_style="margin-top:14px;"),
         unsafe_allow_html=True
     )
-    if home_inicio_ctx.get("evolucao_semanal_info"):
-        st.markdown(
-            f'<div class="analitico-corte-info">{escape(str(home_inicio_ctx.get("evolucao_semanal_info")))}</div>',
-            unsafe_allow_html=True
-        )
+    meses_sem_home = list(globals().get("meses_disp_sem", []) or [])
+    canais_sem_home = list(globals().get("canais_disp_sem", []) or [])
+    produtos_sem_home = list(globals().get("produtos_disp_sem", []) or [])
+    regionais_sem_home = list(globals().get("regionais_disp_sem", []) or [])
+    if meses_sem_home and canais_sem_home and produtos_sem_home and regionais_sem_home:
+        mes_sem_home_default = st.session_state.get("analitico_evolucao_semanal_mes", meses_sem_home[-1])
+        col_home_sem_f1, col_home_sem_f2, col_home_sem_f3, col_home_sem_f4 = st.columns([1, 1, 1, 1])
+        with col_home_sem_f1:
+            render_home_synced_selectbox(
+                "SELECIONE O MÊS",
+                "Mês da evolução semanal na capa",
+                meses_sem_home,
+                "analitico_evolucao_semanal_mes",
+                "home_evolucao_semanal_mes_widget",
+                default_value=mes_sem_home_default
+            )
+        with col_home_sem_f2:
+            render_home_synced_selectbox(
+                "CANAL",
+                "Canal da evolução semanal na capa",
+                canais_sem_home,
+                "analitico_evolucao_semanal_canal",
+                "home_evolucao_semanal_canal_widget",
+                default_value=st.session_state.get("analitico_evolucao_semanal_canal", canais_sem_home[0])
+            )
+        with col_home_sem_f3:
+            render_home_synced_selectbox(
+                "PRODUTO",
+                "Produto da evolução semanal na capa",
+                produtos_sem_home,
+                "analitico_evolucao_semanal_produto",
+                "home_evolucao_semanal_produto_widget",
+                default_value=st.session_state.get("analitico_evolucao_semanal_produto", produtos_sem_home[0])
+            )
+        with col_home_sem_f4:
+            render_home_synced_selectbox(
+                "REGIONAL",
+                "Regional da evolução semanal na capa",
+                regionais_sem_home,
+                "analitico_evolucao_semanal_regional",
+                "home_evolucao_semanal_regional_widget",
+                default_value=st.session_state.get("analitico_evolucao_semanal_regional", regionais_sem_home[0])
+            )
     fig_home_sem = home_inicio_ctx.get("evolucao_semanal_fig")
     fig_home_sem_resumo = home_inicio_ctx.get("evolucao_semanal_resumo_fig")
     if fig_home_sem is not None and fig_home_sem_resumo is not None:
@@ -23004,7 +24475,7 @@ with tab0:
                     "RESUMO SEMANAL",
                     "grid",
                     "card-title",
-                    subtitle="M-0 • M-1 • ORÇ",
+                    subtitle="M-1 • M-0 • ORÇ",
                     extra_style="margin: 0 0 8px 0;"
                 ),
                 unsafe_allow_html=True
@@ -23022,11 +24493,44 @@ with tab0:
         build_visual_title_html("RESUMO SEMANAL", "grid", "subsection-title", extra_style="margin-top:14px;"),
         unsafe_allow_html=True
     )
-    if home_inicio_ctx.get("resumo_semanal_info"):
-        st.markdown(
-            f'<div class="analitico-corte-info">{escape(str(home_inicio_ctx.get("resumo_semanal_info")))}</div>',
-            unsafe_allow_html=True
-        )
+    if meses_sem_home and canais_sem_home and produtos_sem_home and regionais_sem_home:
+        col_home_res_sem_f1, col_home_res_sem_f2, col_home_res_sem_f3, col_home_res_sem_f4 = st.columns([1, 1, 1, 1])
+        with col_home_res_sem_f1:
+            render_home_synced_selectbox(
+                "SELECIONE O MÊS",
+                "Mês do resumo semanal na capa",
+                meses_sem_home,
+                "analitico_evolucao_semanal_mes",
+                "home_resumo_semanal_mes_widget",
+                default_value=st.session_state.get("analitico_evolucao_semanal_mes", meses_sem_home[-1])
+            )
+        with col_home_res_sem_f2:
+            render_home_synced_selectbox(
+                "CANAL",
+                "Canal do resumo semanal na capa",
+                canais_sem_home,
+                "analitico_evolucao_semanal_canal",
+                "home_resumo_semanal_canal_widget",
+                default_value=st.session_state.get("analitico_evolucao_semanal_canal", canais_sem_home[0])
+            )
+        with col_home_res_sem_f3:
+            render_home_synced_selectbox(
+                "PRODUTO",
+                "Produto do resumo semanal na capa",
+                produtos_sem_home,
+                "analitico_evolucao_semanal_produto",
+                "home_resumo_semanal_produto_widget",
+                default_value=st.session_state.get("analitico_evolucao_semanal_produto", produtos_sem_home[0])
+            )
+        with col_home_res_sem_f4:
+            render_home_synced_selectbox(
+                "REGIONAL",
+                "Regional do resumo semanal na capa",
+                regionais_sem_home,
+                "analitico_evolucao_semanal_regional",
+                "home_resumo_semanal_regional_widget",
+                default_value=st.session_state.get("analitico_evolucao_semanal_regional", regionais_sem_home[0])
+            )
     html_resumo_conta_home = home_inicio_ctx.get("resumo_semanal_conta", "")
     html_resumo_fixa_home = home_inicio_ctx.get("resumo_semanal_fixa", "")
     if html_resumo_conta_home:
@@ -23048,11 +24552,28 @@ with tab0:
         build_visual_title_html("PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES", "grid", "subsection-title", extra_style="margin-top:14px;"),
         unsafe_allow_html=True
     )
-    if home_inicio_ctx.get("regional_info"):
-        st.markdown(
-            f'<div class="analitico-corte-info">{escape(str(home_inicio_ctx.get("regional_info")))}</div>',
-            unsafe_allow_html=True
-        )
+    meses_reg_home = list(globals().get("meses_disp_reg", []) or [])
+    canais_reg_home = list(globals().get("canal_disp_reg", []) or [])
+    if meses_reg_home and canais_reg_home:
+        col_home_reg_f1, col_home_reg_f2 = st.columns([1, 1], gap="small")
+        with col_home_reg_f1:
+            render_home_synced_selectbox(
+                "SELECIONE O MÊS",
+                "Mês da visão regional na capa",
+                meses_reg_home,
+                "reg_viz_mes",
+                "home_reg_viz_mes_widget",
+                default_value=st.session_state.get("reg_viz_mes", meses_reg_home[-1])
+            )
+        with col_home_reg_f2:
+            render_home_synced_selectbox(
+                "CANAL",
+                "Canal da visão regional na capa",
+                canais_reg_home,
+                "reg_viz_canal",
+                "home_reg_viz_canal_widget",
+                default_value=st.session_state.get("reg_viz_canal", canais_reg_home[0])
+            )
     html_regional_conta_home = home_inicio_ctx.get("regional_conta", "")
     html_regional_fixa_home = home_inicio_ctx.get("regional_fixa", "")
     if html_regional_conta_home or html_regional_fixa_home:
@@ -23195,11 +24716,36 @@ with tab0:
         build_visual_title_html("NECESSIDADE DIÁRIA POR CANAL/PRODUTO", "target", "subsection-title", extra_style="margin-top:14px;"),
         unsafe_allow_html=True
     )
-    if home_inicio_ctx.get("necessidade_info"):
-        st.markdown(
-            f'<div class="analitico-corte-info">{escape(str(home_inicio_ctx.get("necessidade_info")))}</div>',
-            unsafe_allow_html=True
-        )
+    canais_analitico_home = list(globals().get("canais_analitico", []) or [])
+    if meses_analitico_home and regionais_analitico_home and canais_analitico_home:
+        col_home_need_f1, col_home_need_f2, col_home_need_f3 = st.columns([1.0, 1.0, 1.2])
+        with col_home_need_f1:
+            render_home_synced_selectbox(
+                "SELECIONE O MÊS",
+                "Mês da necessidade diária na capa",
+                meses_analitico_home,
+                "analitico_mes_ref",
+                "home_necessidade_mes_widget",
+                default_value=st.session_state.get("analitico_mes_ref", meses_analitico_home[-1])
+            )
+        with col_home_need_f2:
+            render_home_synced_selectbox(
+                "REGIONAL",
+                "Regional da necessidade diária na capa",
+                regionais_analitico_home,
+                "analitico_regional_ref",
+                "home_necessidade_regional_widget",
+                default_value=st.session_state.get("analitico_regional_ref", regionais_analitico_home[0])
+            )
+        with col_home_need_f3:
+            render_home_synced_selectbox(
+                "CANAL",
+                "Canal da necessidade diária na capa",
+                canais_analitico_home,
+                "analitico_canal_ref",
+                "home_necessidade_canal_widget",
+                default_value=st.session_state.get("analitico_canal_ref", canais_analitico_home[0])
+            )
     html_need_conta_home = home_inicio_ctx.get("necessidade_conta", "")
     html_need_fixa_home = home_inicio_ctx.get("necessidade_fixa", "")
     if html_need_conta_home:
