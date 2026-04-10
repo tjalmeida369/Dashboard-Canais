@@ -4109,7 +4109,7 @@ RAW_LIGACOES_FILE_PATH = Path(
 )
 RAW_COTACOES_FILE_PATH = DASHBOARD_DATA_DIR / "RelatorioFluxoVidaCotacao.xlsx"
 RAW_BACKLOG_CONSOLIDADO_FILE_PATH = (
-    DASHBOARD_DATA_DIR / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
+    DASHBOARD_DATA_DIR / "backlog_consolidado.csv"
 )
 
 
@@ -20758,7 +20758,7 @@ with tab5:
 
         backlog_candidates = [
             BACKLOG_CONSOLIDADO_FILE_PATH,
-            Path(__file__).resolve().parent / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
+            Path(__file__).resolve().parent / "backlog_consolidado.csv"
         ]
         backlog_path = next((path for path in backlog_candidates if Path(path).exists()), None)
 
