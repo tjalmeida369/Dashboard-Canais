@@ -14,7 +14,9 @@ import shutil
 import tempfile
 import gc
 import unicodedata
+import io
 from html import escape
+from html.parser import HTMLParser
 from textwrap import dedent
 base_template = go.layout.Template(
     layout=go.Layout(
@@ -238,7 +240,7 @@ DASHBOARD_APP_DIR = Path(__file__).resolve().parent
 DASHBOARD_FILES_DIR_PROD = Path(
     r""
 )
-DASHBOARD_FILES_DIR_LOCAL = DASHBOARD_APP_DIR / "Arquivos_Dashboard"
+DASHBOARD_FILES_DIR_LOCAL = DASHBOARD_APP_DIR / ""
 DASHBOARD_FILES_DIR = (
     DASHBOARD_FILES_DIR_PROD
     if DASHBOARD_FILES_DIR_PROD.exists()
@@ -246,6 +248,214 @@ DASHBOARD_FILES_DIR = (
 )
 LOGO_FILE_PATH = DASHBOARD_FILES_DIR / "logo_claro_empresas.png"
 OBS_RESULTADO_FILE_PATH = DASHBOARD_FILES_DIR / "obs_resultado_canais.txt"
+
+EXPORTAR_GRAFICOS_ALTA_QUALIDADE = True
+EXPORTAR_TABELAS_HTML = True
+PLOTLY_DOWNLOAD_SCALE = 4
+_ORIGINAL_ST_PLOTLY_CHART = st.plotly_chart
+_ORIGINAL_ST_MARKDOWN = st.markdown
+_ORIGINAL_COMPONENTS_HTML = components.html
+_EXPORT_TABLE_COUNTER = 0
+_EXPORT_CHART_COUNTER = 0
+
+def _nome_arquivo_exportacao(texto: str, fallback: str) -> str:
+    """Gera nomes seguros para arquivos baixados no dashboard."""
+    nome = normalizar_chave_visual(texto or fallback).replace(" ", "_")
+    nome = re.sub(r"_+", "_", nome).strip("_")
+    return nome or fallback
+
+def _nome_grafico_plotly(fig) -> str:
+    """Extrai um nome amigável do título do gráfico, quando existir."""
+    global _EXPORT_CHART_COUNTER
+    _EXPORT_CHART_COUNTER += 1
+    fallback = f"grafico_dashboard_{_EXPORT_CHART_COUNTER:03d}"
+    try:
+        titulo = getattr(getattr(fig, "layout", None), "title", None)
+        texto_titulo = getattr(titulo, "text", "") or ""
+        texto_titulo = re.sub(r"<[^>]+>", " ", str(texto_titulo))
+        return _nome_arquivo_exportacao(texto_titulo, fallback)
+    except Exception:
+        return fallback
+
+def _config_plotly_exportacao(fig, config_usuario: dict | None) -> dict:
+    """Ativa o download de imagem em alta resolução em todos os gráficos Plotly."""
+    config = dict(config_usuario or {})
+    to_image = dict(config.get("toImageButtonOptions") or {})
+    to_image.setdefault("format", "png")
+    to_image.setdefault("scale", PLOTLY_DOWNLOAD_SCALE)
+    to_image.setdefault("filename", _nome_grafico_plotly(fig))
+    config["toImageButtonOptions"] = to_image
+    config["displayModeBar"] = config.get("displayModeBar") or "hover"
+    if config["displayModeBar"] is False:
+        config["displayModeBar"] = "hover"
+    config["displaylogo"] = False
+    config.setdefault("responsive", True)
+    return config
+
+def _plotly_chart_com_exportacao(*args, **kwargs):
+    """Wrapper de teste para disponibilizar download em alta qualidade nos gráficos."""
+    if EXPORTAR_GRAFICOS_ALTA_QUALIDADE:
+        fig = args[0] if args else kwargs.get("figure_or_data", None)
+        kwargs["config"] = _config_plotly_exportacao(fig, kwargs.get("config"))
+    return _ORIGINAL_ST_PLOTLY_CHART(*args, **kwargs)
+
+def _df_para_excel_bytes(df: pd.DataFrame) -> bytes:
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Tabela")
+    return buffer.getvalue()
+
+def _normalizar_tabela_exportacao(df: pd.DataFrame) -> pd.DataFrame:
+    df_export = df.copy()
+    if isinstance(df_export.columns, pd.MultiIndex):
+        df_export.columns = [
+            " ".join([str(parte) for parte in coluna if str(parte) != "nan"]).strip()
+            for coluna in df_export.columns
+        ]
+    df_export.columns = [str(coluna).strip() for coluna in df_export.columns]
+    return df_export
+
+class _PrimeiraTabelaHTMLParser(HTMLParser):
+    """Extrai a primeira tabela HTML sem depender de lxml/html5lib."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.in_table = False
+        self.finished = False
+        self.in_row = False
+        self.in_cell = False
+        self.current_row: list[str] = []
+        self.current_cell: list[str] = []
+        self.rows: list[list[str]] = []
+
+    def handle_starttag(self, tag, attrs):
+        tag = str(tag).lower()
+        if tag == "table" and not self.in_table and not self.finished:
+            self.in_table = True
+            return
+        if not self.in_table:
+            return
+        if tag == "tr":
+            self.in_row = True
+            self.current_row = []
+        elif tag in {"td", "th"} and self.in_row:
+            self.in_cell = True
+            self.current_cell = []
+        elif tag == "br" and self.in_cell:
+            self.current_cell.append(" ")
+
+    def handle_data(self, data):
+        if self.in_table and self.in_cell:
+            texto = str(data).strip()
+            if texto:
+                self.current_cell.append(texto)
+
+    def handle_endtag(self, tag):
+        tag = str(tag).lower()
+        if not self.in_table:
+            return
+        if tag in {"td", "th"} and self.in_cell:
+            texto = " ".join(" ".join(self.current_cell).split())
+            self.current_row.append(texto)
+            self.current_cell = []
+            self.in_cell = False
+        elif tag == "tr" and self.in_row:
+            if any(str(celula).strip() for celula in self.current_row):
+                self.rows.append(self.current_row)
+            self.current_row = []
+            self.in_row = False
+        elif tag == "table":
+            self.in_table = False
+            self.finished = True
+
+def _deduplicar_colunas_exportacao(colunas: list[str]) -> list[str]:
+    vistos: dict[str, int] = {}
+    saida: list[str] = []
+    for idx, coluna in enumerate(colunas, start=1):
+        nome = str(coluna or "").strip() or f"Coluna {idx}"
+        vistos[nome] = vistos.get(nome, 0) + 1
+        saida.append(nome if vistos[nome] == 1 else f"{nome}_{vistos[nome]}")
+    return saida
+
+def _extrair_tabela_html_para_exportacao(html: str) -> pd.DataFrame:
+    parser = _PrimeiraTabelaHTMLParser()
+    parser.feed(str(html))
+    rows = [row for row in parser.rows if row]
+    if len(rows) < 2:
+        return pd.DataFrame()
+    max_cols = max(len(row) for row in rows)
+    rows_norm = [row + [""] * (max_cols - len(row)) for row in rows]
+    colunas = _deduplicar_colunas_exportacao(rows_norm[0])
+    return _normalizar_tabela_exportacao(pd.DataFrame(rows_norm[1:], columns=colunas))
+
+def _nome_tabela_exportacao(html: str) -> str:
+    match_classe = re.search(r"<table[^>]*class=[\"']([^\"']+)[\"']", html, flags=re.IGNORECASE)
+    if match_classe:
+        classe = str(match_classe.group(1)).split()[0]
+        return _nome_arquivo_exportacao(classe, "tabela_dashboard")
+    return "tabela_dashboard"
+
+def _renderizar_botoes_download_tabela(html: str) -> None:
+    """Adiciona downloads CSV/XLSX/HTML para as tabelas HTML do app."""
+    global _EXPORT_TABLE_COUNTER
+    if not EXPORTAR_TABELAS_HTML or "<table" not in str(html).lower():
+        return
+
+    try:
+        df_export = _extrair_tabela_html_para_exportacao(str(html))
+    except Exception:
+        df_export = pd.DataFrame()
+
+    if df_export.empty:
+        return
+
+    _EXPORT_TABLE_COUNTER += 1
+    base_nome = f"{_nome_tabela_exportacao(str(html))}_{_EXPORT_TABLE_COUNTER:03d}"
+    csv_bytes = df_export.to_csv(index=False, sep=";", encoding="utf-8-sig").encode("utf-8-sig")
+    excel_bytes = _df_para_excel_bytes(df_export)
+    html_bytes = str(html).encode("utf-8")
+
+    cols_download = st.columns([0.34, 0.33, 0.33], gap="small")
+    with cols_download[0]:
+        st.download_button(
+            "Baixar Excel",
+            data=excel_bytes,
+            file_name=f"{base_nome}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_excel_{base_nome}"
+        )
+    with cols_download[1]:
+        st.download_button(
+            "Baixar CSV",
+            data=csv_bytes,
+            file_name=f"{base_nome}.csv",
+            mime="text/csv",
+            key=f"download_csv_{base_nome}"
+        )
+    with cols_download[2]:
+        st.download_button(
+            "Baixar tabela HTML",
+            data=html_bytes,
+            file_name=f"{base_nome}.html",
+            mime="text/html",
+            key=f"download_html_{base_nome}"
+        )
+
+def _markdown_com_exportacao_tabela(body, *args, **kwargs):
+    resultado = _ORIGINAL_ST_MARKDOWN(body, *args, **kwargs)
+    unsafe_html = bool(kwargs.get("unsafe_allow_html", False))
+    if unsafe_html and isinstance(body, str) and "<table" in body.lower():
+        _renderizar_botoes_download_tabela(body)
+    return resultado
+
+def _components_html_com_exportacao(html, *args, **kwargs):
+    resultado = _ORIGINAL_COMPONENTS_HTML(html, *args, **kwargs)
+    if isinstance(html, str) and "<table" in html.lower():
+        _renderizar_botoes_download_tabela(html)
+    return resultado
+
+st.plotly_chart = _plotly_chart_com_exportacao
+st.markdown = _markdown_com_exportacao_tabela
+components.html = _components_html_com_exportacao
 
 def render_header_logo():
     """Render top-right logo if the local PNG file exists."""
