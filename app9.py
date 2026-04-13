@@ -249,12 +249,48 @@ DASHBOARD_FILES_DIR = (
 LOGO_FILE_PATH = DASHBOARD_FILES_DIR / "logo_claro_empresas.png"
 OBS_RESULTADO_FILE_PATH = DASHBOARD_FILES_DIR / "obs_resultado_canais.txt"
 
+def _recuperar_original_wrapper_exportacao(metodo_atual, nome_global_original: str):
+    """Recupera o metodo original caso o Streamlit tenha mantido um wrapper de um rerun anterior."""
+    try:
+        if getattr(metodo_atual, "__name__", "") in {
+            "_plotly_chart_com_exportacao",
+            "_markdown_com_exportacao_tabela",
+            "_components_html_com_exportacao",
+        }:
+            original = getattr(metodo_atual, "__globals__", {}).get(nome_global_original)
+            if original is not None and original is not metodo_atual:
+                return original
+    except Exception:
+        return None
+    return None
+
 EXPORTAR_GRAFICOS_ALTA_QUALIDADE = True
 EXPORTAR_TABELAS_HTML = True
 PLOTLY_DOWNLOAD_SCALE = 4
-_ORIGINAL_ST_PLOTLY_CHART = st.plotly_chart
-_ORIGINAL_ST_MARKDOWN = st.markdown
-_ORIGINAL_COMPONENTS_HTML = components.html
+_CURRENT_ST_PLOTLY_CHART = st.plotly_chart
+_CURRENT_ST_MARKDOWN = st.markdown
+_CURRENT_COMPONENTS_HTML = components.html
+_ORIGINAL_ST_PLOTLY_CHART = (
+    getattr(_CURRENT_ST_PLOTLY_CHART, "_dashboard_export_original", None)
+    or getattr(st, "_dashboard_export_original_plotly_chart", None)
+    or _recuperar_original_wrapper_exportacao(_CURRENT_ST_PLOTLY_CHART, "_ORIGINAL_ST_PLOTLY_CHART")
+    or _CURRENT_ST_PLOTLY_CHART
+)
+_ORIGINAL_ST_MARKDOWN = (
+    getattr(_CURRENT_ST_MARKDOWN, "_dashboard_export_original", None)
+    or getattr(st, "_dashboard_export_original_markdown", None)
+    or _recuperar_original_wrapper_exportacao(_CURRENT_ST_MARKDOWN, "_ORIGINAL_ST_MARKDOWN")
+    or _CURRENT_ST_MARKDOWN
+)
+_ORIGINAL_COMPONENTS_HTML = (
+    getattr(_CURRENT_COMPONENTS_HTML, "_dashboard_export_original", None)
+    or getattr(components, "_dashboard_export_original_html", None)
+    or _recuperar_original_wrapper_exportacao(_CURRENT_COMPONENTS_HTML, "_ORIGINAL_COMPONENTS_HTML")
+    or _CURRENT_COMPONENTS_HTML
+)
+setattr(st, "_dashboard_export_original_plotly_chart", _ORIGINAL_ST_PLOTLY_CHART)
+setattr(st, "_dashboard_export_original_markdown", _ORIGINAL_ST_MARKDOWN)
+setattr(components, "_dashboard_export_original_html", _ORIGINAL_COMPONENTS_HTML)
 _EXPORT_TABLE_COUNTER = 0
 _EXPORT_CHART_COUNTER = 0
 
@@ -453,6 +489,9 @@ def _components_html_com_exportacao(html, *args, **kwargs):
         _renderizar_botoes_download_tabela(html)
     return resultado
 
+_plotly_chart_com_exportacao._dashboard_export_original = _ORIGINAL_ST_PLOTLY_CHART
+_markdown_com_exportacao_tabela._dashboard_export_original = _ORIGINAL_ST_MARKDOWN
+_components_html_com_exportacao._dashboard_export_original = _ORIGINAL_COMPONENTS_HTML
 st.plotly_chart = _plotly_chart_com_exportacao
 st.markdown = _markdown_com_exportacao_tabela
 components.html = _components_html_com_exportacao
