@@ -15,6 +15,7 @@ import tempfile
 import gc
 import unicodedata
 import io
+import uuid
 from html import escape
 from html.parser import HTMLParser
 from textwrap import dedent
@@ -249,20 +250,44 @@ DASHBOARD_FILES_DIR = (
 LOGO_FILE_PATH = DASHBOARD_FILES_DIR / "logo_claro_empresas.png"
 OBS_RESULTADO_FILE_PATH = DASHBOARD_FILES_DIR / "obs_resultado_canais.txt"
 
-def _recuperar_original_wrapper_exportacao(metodo_atual, nome_global_original: str):
-    """Recupera o metodo original caso o Streamlit tenha mantido um wrapper de um rerun anterior."""
-    try:
-        if getattr(metodo_atual, "__name__", "") in {
-            "_plotly_chart_com_exportacao",
-            "_markdown_com_exportacao_tabela",
-            "_components_html_com_exportacao",
-        }:
-            original = getattr(metodo_atual, "__globals__", {}).get(nome_global_original)
-            if original is not None and original is not metodo_atual:
-                return original
-    except Exception:
-        return None
-    return None
+_EXPORT_WRAPPER_NAMES = {
+    "_plotly_chart_com_exportacao",
+    "_markdown_com_exportacao_tabela",
+    "_components_html_com_exportacao",
+}
+
+def _desembrulhar_metodo_exportacao(metodo_atual, nome_global_original: str):
+    """Remove camadas antigas de wrapper mantidas pelo rerun do Streamlit."""
+    metodo = metodo_atual
+    visitados: set[int] = set()
+    for _ in range(12):
+        if metodo is None:
+            return metodo_atual
+        metodo_id = id(metodo)
+        if metodo_id in visitados:
+            return metodo
+        visitados.add(metodo_id)
+
+        candidatos = []
+        try:
+            original_attr = getattr(metodo, "_dashboard_export_original", None)
+            if original_attr is not None and original_attr is not metodo:
+                candidatos.append(original_attr)
+        except Exception:
+            pass
+
+        try:
+            if getattr(metodo, "__name__", "") in _EXPORT_WRAPPER_NAMES:
+                original_global = getattr(metodo, "__globals__", {}).get(nome_global_original)
+                if original_global is not None and original_global is not metodo:
+                    candidatos.append(original_global)
+        except Exception:
+            pass
+
+        if not candidatos:
+            return metodo
+        metodo = candidatos[0]
+    return metodo
 
 EXPORTAR_GRAFICOS_ALTA_QUALIDADE = True
 EXPORTAR_TABELAS_HTML = True
@@ -270,23 +295,17 @@ PLOTLY_DOWNLOAD_SCALE = 4
 _CURRENT_ST_PLOTLY_CHART = st.plotly_chart
 _CURRENT_ST_MARKDOWN = st.markdown
 _CURRENT_COMPONENTS_HTML = components.html
-_ORIGINAL_ST_PLOTLY_CHART = (
-    getattr(_CURRENT_ST_PLOTLY_CHART, "_dashboard_export_original", None)
-    or getattr(st, "_dashboard_export_original_plotly_chart", None)
-    or _recuperar_original_wrapper_exportacao(_CURRENT_ST_PLOTLY_CHART, "_ORIGINAL_ST_PLOTLY_CHART")
-    or _CURRENT_ST_PLOTLY_CHART
+_ORIGINAL_ST_PLOTLY_CHART = _desembrulhar_metodo_exportacao(
+    getattr(st, "_dashboard_export_original_plotly_chart", None) or _CURRENT_ST_PLOTLY_CHART,
+    "_ORIGINAL_ST_PLOTLY_CHART",
 )
-_ORIGINAL_ST_MARKDOWN = (
-    getattr(_CURRENT_ST_MARKDOWN, "_dashboard_export_original", None)
-    or getattr(st, "_dashboard_export_original_markdown", None)
-    or _recuperar_original_wrapper_exportacao(_CURRENT_ST_MARKDOWN, "_ORIGINAL_ST_MARKDOWN")
-    or _CURRENT_ST_MARKDOWN
+_ORIGINAL_ST_MARKDOWN = _desembrulhar_metodo_exportacao(
+    getattr(st, "_dashboard_export_original_markdown", None) or _CURRENT_ST_MARKDOWN,
+    "_ORIGINAL_ST_MARKDOWN",
 )
-_ORIGINAL_COMPONENTS_HTML = (
-    getattr(_CURRENT_COMPONENTS_HTML, "_dashboard_export_original", None)
-    or getattr(components, "_dashboard_export_original_html", None)
-    or _recuperar_original_wrapper_exportacao(_CURRENT_COMPONENTS_HTML, "_ORIGINAL_COMPONENTS_HTML")
-    or _CURRENT_COMPONENTS_HTML
+_ORIGINAL_COMPONENTS_HTML = _desembrulhar_metodo_exportacao(
+    getattr(components, "_dashboard_export_original_html", None) or _CURRENT_COMPONENTS_HTML,
+    "_ORIGINAL_COMPONENTS_HTML",
 )
 setattr(st, "_dashboard_export_original_plotly_chart", _ORIGINAL_ST_PLOTLY_CHART)
 setattr(st, "_dashboard_export_original_markdown", _ORIGINAL_ST_MARKDOWN)
@@ -446,6 +465,7 @@ def _renderizar_botoes_download_tabela(html: str) -> None:
 
     _EXPORT_TABLE_COUNTER += 1
     base_nome = f"{_nome_tabela_exportacao(str(html))}_{_EXPORT_TABLE_COUNTER:03d}"
+    key_salt = uuid.uuid4().hex[:10]
     csv_bytes = df_export.to_csv(index=False, sep=";", encoding="utf-8-sig").encode("utf-8-sig")
     excel_bytes = _df_para_excel_bytes(df_export)
     html_bytes = str(html).encode("utf-8")
@@ -457,7 +477,7 @@ def _renderizar_botoes_download_tabela(html: str) -> None:
             data=excel_bytes,
             file_name=f"{base_nome}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_excel_{base_nome}"
+            key=f"download_excel_{base_nome}_{key_salt}"
         )
     with cols_download[1]:
         st.download_button(
@@ -465,7 +485,7 @@ def _renderizar_botoes_download_tabela(html: str) -> None:
             data=csv_bytes,
             file_name=f"{base_nome}.csv",
             mime="text/csv",
-            key=f"download_csv_{base_nome}"
+            key=f"download_csv_{base_nome}_{key_salt}"
         )
     with cols_download[2]:
         st.download_button(
@@ -473,7 +493,7 @@ def _renderizar_botoes_download_tabela(html: str) -> None:
             data=html_bytes,
             file_name=f"{base_nome}.html",
             mime="text/html",
-            key=f"download_html_{base_nome}"
+            key=f"download_html_{base_nome}_{key_salt}"
         )
 
 def _markdown_com_exportacao_tabela(body, *args, **kwargs):
@@ -21319,7 +21339,7 @@ with tab5:
 
         backlog_candidates = [
             BACKLOG_CONSOLIDADO_FILE_PATH,
-            Path(__file__).resolve().parent / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
+            Path(__file__).resolve().parent /"backlog_consolidado.csv"
         ]
         backlog_path = next((path for path in backlog_candidates if Path(path).exists()), None)
 
