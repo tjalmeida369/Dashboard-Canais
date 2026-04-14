@@ -14,10 +14,7 @@ import shutil
 import tempfile
 import gc
 import unicodedata
-import io
-import uuid
 from html import escape
-from html.parser import HTMLParser
 from textwrap import dedent
 base_template = go.layout.Template(
     layout=go.Layout(
@@ -247,8 +244,47 @@ DASHBOARD_FILES_DIR = (
     if DASHBOARD_FILES_DIR_PROD.exists()
     else (DASHBOARD_FILES_DIR_LOCAL if DASHBOARD_FILES_DIR_LOCAL.exists() else DASHBOARD_APP_DIR)
 )
-LOGO_FILE_PATH = DASHBOARD_FILES_DIR / "logo_claro_empresas.png"
-OBS_RESULTADO_FILE_PATH = DASHBOARD_FILES_DIR / "obs_resultado_canais.txt"
+DASHBOARD_LEGACY_MOBILITY_DIR = Path(
+    r""
+)
+DASHBOARD_FILE_SEARCH_DIRS = (
+    DASHBOARD_FILES_DIR,
+    DASHBOARD_FILES_DIR_LOCAL,
+    DASHBOARD_FILES_DIR_PROD,
+    DASHBOARD_APP_DIR,
+)
+
+def resolver_arquivo_dashboard(nome_arquivo: str | Path, *fallbacks: str | Path) -> Path:
+    """Resolve arquivos do dashboard priorizando a pasta Arquivos_Dashboard."""
+    candidatos: list[Path] = []
+    vistos: set[str] = set()
+
+    def adicionar_candidato(candidato: str | Path | None) -> None:
+        if candidato is None:
+            return
+        path_obj = Path(candidato)
+        paths_para_incluir = (
+            [path_obj]
+            if path_obj.is_absolute()
+            else [Path(base_dir) / path_obj for base_dir in DASHBOARD_FILE_SEARCH_DIRS]
+        )
+        for item in paths_para_incluir:
+            chave = str(item).strip().lower()
+            if chave and chave not in vistos:
+                candidatos.append(item)
+                vistos.add(chave)
+
+    adicionar_candidato(nome_arquivo)
+    for fallback in fallbacks:
+        adicionar_candidato(fallback)
+
+    for candidato in candidatos:
+        if candidato.exists():
+            return candidato
+    return candidatos[0] if candidatos else Path(nome_arquivo)
+
+LOGO_FILE_PATH = resolver_arquivo_dashboard("logo_claro_empresas.png")
+OBS_RESULTADO_FILE_PATH = resolver_arquivo_dashboard("obs_resultado_canais.txt")
 
 _EXPORT_WRAPPER_NAMES = {
     "_plotly_chart_com_exportacao",
@@ -290,7 +326,6 @@ def _desembrulhar_metodo_exportacao(metodo_atual, nome_global_original: str):
     return metodo
 
 EXPORTAR_GRAFICOS_ALTA_QUALIDADE = True
-EXPORTAR_TABELAS_HTML = True
 PLOTLY_DOWNLOAD_SCALE = 4
 _CURRENT_ST_PLOTLY_CHART = st.plotly_chart
 _CURRENT_ST_MARKDOWN = st.markdown
@@ -310,7 +345,6 @@ _ORIGINAL_COMPONENTS_HTML = _desembrulhar_metodo_exportacao(
 setattr(st, "_dashboard_export_original_plotly_chart", _ORIGINAL_ST_PLOTLY_CHART)
 setattr(st, "_dashboard_export_original_markdown", _ORIGINAL_ST_MARKDOWN)
 setattr(components, "_dashboard_export_original_html", _ORIGINAL_COMPONENTS_HTML)
-_EXPORT_TABLE_COUNTER = 0
 _EXPORT_CHART_COUNTER = 0
 
 def _nome_arquivo_exportacao(texto: str, fallback: str) -> str:
@@ -347,174 +381,35 @@ def _config_plotly_exportacao(fig, config_usuario: dict | None) -> dict:
     config.setdefault("responsive", True)
     return config
 
+def _aplicar_autoscale_inicial_linhas(fig) -> None:
+    """Evita gráficos de linha iniciarem com range travado após filtros."""
+    try:
+        traces = list(getattr(fig, "data", []) or [])
+        tem_linha = any(
+            str(getattr(trace, "type", "") or "").lower() in {"scatter", "scattergl"} and
+            ("lines" in str(getattr(trace, "mode", "") or "lines").lower())
+            for trace in traces
+        )
+        tem_barra = any(str(getattr(trace, "type", "") or "").lower() == "bar" for trace in traces)
+        if not tem_linha or tem_barra:
+            return
+        fig.update_xaxes(autorange=True, fixedrange=False)
+        fig.update_yaxes(autorange=True, fixedrange=False)
+    except Exception:
+        return
+
 def _plotly_chart_com_exportacao(*args, **kwargs):
     """Wrapper de teste para disponibilizar download em alta qualidade nos gráficos."""
+    fig = args[0] if args else kwargs.get("figure_or_data", None)
+    _aplicar_autoscale_inicial_linhas(fig)
     if EXPORTAR_GRAFICOS_ALTA_QUALIDADE:
-        fig = args[0] if args else kwargs.get("figure_or_data", None)
         kwargs["config"] = _config_plotly_exportacao(fig, kwargs.get("config"))
     return _ORIGINAL_ST_PLOTLY_CHART(*args, **kwargs)
 
-def _df_para_excel_bytes(df: pd.DataFrame) -> bytes:
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Tabela")
-    return buffer.getvalue()
-
-def _normalizar_tabela_exportacao(df: pd.DataFrame) -> pd.DataFrame:
-    df_export = df.copy()
-    if isinstance(df_export.columns, pd.MultiIndex):
-        df_export.columns = [
-            " ".join([str(parte) for parte in coluna if str(parte) != "nan"]).strip()
-            for coluna in df_export.columns
-        ]
-    df_export.columns = [str(coluna).strip() for coluna in df_export.columns]
-    return df_export
-
-class _PrimeiraTabelaHTMLParser(HTMLParser):
-    """Extrai a primeira tabela HTML sem depender de lxml/html5lib."""
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.in_table = False
-        self.finished = False
-        self.in_row = False
-        self.in_cell = False
-        self.current_row: list[str] = []
-        self.current_cell: list[str] = []
-        self.rows: list[list[str]] = []
-
-    def handle_starttag(self, tag, attrs):
-        tag = str(tag).lower()
-        if tag == "table" and not self.in_table and not self.finished:
-            self.in_table = True
-            return
-        if not self.in_table:
-            return
-        if tag == "tr":
-            self.in_row = True
-            self.current_row = []
-        elif tag in {"td", "th"} and self.in_row:
-            self.in_cell = True
-            self.current_cell = []
-        elif tag == "br" and self.in_cell:
-            self.current_cell.append(" ")
-
-    def handle_data(self, data):
-        if self.in_table and self.in_cell:
-            texto = str(data).strip()
-            if texto:
-                self.current_cell.append(texto)
-
-    def handle_endtag(self, tag):
-        tag = str(tag).lower()
-        if not self.in_table:
-            return
-        if tag in {"td", "th"} and self.in_cell:
-            texto = " ".join(" ".join(self.current_cell).split())
-            self.current_row.append(texto)
-            self.current_cell = []
-            self.in_cell = False
-        elif tag == "tr" and self.in_row:
-            if any(str(celula).strip() for celula in self.current_row):
-                self.rows.append(self.current_row)
-            self.current_row = []
-            self.in_row = False
-        elif tag == "table":
-            self.in_table = False
-            self.finished = True
-
-def _deduplicar_colunas_exportacao(colunas: list[str]) -> list[str]:
-    vistos: dict[str, int] = {}
-    saida: list[str] = []
-    for idx, coluna in enumerate(colunas, start=1):
-        nome = str(coluna or "").strip() or f"Coluna {idx}"
-        vistos[nome] = vistos.get(nome, 0) + 1
-        saida.append(nome if vistos[nome] == 1 else f"{nome}_{vistos[nome]}")
-    return saida
-
-def _extrair_tabela_html_para_exportacao(html: str) -> pd.DataFrame:
-    parser = _PrimeiraTabelaHTMLParser()
-    parser.feed(str(html))
-    rows = [row for row in parser.rows if row]
-    if len(rows) < 2:
-        return pd.DataFrame()
-    max_cols = max(len(row) for row in rows)
-    rows_norm = [row + [""] * (max_cols - len(row)) for row in rows]
-    colunas = _deduplicar_colunas_exportacao(rows_norm[0])
-    return _normalizar_tabela_exportacao(pd.DataFrame(rows_norm[1:], columns=colunas))
-
-def _nome_tabela_exportacao(html: str) -> str:
-    match_classe = re.search(r"<table[^>]*class=[\"']([^\"']+)[\"']", html, flags=re.IGNORECASE)
-    if match_classe:
-        classe = str(match_classe.group(1)).split()[0]
-        return _nome_arquivo_exportacao(classe, "tabela_dashboard")
-    return "tabela_dashboard"
-
-def _renderizar_botoes_download_tabela(html: str) -> None:
-    """Adiciona downloads CSV/XLSX/HTML para as tabelas HTML do app."""
-    global _EXPORT_TABLE_COUNTER
-    if not EXPORTAR_TABELAS_HTML or "<table" not in str(html).lower():
-        return
-
-    try:
-        df_export = _extrair_tabela_html_para_exportacao(str(html))
-    except Exception:
-        df_export = pd.DataFrame()
-
-    if df_export.empty:
-        return
-
-    _EXPORT_TABLE_COUNTER += 1
-    base_nome = f"{_nome_tabela_exportacao(str(html))}_{_EXPORT_TABLE_COUNTER:03d}"
-    key_salt = uuid.uuid4().hex[:10]
-    csv_bytes = df_export.to_csv(index=False, sep=";", encoding="utf-8-sig").encode("utf-8-sig")
-    excel_bytes = _df_para_excel_bytes(df_export)
-    html_bytes = str(html).encode("utf-8")
-
-    cols_download = st.columns([0.34, 0.33, 0.33], gap="small")
-    with cols_download[0]:
-        st.download_button(
-            "Baixar Excel",
-            data=excel_bytes,
-            file_name=f"{base_nome}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_excel_{base_nome}_{key_salt}"
-        )
-    with cols_download[1]:
-        st.download_button(
-            "Baixar CSV",
-            data=csv_bytes,
-            file_name=f"{base_nome}.csv",
-            mime="text/csv",
-            key=f"download_csv_{base_nome}_{key_salt}"
-        )
-    with cols_download[2]:
-        st.download_button(
-            "Baixar tabela HTML",
-            data=html_bytes,
-            file_name=f"{base_nome}.html",
-            mime="text/html",
-            key=f"download_html_{base_nome}_{key_salt}"
-        )
-
-def _markdown_com_exportacao_tabela(body, *args, **kwargs):
-    resultado = _ORIGINAL_ST_MARKDOWN(body, *args, **kwargs)
-    unsafe_html = bool(kwargs.get("unsafe_allow_html", False))
-    if unsafe_html and isinstance(body, str) and "<table" in body.lower():
-        _renderizar_botoes_download_tabela(body)
-    return resultado
-
-def _components_html_com_exportacao(html, *args, **kwargs):
-    resultado = _ORIGINAL_COMPONENTS_HTML(html, *args, **kwargs)
-    if isinstance(html, str) and "<table" in html.lower():
-        _renderizar_botoes_download_tabela(html)
-    return resultado
-
 _plotly_chart_com_exportacao._dashboard_export_original = _ORIGINAL_ST_PLOTLY_CHART
-_markdown_com_exportacao_tabela._dashboard_export_original = _ORIGINAL_ST_MARKDOWN
-_components_html_com_exportacao._dashboard_export_original = _ORIGINAL_COMPONENTS_HTML
 st.plotly_chart = _plotly_chart_com_exportacao
-st.markdown = _markdown_com_exportacao_tabela
-components.html = _components_html_com_exportacao
+st.markdown = _ORIGINAL_ST_MARKDOWN
+components.html = _ORIGINAL_COMPONENTS_HTML
 
 def render_header_logo():
     """Render top-right logo if the local PNG file exists."""
@@ -2390,6 +2285,313 @@ st.markdown("""
                 font-size: 12px;
                 padding: 8px 10px;
             }
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <style>
+        /* Executive visual layer for the regional tables in ATIVADOS, PEDIDOS, LIGACOES and DESATIVACOES. */
+        body .tabela-container-melhorada,
+        body .tabela-container-pedidos,
+        body .tabela-container-ligacoes,
+        body .tabela-container-desativados {
+            border: 1px solid rgba(121, 14, 9, 0.74) !important;
+            border-radius: 4px !important;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%) !important;
+            box-shadow:
+                0 16px 34px rgba(90, 10, 6, 0.13),
+                0 3px 10px rgba(15, 23, 42, 0.07),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.92) !important;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        body .tabela-container-melhorada::after,
+        body .tabela-container-pedidos::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        body table.tabela-melhorada,
+        body table.tabela-pedidos,
+        body table.tabela-ligacoes,
+        body table.tabela-desativados {
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            font-variant-numeric: tabular-nums !important;
+        }
+
+        body table.tabela-melhorada th,
+        body table.tabela-pedidos th,
+        body table.tabela-ligacoes th,
+        body table.tabela-desativados th {
+            border-right: 1px solid rgba(255, 255, 255, 0.24) !important;
+            border-bottom: 1px solid rgba(61, 7, 4, 0.92) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+            text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18) !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.22px !important;
+        }
+
+        body table.tabela-melhorada th:first-child,
+        body table.tabela-pedidos th:first-child,
+        body table.tabela-ligacoes th:first-child,
+        body table.tabela-desativados th:first-child {
+            border-top-left-radius: 3px !important;
+        }
+
+        body table.tabela-melhorada th:last-child,
+        body table.tabela-pedidos th:last-child,
+        body table.tabela-ligacoes th:last-child,
+        body table.tabela-desativados th:last-child {
+            border-top-right-radius: 3px !important;
+        }
+
+        body table.tabela-melhorada th.col-total-anual,
+        body table.tabela-pedidos th.col-total-anual-pedidos,
+        body table.tabela-ligacoes th.col-total-anual,
+        body table.tabela-desativados th.col-total-anual-desativados {
+            background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%) !important;
+            box-shadow: inset 0 -2px 0 rgba(255, 40, 0, 0.26) !important;
+        }
+
+        body table.tabela-melhorada th.col-mes-2025,
+        body table.tabela-pedidos th.col-mes-pedidos,
+        body table.tabela-ligacoes th.col-mes-2025,
+        body table.tabela-desativados th.col-mes-2025-desativados {
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+        }
+
+        body table.tabela-melhorada th.col-mes,
+        body table.tabela-melhorada th.col-real-mes,
+        body table.tabela-pedidos th.col-mes-2026-pedidos,
+        body table.tabela-pedidos th.col-real-jan26-pedidos,
+        body table.tabela-ligacoes th.col-mes-2026,
+        body table.tabela-ligacoes th.col-real-mes,
+        body table.tabela-desativados th.col-real-mes-desativados {
+            background: linear-gradient(135deg, #8F1B14 0%, #6C0C08 100%) !important;
+        }
+
+        body table.tabela-melhorada th.col-tend,
+        body table.tabela-pedidos th.col-tend-pedidos {
+            background: linear-gradient(135deg, #6B7280 0%, #475569 100%) !important;
+            box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.14) !important;
+        }
+
+        body table.tabela-melhorada th.col-meta,
+        body table.tabela-pedidos th.col-meta-pedidos,
+        body table.tabela-ligacoes th.col-meta-mes {
+            background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%) !important;
+        }
+
+        body table.tabela-melhorada th.col-alcance,
+        body table.tabela-melhorada th.col-variacao,
+        body table.tabela-pedidos th.col-alcance-pedidos,
+        body table.tabela-pedidos th.col-variacao-pedidos,
+        body table.tabela-ligacoes th.col-alcance,
+        body table.tabela-ligacoes th.col-variacao,
+        body table.tabela-desativados th.col-variacao-desativados {
+            background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+            box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.12) !important;
+        }
+
+        body table.tabela-melhorada td,
+        body table.tabela-pedidos td,
+        body table.tabela-ligacoes td,
+        body table.tabela-desativados td {
+            border-bottom: 1px solid rgba(121, 14, 9, 0.07) !important;
+            border-right: 1px solid rgba(121, 14, 9, 0.055) !important;
+            color: #2F3747 !important;
+        }
+
+        body table.tabela-melhorada td {
+            font-size: 10px !important;
+            line-height: 1.15 !important;
+        }
+
+        body table.tabela-pedidos td,
+        body table.tabela-ligacoes td,
+        body table.tabela-desativados td {
+            font-size: 10.6px !important;
+            line-height: 1.18 !important;
+        }
+
+        body table.tabela-melhorada tr:not(.linha-total-melhorada) td:first-child,
+        body table.tabela-pedidos tr:not(.linha-total-pedidos) td:first-child,
+        body table.tabela-ligacoes tr:not(.linha-total-ligacoes) td:first-child,
+        body table.tabela-desativados tr:not(.linha-total-desativados) td:first-child {
+            color: #2F3747 !important;
+            font-weight: 800 !important;
+            box-shadow: inset 3px 0 0 rgba(255, 40, 0, 0.26), 4px 0 10px rgba(90, 10, 6, 0.025) !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada:nth-child(even) td,
+        body table.tabela-pedidos tr.linha-regional-pedidos:nth-child(even) td,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes:nth-child(even) td,
+        body table.tabela-desativados tr.linha-regional-desativados:nth-child(even) td {
+            background: #FFFFFF !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada:nth-child(odd) td,
+        body table.tabela-pedidos tr.linha-regional-pedidos:nth-child(odd) td,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes:nth-child(odd) td,
+        body table.tabela-desativados tr.linha-regional-desativados:nth-child(odd) td {
+            background: #FFF7F6 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada:hover td,
+        body table.tabela-pedidos tr.linha-regional-pedidos:hover td,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes:hover td,
+        body table.tabela-desativados tr.linha-regional-desativados:hover td {
+            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.70) !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada:hover td:first-child,
+        body table.tabela-pedidos tr.linha-regional-pedidos:hover td:first-child,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes:hover td:first-child,
+        body table.tabela-desativados tr.linha-regional-desativados:hover td:first-child {
+            box-shadow: inset 3px 0 0 #FF2800, 4px 0 10px rgba(90, 10, 6, 0.035) !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-total-anual,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.col-total-anual-pedidos,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-total-anual,
+        body table.tabela-desativados tr.linha-regional-desativados td.col-total-anual-desativados {
+            background: linear-gradient(180deg, #F3F5F7 0%, #E9EDF1 100%) !important;
+            color: #1F2937 !important;
+            font-weight: 850 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-mes,
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-real-mes,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.col-mes-2026-pedidos,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.col-real-jan26-pedidos,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-mes-2026,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-real-mes,
+        body table.tabela-desativados tr.linha-regional-desativados td.col-real-mes-desativados {
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            color: #1F2937 !important;
+            font-weight: 800 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-tend,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.col-tend-pedidos {
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            color: #2F3747 !important;
+            font-weight: 850 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-meta,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.col-meta-pedidos,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-meta-mes {
+            background: linear-gradient(180deg, #FFF0ED 0%, #F8D9D4 100%) !important;
+            color: #6B1F1A !important;
+            font-weight: 850 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-alcance,
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-variacao,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.col-alcance-pedidos,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.col-variacao-pedidos,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-alcance,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-variacao,
+        body table.tabela-desativados tr.linha-regional-desativados td.col-variacao-desativados {
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            border-left: 1px solid rgba(100, 116, 139, 0.16) !important;
+            border-right: 1px solid rgba(100, 116, 139, 0.12) !important;
+            font-weight: 850 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.percentual-positivo,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.percentual-positivo-pedidos,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.valor-positivo,
+        body table.tabela-desativados tr.linha-regional-desativados td.percentual-positivo-desativados {
+            color: #1B5E20 !important;
+            background: linear-gradient(180deg, #F2FAF4 0%, #EAF6EE 100%) !important;
+            font-weight: 900 !important;
+            position: relative !important;
+            padding-left: 16px !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.percentual-negativo,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.percentual-negativo-pedidos,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.valor-negativo,
+        body table.tabela-desativados tr.linha-regional-desativados td.percentual-negativo-desativados {
+            color: #B71C1C !important;
+            background: linear-gradient(180deg, #FFF3F1 0%, #FBE4E0 100%) !important;
+            font-weight: 900 !important;
+            position: relative !important;
+            padding-left: 16px !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.percentual-neutro,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.percentual-neutro-pedidos,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.valor-neutro,
+        body table.tabela-desativados tr.linha-regional-desativados td.percentual-neutro-desativados {
+            color: #475569 !important;
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            font-weight: 850 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.percentual-positivo::before,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.percentual-positivo-pedidos::before,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.valor-positivo::before,
+        body table.tabela-desativados tr.linha-regional-desativados td.percentual-positivo-desativados::before {
+            content: "▲" !important;
+            position: absolute !important;
+            left: 5px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            font-size: 8px !important;
+            font-weight: 900 !important;
+            color: #2E7D32 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.percentual-negativo::before,
+        body table.tabela-pedidos tr.linha-regional-pedidos td.percentual-negativo-pedidos::before,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.valor-negativo::before,
+        body table.tabela-desativados tr.linha-regional-desativados td.percentual-negativo-desativados::before {
+            content: "▼" !important;
+            position: absolute !important;
+            left: 5px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            font-size: 8px !important;
+            font-weight: 900 !important;
+            color: #C62828 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-total-melhorada td,
+        body table.tabela-pedidos tr.linha-total-pedidos td,
+        body table.tabela-ligacoes tr.linha-total-ligacoes td,
+        body table.tabela-desativados tr.linha-total-desativados td {
+            background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 900 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.22) !important;
+            border-bottom: 1px solid rgba(61, 7, 4, 0.92) !important;
+        }
+
+        body table.tabela-melhorada tr.linha-total-melhorada td:first-child,
+        body table.tabela-pedidos tr.linha-total-pedidos td:first-child,
+        body table.tabela-ligacoes tr.linha-total-ligacoes td:first-child,
+        body table.tabela-desativados tr.linha-total-desativados td:first-child {
+            box-shadow: inset 4px 0 0 rgba(255, 40, 0, 0.58) !important;
+        }
+
+        body table.tabela-melhorada tr.linha-total-melhorada td::before,
+        body table.tabela-pedidos tr.linha-total-pedidos td::before,
+        body table.tabela-ligacoes tr.linha-total-ligacoes td::before,
+        body table.tabela-desativados tr.linha-total-desativados td::before {
+            content: "" !important;
+        }
+
+        body table.tabela-melhorada td.performance-excelente,
+        body table.tabela-melhorada td.performance-critica,
+        body table.tabela-pedidos td.performance-excelente-pedidos,
+        body table.tabela-pedidos td.performance-critica-pedidos {
+            animation: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -4294,7 +4496,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """
     Carrega e pré-trata a base principal.
@@ -4371,7 +4573,7 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_excel_cached(
     path: str,
     file_mtime: float | None = None,
@@ -4383,22 +4585,18 @@ def load_excel_cached(
     return pd.read_excel(path, usecols=usecols, nrows=nrows)
 
 DASHBOARD_DATA_DIR = DASHBOARD_APP_DIR
-RAW_PRIMARY_BASE_FILE_PATH = DASHBOARD_FILES_DIR / "base_final_trt_new3.xlsx"
-RAW_LIGACOES_FILE_PATH = DASHBOARD_FILES_DIR / "televendas_ligacoes2.xlsx"
-RAW_COTACOES_FILE_PATH = DASHBOARD_FILES_DIR / "RelatorioFluxoVidaCotacao.xlsx"
-RAW_BACKLOG_CONSOLIDADO_FILE_PATH = DASHBOARD_FILES_DIR / "backlog_consolidado.csv"
-CHURN_FILE_PATH = DASHBOARD_FILES_DIR / "base_final_churn.xlsx"
+RAW_PRIMARY_BASE_FILE_PATH = resolver_arquivo_dashboard("base_final_trt_new3.xlsx")
+RAW_LIGACOES_FILE_PATH = resolver_arquivo_dashboard("televendas_ligacoes2.xlsx")
+RAW_COTACOES_FILE_PATH = resolver_arquivo_dashboard("RelatorioFluxoVidaCotacao.xlsx")
+RAW_BACKLOG_CONSOLIDADO_FILE_PATH = resolver_arquivo_dashboard("backlog_consolidado.csv")
+CHURN_FILE_PATH = resolver_arquivo_dashboard("base_final_churn.xlsx")
 
 
 def _resolver_primeiro_arquivo_existente(*candidatos: str | Path) -> Path:
-    for candidato in candidatos:
-        path_obj = Path(candidato)
-        if path_obj.exists():
-            return path_obj
-    return Path(candidatos[0])
+    return resolver_arquivo_dashboard(candidatos[0], *candidatos[1:]) if candidatos else DASHBOARD_APP_DIR
 
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_tabular_cached(
     path: str,
     file_mtime: float | None = None,
@@ -4432,7 +4630,8 @@ LIGACOES_FILE_PATH = RAW_LIGACOES_FILE_PATH
 COTACOES_FILE_PATH = RAW_COTACOES_FILE_PATH
 BACKLOG_CONSOLIDADO_FILE_PATH = RAW_BACKLOG_CONSOLIDADO_FILE_PATH
 PEDIDOS_FILE_PATH = RAW_PRIMARY_BASE_FILE_PATH
-ANALITICO_MIGRACOES_FILE_PATH = DASHBOARD_FILES_DIR / "ANALITICO_MIGRACOES_fev26.xlsx"
+ANALITICO_MIGRACOES_FILE_PATH = resolver_arquivo_dashboard("ANALITICO_MIGRACOES_fev26.xlsx")
+
 BACKLOG_CANAIS_PERMITIDOS = [
     "DAC",
     "DAC Adequacao de Pacote",
@@ -4498,7 +4697,7 @@ def _filtrar_regra_cotacoes_novas_linhas(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df.loc[mask_regra]
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_cotacoes_data(
     path: str,
     file_mtime: float | None = None,
@@ -4714,7 +4913,7 @@ def _agregar_cotacoes_dataframe(df_cot: pd.DataFrame) -> pd.DataFrame:
     compactar_colunas_categoricas(df_agg, ["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL"])
     return df_agg[colunas_saida]
 
-@st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+@st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
 def preparar_agregados_cotacoes(
     path: str,
     file_mtime: float | None = None,
@@ -4850,7 +5049,7 @@ def _formatar_mes_ano_backlog(data_valor) -> str | None:
     }
     return f"{meses_pt.get(data_ts.month, 'jan')}/{data_ts.strftime('%y')}"
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
 def load_backlog_consolidado_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega o backlog consolidado com os mesmos filtros do notebook de preparo."""
     _ = file_mtime
@@ -4960,7 +5159,7 @@ def load_backlog_consolidado_data(path: str, file_mtime: float | None = None) ->
     return df
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
 def load_pedidos_dashboard_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega a base otimizada de pedidos E-Commerce já consolidada por mês/regional/canal."""
     _ = file_mtime
@@ -5032,9 +5231,16 @@ def montar_tabela_backlog_canais(
     )
     if not meses_ordem:
         return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+    mes_corrente_backlog = get_mes_atual_formatado().strip().lower()
+    if mes_corrente_backlog not in [str(m).strip().lower() for m in meses_ordem]:
+        try:
+            if pd.Timestamp(mes_ano_para_data(mes_corrente_backlog)) >= pd.Timestamp(mes_ano_para_data(str(meses_ordem[-1]))):
+                meses_ordem.append(mes_corrente_backlog)
+        except Exception:
+            pass
     mes_foco_backlog = (
-        get_mes_atual_formatado().strip().lower()
-        if get_mes_atual_formatado().strip().lower() in [str(m).strip().lower() for m in meses_ordem]
+        mes_corrente_backlog
+        if mes_corrente_backlog in [str(m).strip().lower() for m in meses_ordem]
         else str(meses_ordem[-1]).strip().lower()
     )
     meses_ordem = obter_janela_meses_disponiveis(mes_foco_backlog, meses_ordem, qtd_meses=13)
@@ -5812,10 +6018,11 @@ def criar_tabela_html_funil_cotacoes(
     col_etapa = colunas[0] if colunas else "ETAPA"
     col_mom = "MoM" if "MoM" in colunas else (colunas[-1] if len(colunas) >= 1 else "")
     colunas_meses = [col for col in colunas if col not in {col_etapa, col_mom}]
+    col_mes_foco = colunas_meses[-1] if colunas_meses else ""
 
     qtd_meses = max(len(colunas_meses), 1)
-    largura_etapa_pct = 13.0 if qtd_meses >= 10 else 18.0
-    largura_final_pct = 6.6
+    largura_etapa_pct = 14.5 if qtd_meses >= 10 else 20.0
+    largura_final_pct = 7.5
     largura_meses_pct = max((100.0 - largura_etapa_pct - largura_final_pct) / qtd_meses, 4.0)
     larguras = [largura_etapa_pct] + [largura_meses_pct] * len(colunas_meses) + [largura_final_pct]
     soma_larguras = float(sum(larguras)) if larguras else 100.0
@@ -5842,116 +6049,280 @@ def criar_tabela_html_funil_cotacoes(
         #{table_id}.tabela-container-funil-cotacoes {{
             width: 100%;
             overflow-x: auto;
-            border: 2px solid #790E09;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(121,14,9,0.16);
+            border: 1px solid rgba(121,14,9,0.74);
+            border-radius: 4px;
+            box-shadow:
+                0 18px 38px rgba(90,10,6,0.14),
+                0 4px 12px rgba(15,23,42,0.07),
+                inset 0 0 0 1px rgba(255,255,255,0.92),
+                inset 0 0 0 4px rgba(121,14,9,0.025);
             margin: 10px 0 18px 0;
-            background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        #{table_id}.tabela-container-funil-cotacoes::before {{
+            content: none;
+            display: none;
         }}
         #{table_id} .tabela-funil-cotacoes {{
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             width: 100%;
-            min-width: 1180px;
+            min-width: 1200px;
             table-layout: fixed;
-            font-size: 9.4px;
-            line-height: 1.08;
+            font-size: clamp(10.2px, 0.72vw, 11.3px);
+            line-height: 1.15;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
+            font-variant-numeric: tabular-nums;
+            background: #FFFFFF;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody {{
+            counter-reset: none;
         }}
         #{table_id} .tabela-funil-cotacoes thead th {{
             position: sticky;
             top: 0;
             z-index: 40;
-            background: linear-gradient(135deg, #8A120D 0%, #650906 100%);
+            background: linear-gradient(180deg, #790E09 0%, #4E0805 100%);
             color: #FFFFFF;
-            padding: 5px 4px;
+            padding: 8px 5px;
             text-align: center;
-            font-weight: 700;
-            letter-spacing: 0.15px;
+            font-weight: 800;
+            letter-spacing: 0.30px;
             white-space: nowrap;
-            font-size: 8.6px;
-            border-right: 1px solid rgba(255,255,255,0.9);
-            border-bottom: 2px solid #4A0704;
+            font-size: clamp(9.4px, 0.64vw, 10.4px);
+            text-transform: uppercase;
+            border-right: 1px solid rgba(255,255,255,0.20);
+            border-bottom: 1px solid rgba(61,7,4,0.90);
+            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+        }}
+        #{table_id} .tabela-funil-cotacoes thead th:first-child {{
+            border-top-left-radius: 3px;
+        }}
+        #{table_id} .tabela-funil-cotacoes thead th:last-child {{
+            border-top-right-radius: 3px;
         }}
         #{table_id} .tabela-funil-cotacoes thead th.col-etapa {{
             position: sticky;
             left: 0;
             z-index: 50;
-            background: linear-gradient(135deg, #74100B 0%, #520604 100%);
+            background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);
             text-align: left;
-            padding-left: 6px;
+            padding-left: 10px;
         }}
         #{table_id} .tabela-funil-cotacoes thead th.col-var {{
-            background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%);
+            background: linear-gradient(180deg, #4F5861 0%, #343B43 100%);
+            box-shadow: inset 0 -3px 0 rgba(255,255,255,0.10);
+        }}
+        #{table_id} .tabela-funil-cotacoes thead th.col-mes-foco {{
+            background: linear-gradient(180deg, #A23B36 0%, #790E09 100%);
+            color: #FFFFFF;
+            box-shadow: inset 3px 0 0 rgba(255,255,255,0.20), inset -3px 0 0 rgba(255,255,255,0.10);
         }}
         #{table_id} .tabela-funil-cotacoes thead th.col-tend {{
-            background: linear-gradient(135deg, #D85A50 0%, #A61F17 100%);
-            color: #FFF6F4;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+            background: linear-gradient(180deg, #6B7280 0%, #4B5563 100%);
+            color: #FFFFFF;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.18),
+                inset 0 -3px 0 rgba(255,255,255,0.18),
+                inset 1px 0 0 rgba(255,255,255,0.14),
+                inset -1px 0 0 rgba(255,255,255,0.14);
         }}
         #{table_id} .tabela-funil-cotacoes tbody td {{
-            padding: 4px 5px;
+            padding: 7px 6px;
             text-align: right;
-            border-bottom: 1px solid #F0E4E2;
+            border-bottom: 1px solid rgba(121,14,9,0.07);
+            border-right: 1px solid rgba(121,14,9,0.06);
             color: #2F3747;
-            font-size: 9.3px;
-            font-variant-numeric: tabular-nums;
+            font-size: clamp(10.4px, 0.72vw, 11.6px);
+            font-weight: 700;
             white-space: nowrap;
         }}
         #{table_id} .tabela-funil-cotacoes tbody tr:nth-child(odd) td {{
-            background: #FFF9F8;
+            background: #FFFFFF;
         }}
         #{table_id} .tabela-funil-cotacoes tbody tr:nth-child(even) td {{
-            background: #FDF3F2;
+            background: #FFF7F6;
         }}
         #{table_id} .tabela-funil-cotacoes tbody tr:hover td {{
-            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%);
-            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr {{
+            counter-increment: none;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.linha-conversao-funil td {{
+            background: linear-gradient(180deg, #FCF4F2 0%, #F9ECE9 100%) !important;
+            color: #5F2B27;
+            font-weight: 800;
+            border-top: 1px solid rgba(121,14,9,0.11);
         }}
         #{table_id} .tabela-funil-cotacoes tbody td.col-etapa {{
             position: sticky;
             left: 0;
             z-index: 20;
             text-align: left;
-            padding-left: 6px;
-            font-weight: 700;
+            padding-left: 13px;
+            font-weight: 900;
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: break-word;
+            letter-spacing: -0.01em;
+            box-shadow: inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-etapa::before {{
+            content: none;
+            display: none;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.etapa-cotacao td.col-etapa::before {{
+            border-left-color: #A23B36;
+            color: #6B1F1A;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.etapa-saida td.col-etapa::before {{
+            border-left-color: #790E09;
+            background: linear-gradient(90deg, rgba(121,14,9,0.13) 0%, rgba(255,255,255,0.88) 100%);
+            color: #5A0A06;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.etapa-conversao td.col-etapa::before {{
+            border-left-color: #5A6268;
+            background: linear-gradient(90deg, rgba(90,98,104,0.15) 0%, rgba(255,255,255,0.88) 100%);
+            color: #3E444A;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.etapa-cotacao td.col-etapa {{
+            box-shadow: inset 3px 0 0 #A23B36, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.etapa-saida td.col-etapa {{
+            box-shadow: inset 3px 0 0 #790E09, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.etapa-conversao td.col-etapa {{
+            box-shadow: inset 3px 0 0 #5A6268, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        #{table_id} .valor-funil {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            min-width: 44px;
+            letter-spacing: -0.02em;
+        }}
+        #{table_id} .linha-conversao-funil .valor-funil {{
+            color: #5F2B27;
+            font-weight: 800;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-mes-foco {{
+            background: linear-gradient(180deg, #FFF7F5 0%, #FBEAE7 100%) !important;
+            color: #6B1F1A;
+            font-weight: 900;
+            box-shadow: inset 2px 0 0 rgba(255,40,0,0.14), inset -1px 0 0 rgba(121,14,9,0.06);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.linha-conversao-funil td.col-mes-foco {{
+            background: linear-gradient(180deg, #FBEEEB 0%, #F8E2DE 100%) !important;
         }}
         #{table_id} .tabela-funil-cotacoes tbody td.col-var {{
             position: relative;
-            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            text-align: center;
+            background: linear-gradient(180deg, #F5F7F9 0%, #EEF2F5 100%) !important;
             border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
             border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
+            font-weight: 900;
+        }}
+        #{table_id} .mom-chip-funil {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 62px;
+            padding: 2px 5px;
+            border-radius: 2px;
+            border: 1px solid rgba(100,116,139,0.16);
+            background: rgba(255,255,255,0.62);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.86);
+            letter-spacing: -0.02em;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-positivo {{
+            background: linear-gradient(180deg, #F2FAF4 0%, #EAF6EE 100%) !important;
+            box-shadow: inset 3px 0 0 rgba(46,125,50,0.74);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-negativo {{
+            background: linear-gradient(180deg, #FFF3F1 0%, #FBE4E0 100%) !important;
+            box-shadow: inset 3px 0 0 rgba(198,40,40,0.74);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-neutro {{
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            box-shadow: inset 3px 0 0 rgba(100,116,139,0.42);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-positivo .mom-chip-funil {{
+            border-color: rgba(46,125,50,0.18);
+            background: rgba(255,255,255,0.78);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-negativo .mom-chip-funil {{
+            border-color: rgba(198,40,40,0.18);
+            background: rgba(255,255,255,0.78);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-neutro .mom-chip-funil {{
+            border-color: rgba(100,116,139,0.18);
+            background: rgba(255,255,255,0.66);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-positivo .mom-chip-funil::before {{
+            content: "▲";
+            margin-right: 3px;
+            font-size: 8px;
+            color: #2E7D32;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-var.status-negativo .mom-chip-funil::before {{
+            content: "▼";
+            margin-right: 3px;
+            font-size: 8px;
+            color: #C62828;
         }}
         #{table_id} .tabela-funil-cotacoes tbody td.col-tend {{
-            background: linear-gradient(180deg, rgba(216, 90, 80, 0.14) 0%, rgba(216, 90, 80, 0.06) 100%) !important;
-            border-left: 1px solid rgba(166, 31, 23, 0.18) !important;
-            border-right: 1px solid rgba(166, 31, 23, 0.18) !important;
-            color: #7A1712;
-            font-weight: 700;
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            border-left: 1px solid rgba(100,116,139,0.20) !important;
+            border-right: 1px solid rgba(100,116,139,0.16) !important;
+            color: #2F3747;
+            font-weight: 950;
+            box-shadow:
+                inset 3px 0 0 rgba(100,116,139,0.34),
+                inset -1px 0 0 rgba(100,116,139,0.10);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody td.col-tend .valor-funil {{
+            padding: 2px 5px;
+            border-left: 2px solid rgba(100,116,139,0.42);
+            border-bottom: 1px solid rgba(100,116,139,0.12);
+            background: rgba(255,255,255,0.58);
+            min-width: 50px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr.linha-conversao-funil td.col-tend {{
+            background: linear-gradient(180deg, #F1F3F5 0%, #E8ECEF 100%) !important;
+            color: #3E444A;
         }}
         #{table_id} .tabela-funil-cotacoes tbody td.status-positivo {{
             color: #1B5E20 !important;
-            font-weight: 700;
+            font-weight: 900;
         }}
         #{table_id} .tabela-funil-cotacoes tbody td.status-negativo {{
             color: #B71C1C !important;
-            font-weight: 700;
+            font-weight: 900;
         }}
         #{table_id} .tabela-funil-cotacoes tbody td.status-neutro {{
             color: #666666 !important;
-            font-weight: 600;
+            font-weight: 800;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr:last-child td:first-child {{
+            border-bottom-left-radius: 3px;
+        }}
+        #{table_id} .tabela-funil-cotacoes tbody tr:last-child td:last-child {{
+            border-bottom-right-radius: 3px;
         }}
         @media (max-width: 768px) {{
             #{table_id} .tabela-funil-cotacoes {{
-                min-width: 1040px;
-                font-size: 8.8px;
+                min-width: 1120px;
+                font-size: 9.2px;
             }}
             #{table_id} .tabela-funil-cotacoes thead th,
             #{table_id} .tabela-funil-cotacoes tbody td {{
-                padding: 4px 4px;
-                font-size: 8.3px;
+                padding: 6px 4px;
+                font-size: 9px;
             }}
         }}
     </style>
@@ -5967,24 +6338,44 @@ def criar_tabela_html_funil_cotacoes(
             classes.append("col-etapa")
         elif col == col_mom:
             classes.append("col-var")
+        elif col in colunas_meses:
+            classes.append("col-mes")
+            if col == col_mes_foco:
+                classes.append("col-mes-foco")
         if "(TEND.)" in str(col).upper():
             classes.append("col-tend")
         html += f'<th class="{" ".join(classes)}">{escape(str(col))}</th>'
     html += "</tr></thead><tbody>"
 
     for idx, row in df_formatado.iterrows():
-        html += "<tr>"
+        etapa_ref = str(row.get(col_etapa, "")).strip().upper()
+        if " VS " in etapa_ref:
+            classe_linha = "linha-conversao-funil etapa-conversao"
+        elif "COT" in etapa_ref:
+            classe_linha = "linha-etapa-funil etapa-cotacao"
+        elif any(chave in etapa_ref for chave in ["ATIVA", "INSTAL", "VENDA BRUTA"]):
+            classe_linha = "linha-etapa-funil etapa-saida"
+        else:
+            classe_linha = "linha-etapa-funil etapa-entrada"
+        html += f'<tr class="{classe_linha}">'
         for col_idx, col in enumerate(colunas):
             valor_fmt = escape(str(row[col]))
             classes = []
+            valor_html = f'<span class="valor-funil">{valor_fmt}</span>'
             if col == col_etapa:
                 classes.append("col-etapa")
+                valor_html = f'<span class="etapa-texto-funil">{valor_fmt}</span>'
             elif col == col_mom:
                 classes.extend(["col-var", _classe_pct(df_numerico.iloc[idx, col_idx])])
+                valor_html = f'<span class="mom-chip-funil">{valor_fmt}</span>'
+            elif col in colunas_meses:
+                classes.append("col-mes")
+                if col == col_mes_foco:
+                    classes.append("col-mes-foco")
             if "(TEND.)" in str(col).upper():
                 classes.append("col-tend")
             classe_attr = " ".join(classes)
-            html += f'<td class="{classe_attr}">{valor_fmt}</td>'
+            html += f'<td class="{classe_attr}">{valor_html}</td>'
         html += "</tr>"
 
     html += "</tbody></table></div>"
@@ -6001,102 +6392,185 @@ def criar_tabela_html_backlog_canais(
 
     colunas = list(df_formatado.columns)
     qtd_meses = max(len(colunas) - 1, 1)
-    largura_canal_pct = 18.0 if qtd_meses >= 10 else 22.0
+    largura_canal_pct = 16.2 if qtd_meses >= 10 else 20.0
     largura_mes_pct = (100.0 - largura_canal_pct) / qtd_meses
     larguras = [largura_canal_pct] + [largura_mes_pct] * qtd_meses
     colgroup_html = "<colgroup>" + "".join(
         [f'<col style="width:{largura:.4f}%;">' for largura in larguras]
     ) + "</colgroup>"
 
+    mask_linhas_valor = (
+        df_numerico.iloc[:, 0].astype(str).str.strip().str.upper().ne("TOTAL")
+        if df_numerico is not None and not df_numerico.empty and df_numerico.shape[1] > 0
+        else pd.Series(dtype=bool)
+    )
+    maximos_coluna: dict[int, float] = {}
+    for idx_col in range(1, len(colunas)):
+        if df_numerico is None or df_numerico.empty or idx_col >= df_numerico.shape[1]:
+            maximos_coluna[idx_col] = 0.0
+            continue
+        serie_valores = pd.to_numeric(df_numerico.iloc[:, idx_col], errors="coerce").fillna(0.0)
+        serie_base = (
+            serie_valores[mask_linhas_valor]
+            if len(mask_linhas_valor) == len(serie_valores) and bool(mask_linhas_valor.any())
+            else serie_valores
+        )
+        maximos_coluna[idx_col] = float(serie_base.max()) if not serie_base.empty else 0.0
+
+    def _largura_data_bar(idx_linha: int, idx_col: int) -> float:
+        try:
+            valor = float(pd.to_numeric(pd.Series([df_numerico.iloc[idx_linha, idx_col]]), errors="coerce").fillna(0.0).iloc[0])
+        except Exception:
+            valor = 0.0
+        max_coluna = float(maximos_coluna.get(idx_col, 0.0) or 0.0)
+        if valor <= 0 or max_coluna <= 0:
+            return 0.0
+        return max(5.0, min(100.0, (valor / max_coluna) * 100.0))
+
     html = f"""
     <style>
         .{table_id}-container {{
             width: 100%;
             overflow-x: auto;
-            border: 2px solid #790E09;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(121,14,9,0.16);
-            margin: 10px 0 18px 0;
-            background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+            border: 1px solid rgba(121,14,9,0.78);
+            border-radius: 5px;
+            box-shadow:
+                0 18px 38px rgba(90,10,6,0.14),
+                0 4px 12px rgba(15,23,42,0.06),
+                inset 0 0 0 1px rgba(255,255,255,0.90);
+            margin: 8px 0 16px 0;
+            background:
+                linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
         }}
         table.{table_id} {{
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             width: 100%;
-            min-width: 1120px;
+            min-width: 1040px;
             table-layout: fixed;
-            font-size: 9.5px;
-            line-height: 1.08;
+            font-size: clamp(10.1px, 0.72vw, 11.1px);
+            line-height: 1.14;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
+            font-variant-numeric: tabular-nums;
+            background: #FFFFFF;
         }}
         .{table_id} thead th {{
             position: sticky;
             top: 0;
             z-index: 40;
-            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+            background: linear-gradient(180deg, #790E09 0%, #4E0805 100%);
             color: #fff;
-            padding: 5px 5px;
+            padding: 7px 5px;
             text-align: center;
-            font-weight: 700;
-            letter-spacing: 0.25px;
+            font-weight: 800;
+            letter-spacing: 0.26px;
             white-space: nowrap;
-            font-size: 9px;
-            border-right: 1px solid rgba(255,255,255,0.9);
-            border-bottom: 2px solid #4A0704;
+            font-size: clamp(9.3px, 0.64vw, 10.2px);
+            border-right: 1px solid rgba(255,255,255,0.20);
+            border-bottom: 1px solid rgba(61,7,4,0.92);
+            text-transform: uppercase;
+            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
         }}
         .{table_id} thead th.col-total-mes {{
-            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+            background: linear-gradient(180deg, #6B7280 0%, #4B5563 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.18),
+                inset 0 -3px 0 rgba(255,255,255,0.14);
+        }}
+        .{table_id} thead th.col-mes-atual {{
+            background: linear-gradient(180deg, #B7443B 0%, #8F241D 100%) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.20),
+                inset 0 -3px 0 rgba(255,255,255,0.16);
         }}
         .{table_id} thead th.col-canal {{
             position: sticky;
             left: 0;
             z-index: 50;
-            background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
+            background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);
             text-align: left;
-            padding-left: 7px;
+            padding-left: 10px;
         }}
         .{table_id} tbody td {{
-            padding: 5px 6px;
+            position: relative;
+            padding: 7px 6px;
             text-align: right;
-            border-bottom: 1px solid #F0E4E2;
+            border-bottom: 1px solid rgba(121,14,9,0.07);
+            border-right: 1px solid rgba(121,14,9,0.055);
             color: #2F3747;
-            font-size: 9.5px;
+            font-size: clamp(10.3px, 0.72vw, 11.2px);
+            font-weight: 700;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
         }}
         .{table_id} tbody tr:nth-child(odd) td {{
-            background: #FFF9F8;
+            background: #FFFFFF;
         }}
         .{table_id} tbody tr:nth-child(even) td {{
-            background: #FDF3F2;
+            background: #FFF7F6;
         }}
         .{table_id} tbody tr:hover td {{
-            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%);
-            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
         }}
         .{table_id} tbody td.col-canal {{
             position: sticky;
             left: 0;
             z-index: 20;
             text-align: left;
-            padding-left: 7px;
-            font-weight: 600;
+            padding-left: 10px;
+            color: #5A0A06;
+            font-weight: 800;
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: break-word;
+            box-shadow: inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        .{table_id} tbody td.col-valor {{
+            overflow: hidden;
+        }}
+        .{table_id} tbody td.col-valor::before {{
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            bottom: 5px;
+            width: var(--bar, 0%);
+            max-width: calc(100% - 10px);
+            border-radius: 2px;
+            background: linear-gradient(90deg, rgba(121,14,9,0.115) 0%, rgba(255,40,0,0.035) 100%);
+            pointer-events: none;
+        }}
+        .{table_id} .valor-tabela {{
+            position: relative;
+            z-index: 2;
+            letter-spacing: -0.015em;
         }}
         .{table_id} tbody td.col-total-mes {{
-            background: linear-gradient(180deg, rgba(121, 14, 9, 0.07) 0%, rgba(121, 14, 9, 0.028) 100%) !important;
-            color: #6B1F1A;
-            font-weight: 700;
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            color: #2F3747;
+            font-weight: 900;
+            box-shadow: inset 3px 0 0 rgba(100,116,139,0.34);
+        }}
+        .{table_id} tbody td.col-total-mes::before {{
+            background: linear-gradient(90deg, rgba(100,116,139,0.13) 0%, rgba(100,116,139,0.035) 100%);
         }}
         .{table_id} tbody tr.linha-total td {{
-            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            background: linear-gradient(180deg, #5A0A06 0%, #3D0704 100%) !important;
             color: #FFFFFF !important;
-            font-weight: 700;
-            border-bottom: 2px solid #A23B36;
+            font-weight: 900;
+            border-bottom: 1px solid #A23B36;
+            border-right: 1px solid rgba(255,255,255,0.13);
+            text-shadow: 0 1px 0 rgba(0,0,0,0.22);
+        }}
+        .{table_id} tbody tr.linha-total td.col-valor::before {{
+            display: none;
         }}
         .{table_id} tbody tr.linha-total td.col-canal {{
             z-index: 30;
+            box-shadow: inset 3px 0 0 #FF2800;
         }}
         .{table_id}-container::-webkit-scrollbar {{
             width: 8px;
@@ -6117,12 +6591,16 @@ def criar_tabela_html_backlog_canais(
         <thead>
           <tr>
     """
+    mes_atual_backlog_label = get_mes_atual_formatado().strip().lower()
     for idx_col, coluna in enumerate(colunas):
         classes = []
+        coluna_norm = str(coluna).replace("TEND.", "").strip().lower()
         if idx_col == 0:
             classes.append("col-canal")
         elif str(coluna).strip().upper().startswith("TEND."):
             classes.append("col-total-mes")
+        if idx_col > 0 and coluna_norm == mes_atual_backlog_label:
+            classes.append("col-mes-atual")
         html += f'<th class="{" ".join(classes)}">{escape(str(coluna))}</th>'
     html += "</tr></thead><tbody>"
 
@@ -6134,11 +6612,18 @@ def criar_tabela_html_backlog_canais(
         for idx_col, coluna in enumerate(colunas):
             valor = escape(str(row[coluna]))
             classes = []
+            style_attr = ""
             if idx_col == 0:
                 classes.append("col-canal")
-            elif str(coluna).strip().upper().startswith("TEND."):
-                classes.append("col-total-mes")
-            html += f'<td class="{" ".join(classes)}">{valor}</td>'
+                valor_html = valor
+            else:
+                classes.append("col-valor")
+                if str(coluna).strip().upper().startswith("TEND."):
+                    classes.append("col-total-mes")
+                if not is_total:
+                    style_attr = f' style="--bar:{_largura_data_bar(idx_linha, idx_col):.2f}%;"'
+                valor_html = f'<span class="valor-tabela">{valor}</span>'
+            html += f'<td class="{" ".join(classes)}"{style_attr}>{valor_html}</td>'
         html += "</tr>"
 
     html += "</tbody></table></div>"
@@ -6157,8 +6642,8 @@ def criar_tabela_html_migracoes_regionais(
     col_regional = colunas[0] if colunas else "REGIONAL"
     col_mom = "MoM" if "MoM" in colunas else ""
     colunas_valor = [col for col in colunas if col not in {col_regional, col_mom}]
-    largura_regional_pct = 12.0
-    largura_mom_pct = 9.0 if col_mom else 0.0
+    largura_regional_pct = 10.2
+    largura_mom_pct = 8.3 if col_mom else 0.0
     largura_mes_pct = (100.0 - largura_regional_pct - largura_mom_pct) / max(len(colunas_valor), 1)
     larguras: list[float] = []
     for coluna in colunas:
@@ -6171,6 +6656,33 @@ def criar_tabela_html_migracoes_regionais(
     colgroup_html = "<colgroup>" + "".join(
         [f'<col style="width:{largura:.4f}%;">' for largura in larguras]
     ) + "</colgroup>"
+
+    mask_linhas_valor = (
+        df_numerico.iloc[:, 0].astype(str).str.strip().str.upper().ne("TOTAL")
+        if df_numerico is not None and not df_numerico.empty and df_numerico.shape[1] > 0
+        else pd.Series(dtype=bool)
+    )
+    maximos_coluna: dict[int, float] = {}
+    for idx_col, coluna in enumerate(colunas):
+        if coluna in {col_regional, col_mom} or df_numerico is None or df_numerico.empty or idx_col >= df_numerico.shape[1]:
+            continue
+        serie_valores = pd.to_numeric(df_numerico.iloc[:, idx_col], errors="coerce").fillna(0.0)
+        serie_base = (
+            serie_valores[mask_linhas_valor]
+            if len(mask_linhas_valor) == len(serie_valores) and bool(mask_linhas_valor.any())
+            else serie_valores
+        )
+        maximos_coluna[idx_col] = float(serie_base.max()) if not serie_base.empty else 0.0
+
+    def _largura_data_bar(idx_linha: int, idx_col: int) -> float:
+        try:
+            valor = float(pd.to_numeric(pd.Series([df_numerico.iloc[idx_linha, idx_col]]), errors="coerce").fillna(0.0).iloc[0])
+        except Exception:
+            valor = 0.0
+        max_coluna = float(maximos_coluna.get(idx_col, 0.0) or 0.0)
+        if valor <= 0 or max_coluna <= 0:
+            return 0.0
+        return max(6.0, min(100.0, (valor / max_coluna) * 100.0))
 
     def _classe_mom(valor) -> str:
         try:
@@ -6188,106 +6700,172 @@ def criar_tabela_html_migracoes_regionais(
         .{table_id}-container {{
             width: 100%;
             overflow-x: auto;
-            border: 2px solid #790E09;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(121,14,9,0.14);
-            margin: 10px 0 14px 0;
-            background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+            border: 1px solid rgba(121,14,9,0.78);
+            border-radius: 5px;
+            box-shadow:
+                0 18px 38px rgba(90,10,6,0.13),
+                0 4px 12px rgba(15,23,42,0.06),
+                inset 0 0 0 1px rgba(255,255,255,0.90);
+            margin: 8px 0 14px 0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
         }}
         table.{table_id} {{
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             width: 100%;
             min-width: 820px;
             table-layout: fixed;
-            font-size: 11.5px;
-            line-height: 1.12;
+            font-size: clamp(11.2px, 0.80vw, 12.4px);
+            line-height: 1.14;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
+            font-variant-numeric: tabular-nums;
+            background: #FFFFFF;
         }}
         .{table_id} thead th {{
             position: sticky;
             top: 0;
             z-index: 40;
-            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+            background: linear-gradient(180deg, #790E09 0%, #4E0805 100%);
             color: #fff;
             padding: 7px 6px;
             text-align: center;
-            font-weight: 700;
-            letter-spacing: 0.22px;
+            font-weight: 800;
+            letter-spacing: 0.26px;
             white-space: nowrap;
-            font-size: 10.5px;
-            border-right: 1px solid rgba(255,255,255,0.9);
-            border-bottom: 2px solid #4A0704;
+            font-size: clamp(10.0px, 0.70vw, 11.0px);
+            border-right: 1px solid rgba(255,255,255,0.20);
+            border-bottom: 1px solid rgba(61,7,4,0.92);
+            text-transform: uppercase;
+            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
         }}
         .{table_id} thead th.col-regional {{
             position: sticky;
             left: 0;
             z-index: 50;
-            background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
+            background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);
             text-align: left;
-            padding-left: 8px;
+            padding-left: 10px;
         }}
         .{table_id} thead th.col-tend {{
-            background: linear-gradient(135deg, #B7443B 0%, #8E211B 100%);
+            background: linear-gradient(180deg, #6B7280 0%, #4B5563 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.18),
+                inset 0 -3px 0 rgba(255,255,255,0.14);
         }}
         .{table_id} thead th.col-mom {{
-            background: linear-gradient(135deg, #3D0704 0%, #2A0402 100%);
+            background: linear-gradient(180deg, #4F5861 0%, #343B43 100%);
         }}
         .{table_id} tbody td {{
-            padding: 7px 6px;
+            position: relative;
+            padding: 8px 6px;
             text-align: right;
-            border-bottom: 1px solid #F0E4E2;
+            border-bottom: 1px solid rgba(121,14,9,0.07);
+            border-right: 1px solid rgba(121,14,9,0.055);
             color: #2F3747;
-            font-size: 11.5px;
-            font-weight: 600;
+            font-size: clamp(11.3px, 0.80vw, 12.5px);
+            font-weight: 700;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
         }}
         .{table_id} tbody tr:nth-child(odd) td {{
-            background: #FFF9F8;
+            background: #FFFFFF;
         }}
         .{table_id} tbody tr:nth-child(even) td {{
-            background: #FDF3F2;
+            background: #FFF7F6;
         }}
         .{table_id} tbody tr:hover td {{
-            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%);
-            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.10);
+            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
         }}
         .{table_id} tbody td.col-regional {{
             position: sticky;
             left: 0;
             z-index: 20;
             text-align: left;
-            padding-left: 8px;
+            padding-left: 10px;
             color: #5A0A06;
-            font-weight: 600;
+            font-weight: 800;
+            box-shadow: inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        .{table_id} tbody td.col-valor {{
+            overflow: hidden;
+        }}
+        .{table_id} tbody td.col-valor::before {{
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            bottom: 5px;
+            width: var(--bar, 0%);
+            max-width: calc(100% - 10px);
+            border-radius: 2px;
+            background: linear-gradient(90deg, rgba(121,14,9,0.115) 0%, rgba(255,40,0,0.035) 100%);
+            pointer-events: none;
+        }}
+        .{table_id} .valor-migracoes {{
+            position: relative;
+            z-index: 2;
+            letter-spacing: -0.015em;
         }}
         .{table_id} tbody td.col-tend {{
-            background: linear-gradient(180deg, rgba(183, 68, 59, 0.10) 0%, rgba(183, 68, 59, 0.045) 100%) !important;
-            color: #6B1F1A;
-            font-weight: 800;
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            color: #2F3747;
+            font-weight: 900;
+            box-shadow: inset 3px 0 0 rgba(100,116,139,0.34);
+        }}
+        .{table_id} tbody td.col-tend::before {{
+            background: linear-gradient(90deg, rgba(100,116,139,0.13) 0%, rgba(100,116,139,0.035) 100%);
         }}
         .{table_id} tbody td.col-mom {{
-            background: transparent !important;
-            font-weight: 600;
+            background: linear-gradient(180deg, #F5F7F9 0%, #EEF2F5 100%) !important;
+            font-weight: 700;
             text-align: center;
+            border-left: 1px solid rgba(90,98,104,0.08) !important;
+        }}
+        .{table_id} .mom-chip-migracoes {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 66px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            border: 1px solid rgba(100,116,139,0.16);
+            background: rgba(255,255,255,0.70);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.86);
+            letter-spacing: -0.02em;
         }}
         .{table_id} tbody td.mom-pos {{
             color: #0F8A4B;
+            box-shadow: inset 3px 0 0 rgba(15,138,75,0.62);
         }}
         .{table_id} tbody td.mom-neg {{
             color: #B42318;
+            box-shadow: inset 3px 0 0 rgba(180,35,24,0.62);
         }}
         .{table_id} tbody td.mom-neut {{
             color: #6B7280;
+            box-shadow: inset 3px 0 0 rgba(100,116,139,0.38);
         }}
         .{table_id} tbody tr.linha-total td {{
-            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            background: linear-gradient(180deg, #5A0A06 0%, #3D0704 100%) !important;
             color: #FFFFFF !important;
             font-weight: 800;
-            border-bottom: 2px solid #A23B36;
+            border-bottom: 1px solid #A23B36;
+            border-right: 1px solid rgba(255,255,255,0.13);
+            text-shadow: 0 1px 0 rgba(0,0,0,0.22);
+        }}
+        .{table_id} tbody tr.linha-total td.col-valor::before {{
+            display: none;
         }}
         .{table_id} tbody tr.linha-total td.col-regional {{
             z-index: 30;
+            box-shadow: inset 3px 0 0 #FF2800;
+        }}
+        .{table_id} tbody tr.linha-total .mom-chip-migracoes {{
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.22);
         }}
         .{table_id}-container::-webkit-scrollbar {{
             width: 8px;
@@ -6328,14 +6906,25 @@ def criar_tabela_html_migracoes_regionais(
         for idx_col, coluna in enumerate(colunas):
             valor = escape(str(row[coluna]))
             classes = []
+            style_attr = ""
+            valor_html = valor
             coluna_txt = str(coluna).strip()
             if idx_col == 0:
                 classes.append("col-regional")
             elif coluna_txt.upper().startswith("TEND."):
-                classes.append("col-tend")
+                classes.extend(["col-valor", "col-tend"])
+                if not is_total:
+                    style_attr = f' style="--bar:{_largura_data_bar(idx_linha, idx_col):.2f}%;"'
+                valor_html = f'<span class="valor-migracoes">{valor}</span>'
             elif coluna == col_mom:
                 classes.extend(["col-mom", _classe_mom(df_numerico.iloc[idx_linha][coluna])])
-            html += f'<td class="{" ".join(classes)}">{valor}</td>'
+                valor_html = f'<span class="mom-chip-migracoes">{valor}</span>'
+            else:
+                classes.append("col-valor")
+                if not is_total:
+                    style_attr = f' style="--bar:{_largura_data_bar(idx_linha, idx_col):.2f}%;"'
+                valor_html = f'<span class="valor-migracoes">{valor}</span>'
+            html += f'<td class="{" ".join(classes)}"{style_attr}>{valor_html}</td>'
         html += "</tr>"
 
     html += "</tbody></table></div>"
@@ -6436,7 +7025,7 @@ def _cor_motivo_gross_sts(motivo: str, idx_fallback: int = 0) -> str:
     paleta_fallback = ["#5A0A06", "#8D1A12", "#B23A2F", "#C86E61", "#7C3F3A", "#A95C54"]
     return paleta_fallback[idx_fallback % len(paleta_fallback)]
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
 def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega a base de migracoes PME e padroniza os campos usados na tabela analitica."""
     _ = file_mtime
@@ -6523,15 +7112,16 @@ def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.Da
 
 def _prever_tendencia_mensal_migracoes(valores_hist: pd.Series | np.ndarray | list[float]) -> float:
     """
-    Projeta o próximo mês pela média móvel dos 3 últimos meses realizados.
+    Projeta o próximo mês pela média móvel dos 2 últimos meses realizados
+    com crescimento adicional de 10%.
     """
     serie = pd.Series(valores_hist, dtype="float64").replace([np.inf, -np.inf], np.nan).dropna()
     if serie.empty:
         return 0.0
 
     y = serie.to_numpy(dtype=float)
-    janela = y[-min(3, len(y)):]
-    return float(max(np.mean(janela), 0.0))
+    janela = y[-min(2, len(y)):]
+    return float(max(np.mean(janela) * 1.10, 0.0))
 
 def _resolver_coluna_mes_migracoes(colunas_valor: list[str], mes_ref: str | None) -> str:
     """Resolve mes selecionado para coluna real ou tendencia da tabela de migracoes."""
@@ -6813,7 +7403,7 @@ def criar_grafico_migracoes_pme_mensal(
 
     return fig
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega e normaliza a base bruta de ligações uma única vez para reaproveitamento no app."""
     path_obj = Path(path)
@@ -7030,6 +7620,45 @@ def get_mes_anterior(mes_atual: str) -> str:
     except:
         return mes_atual
 
+def normalizar_mes_dashboard(mes_ref: str | None) -> str:
+    """Normaliza mês do dashboard para comparar regras de realizado/tendência."""
+    return str(mes_ref or "").strip().lower()
+
+def eh_mes_atual_dashboard(mes_ref: str | None, mes_corrente: str | None = None) -> bool:
+    """Indica se o mês selecionado é o mês corrente usado para tendência."""
+    mes_corrente_norm = normalizar_mes_dashboard(mes_corrente or get_mes_atual_formatado())
+    return bool(normalizar_mes_dashboard(mes_ref) == mes_corrente_norm)
+
+def deve_usar_tendencia_dashboard(
+    mes_ref: str | None,
+    valor_tendencia: float | int | None,
+    mes_corrente: str | None = None
+) -> bool:
+    """Regra única: usar tendência somente no mês corrente e quando houver valor positivo."""
+    try:
+        tendencia = float(valor_tendencia or 0.0)
+    except Exception:
+        tendencia = 0.0
+    return eh_mes_atual_dashboard(mes_ref, mes_corrente) and tendencia > 0
+
+def escolher_valor_realizado_ou_tendencia(
+    valor_realizado: float | int | None,
+    valor_tendencia: float | int | None,
+    mes_ref: str | None,
+    mes_corrente: str | None = None
+) -> tuple[float, bool]:
+    """Retorna o valor exibido e se ele veio da tendência."""
+    try:
+        real = float(valor_realizado or 0.0)
+    except Exception:
+        real = 0.0
+    try:
+        tendencia = float(valor_tendencia or 0.0)
+    except Exception:
+        tendencia = 0.0
+    usar_tendencia = deve_usar_tendencia_dashboard(mes_ref, tendencia, mes_corrente)
+    return (tendencia if usar_tendencia else real), usar_tendencia
+
 def obter_mes_referencia_grafico(mes_ref: str | None = None) -> tuple[int, str]:
     """Extrai o mês de referência selecionado no dashboard com fallback para o mês atual."""
     mes_ref_txt = str(mes_ref or "").strip().lower()
@@ -7045,7 +7674,7 @@ def obter_mes_referencia_grafico(mes_ref: str | None = None) -> tuple[int, str]:
     data_atual = pd.Timestamp(mes_ano_para_data(mes_atual)).normalize()
     return int(data_atual.month), str(mes_atual).upper()
 
-def gerar_intervalo_meses_retroativos(mes_final: str, qtd_meses: int = 12) -> list[str]:
+def gerar_intervalo_meses_retroativos(mes_final: str, qtd_meses: int = 13) -> list[str]:
     """Retorna os últimos N meses até o mês de referência no formato mmm/aa."""
     try:
         data_final = pd.Timestamp(mes_ano_para_data(str(mes_final))).normalize()
@@ -7100,20 +7729,21 @@ def obter_valor_serie_mensal_mes(
     lookup_tend: dict[str, float] | None = None
 ) -> float:
     """Retorna o valor do mês usando tendência apenas no mês atual selecionado."""
-    mes_item_norm = str(mes_item).strip().lower()
-    mes_foco_norm = str(mes_foco).strip().lower()
-    mes_corrente_norm = str(mes_corrente).strip().lower()
+    mes_item_norm = normalizar_mes_dashboard(mes_item)
+    mes_foco_norm = normalizar_mes_dashboard(mes_foco)
+    mes_corrente_norm = normalizar_mes_dashboard(mes_corrente)
     lookup_real = {str(k).strip().lower(): float(v or 0.0) for k, v in (lookup_real or {}).items()}
     lookup_tend = {str(k).strip().lower(): float(v or 0.0) for k, v in (lookup_tend or {}).items()}
 
     valor_real = float(lookup_real.get(mes_item_norm, 0.0))
     valor_tend = float(lookup_tend.get(mes_item_norm, 0.0))
-    usar_tend_mes = (
-        mes_item_norm == mes_foco_norm and
-        mes_foco_norm == mes_corrente_norm and
-        valor_tend > 0
+    valor_exibido, _ = escolher_valor_realizado_ou_tendencia(
+        valor_realizado=valor_real,
+        valor_tendencia=valor_tend,
+        mes_ref=mes_item_norm if mes_item_norm == mes_foco_norm else "",
+        mes_corrente=mes_corrente_norm
     )
-    return valor_tend if usar_tend_mes else valor_real
+    return valor_exibido
 
 def criar_grafico_serie_mensal_comparativos(
     mes_foco: str,
@@ -7128,9 +7758,9 @@ def criar_grafico_serie_mensal_comparativos(
     linha_nome: str = 'Demanda',
     linha_cor: str = '#7A7F87'
 ) -> go.Figure:
-    """Cria gráfico mensal com 12 meses + M-1, mês foco e orçamento."""
+    """Cria gráfico mensal com 13 meses + M-1, mês foco e orçamento."""
     mes_foco_norm = str(mes_foco).strip().lower()
-    meses_janela = gerar_intervalo_meses_retroativos(mes_foco_norm, qtd_meses=12)
+    meses_janela = gerar_intervalo_meses_retroativos(mes_foco_norm, qtd_meses=13)
     mes_m1 = get_mes_anterior(mes_foco_norm)
     mes_corrente = get_mes_atual_formatado().strip().lower()
 
@@ -7166,7 +7796,11 @@ def criar_grafico_serie_mensal_comparativos(
     categorias_plot = [str(mes).strip().upper() for mes in meses_janela] + ['M-1', rotulo_mes_foco, 'ORÇAMENTO']
     valores_plot = valores_janela + [valor_m1, valor_foco, valor_orc]
     cores_plot = ([cor_base] * len(meses_janela)) + [cor_m1, cor_foco, cor_orc]
-    posicoes_plot = list(range(len(meses_janela))) + [13.2, 14.35, 15.5]
+    posicoes_plot = list(range(len(meses_janela))) + [
+        len(meses_janela) + 0.8,
+        len(meses_janela) + 1.95,
+        len(meses_janela) + 3.1
+    ]
     larguras_plot = ([0.50] * len(meses_janela)) + [0.56, 0.56, 0.56]
 
     fig = _criar_grafico_barras_resumo_comparativo(
@@ -10792,11 +11426,15 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id}-container {{
         width: 100%;
         overflow-x: auto;
-        border: 2px solid #790E09;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
+        border: 1px solid rgba(121,14,9,0.74);
+        border-radius: 4px;
+        box-shadow:
+            0 16px 34px rgba(90,10,6,0.13),
+            0 3px 10px rgba(15,23,42,0.07),
+            inset 0 0 0 1px rgba(255,255,255,0.92);
         margin: 10px 0 6px 0;
-        background: #FFFFFF;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+        font-family: 'Manrope', 'Segoe UI', sans-serif;
     }}
     table.{table_id} {{
         border-collapse: collapse;
@@ -10806,6 +11444,8 @@ def criar_tabela_html_necessidade_diaria_produto(
         table-layout: fixed;
         font-size: clamp(8.8px, 0.70vw, 10.4px);
         line-height: 1.04;
+        font-family: 'Manrope', 'Segoe UI', sans-serif;
+        font-variant-numeric: tabular-nums;
     }}
     .{table_id} thead th {{
         background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
@@ -10813,28 +11453,37 @@ def criar_tabela_html_necessidade_diaria_produto(
         padding: 5px 3px;
         text-align: center;
         font-weight: 800;
-        letter-spacing: 0.15px;
-        border-right: 1px solid rgba(255,255,255,0.88);
+        letter-spacing: 0.20px;
+        border-right: 1px solid rgba(255,255,255,0.22);
+        border-bottom: 1px solid rgba(61,7,4,0.92);
         white-space: normal;
         line-height: 1.0;
         font-size: clamp(8.2px, 0.66vw, 10.2px);
+        text-transform: uppercase;
+        text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
     }}
     .{table_id} thead th.th-semana {{
         background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
-        border-bottom: 2px solid rgba(255,255,255,0.22);
+        border-bottom: 1px solid rgba(255,255,255,0.22);
         font-size: clamp(8.6px, 0.70vw, 10.8px);
+        box-shadow: inset 0 -2px 0 rgba(255,40,0,0.24);
     }}
     .{table_id} thead th.th-dia-tot {{
         background: linear-gradient(135deg, #B23A31 0%, #8F1B14 100%) !important;
+        box-shadow: inset 0 -2px 0 rgba(255,255,255,0.16);
     }}
     .{table_id} thead th.th-total-mes {{
         background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%) !important;
+        box-shadow: inset 0 -2px 0 rgba(255,40,0,0.32);
     }}
     .{table_id} thead th.th-dia.th-dia-real {{
         background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
     }}
     .{table_id} thead th.th-dia.th-dia-tend {{
         background: linear-gradient(135deg, #B7443B 0%, #8F241D 100%) !important;
+        color: #FFFFFF !important;
+        box-shadow: inset 0 -2px 0 rgba(255,255,255,0.14);
     }}
     .{table_id} thead tr:nth-child(2) th {{
         font-size: clamp(7.8px, 0.60vw, 9.6px);
@@ -10842,30 +11491,31 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id} tbody td {{
         padding: 4px 3px;
         text-align: center;
-        border-bottom: 1px solid #FFFFFF;
-        border-right: 1px solid #FFFFFF;
+        border-bottom: 1px solid rgba(121,14,9,0.07);
+        border-right: 1px solid rgba(121,14,9,0.055);
         color: #2F3747;
-        font-weight: 400;
+        font-weight: 550;
         font-size: clamp(8.5px, 0.66vw, 10px);
         vertical-align: bottom;
         white-space: nowrap;
     }}
     .{table_id} tbody td.col-linha {{
         text-align: left;
-        padding-left: 5px;
-        font-weight: 600;
+        padding-left: 8px;
+        font-weight: 800;
         line-height: 1.05;
         position: sticky;
         left: 0;
         z-index: 5;
         background: transparent !important;
         white-space: nowrap;
+        box-shadow: inset 3px 0 0 rgba(255,40,0,0.26), 4px 0 10px rgba(90,10,6,0.025);
     }}
     .{table_id} tbody td.col-dia {{
         background: transparent !important;
     }}
     .{table_id} tbody td.col-dia.week-start {{
-        border-left: 1px solid #FFFFFF;
+        border-left: 1px solid rgba(121,14,9,0.20);
     }}
     .{table_id} tbody td.col-dia.dia-fds {{
         background: transparent !important;
@@ -10874,50 +11524,61 @@ def criar_tabela_html_necessidade_diaria_produto(
         background: transparent !important;
     }}
     .{table_id} tbody td.col-dia.dia-futuro {{
-        background: transparent !important;
+        color: #64748B;
+        font-style: italic;
     }}
     .{table_id} tbody td.col-total-sem {{
-        background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+        background: linear-gradient(180deg, #F3F5F7 0%, #E9EDF1 100%) !important;
         color: #1F2937;
-        font-weight: 600;
+        font-weight: 850;
+        box-shadow: inset 2px 0 0 rgba(100,116,139,0.24);
     }}
     .{table_id} tbody td.col-total-mes {{
-        background: linear-gradient(180deg, rgba(47, 55, 71, 0.075) 0%, rgba(47, 55, 71, 0.03) 100%) !important;
-        color: #1F2937;
-        font-weight: 700;
+        background: linear-gradient(180deg, #FFF0ED 0%, #F8D9D4 100%) !important;
+        color: #6B1F1A;
+        font-weight: 900;
+        box-shadow: inset 3px 0 0 rgba(255,40,0,0.28);
     }}
     .{table_id} tbody td.col-pct {{
         color: #374151;
-        font-weight: 600;
-        background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+        font-weight: 850;
+        background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+        box-shadow: none;
     }}
     .{table_id} tbody td.col-pct.pct-positivo {{
         color: #1B5E20 !important;
+        background: linear-gradient(180deg, #F2FAF4 0%, #EAF6EE 100%) !important;
+        box-shadow: none;
     }}
     .{table_id} tbody td.col-pct.pct-negativo {{
         color: #B71C1C !important;
+        background: linear-gradient(180deg, #FFF3F1 0%, #FBE4E0 100%) !important;
+        box-shadow: none;
     }}
     .{table_id} tbody td.col-pct.pct-neutro {{
         color: #475569 !important;
+        background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+        box-shadow: none;
     }}
     .{table_id} tbody tr.linha-grupo td {{
-        background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+        background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
         color: #FFFFFF !important;
         text-align: left !important;
-        font-weight: 800;
+        font-weight: 900;
         letter-spacing: 0.3px;
         padding: 6px 8px !important;
-        border-top: 1px solid #FFFFFF !important;
-        border-bottom: 1px solid #FFFFFF !important;
+        border-top: 1px solid rgba(255,255,255,0.18) !important;
+        border-bottom: 1px solid rgba(61,7,4,0.92) !important;
+        box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
     }}
     .{table_id} tbody tr.linha-projecao td {{
-        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-realizado td {{
-        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%) !important;
     }}
     .{table_id} tbody tr.linha-ating td {{
-        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-projecao td.col-linha,
     .{table_id} tbody tr.linha-projecao td.col-dia,
@@ -10930,21 +11591,29 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-util,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro,
     .{table_id} tbody tr.linha-ating td.col-linha {{
-        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-realizado td.col-linha,
     .{table_id} tbody tr.linha-realizado td.col-dia,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-fds,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-util,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro {{
-        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%) !important;
     }}
     .{table_id} tbody tr.linha-ating td.col-linha,
     .{table_id} tbody tr.linha-ating td.col-dia,
     .{table_id} tbody tr.linha-ating td.col-dia.dia-fds,
     .{table_id} tbody tr.linha-ating td.col-dia.dia-util,
     .{table_id} tbody tr.linha-ating td.col-dia.dia-futuro {{
-        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+    }}
+    .{table_id} tbody tr.linha-projecao td.col-dia.dia-futuro,
+    .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro,
+    .{table_id} tbody tr.linha-ating td.col-dia.dia-futuro {{
+        background: linear-gradient(180deg, #F6F8FA 0%, #EEF1F4 100%) !important;
+    }}
+    .{table_id} tbody tr:not(.linha-grupo):hover td {{
+        filter: brightness(0.985);
     }}
     @media (max-width: 1600px) {{
         table.{table_id} {{ min-width: 100%; }}
@@ -11607,7 +12276,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     if total_colunas == 1:
         larguras_colunas = [100.0]
     else:
-        largura_canal_pct = 22.0
+        largura_canal_pct = 24.0
         largura_num_pct = (100.0 - largura_canal_pct) / float(total_colunas - 1)
         larguras_colunas = [largura_canal_pct] + [largura_num_pct] * (total_colunas - 1)
     colgroup_html = "<colgroup>" + "".join(
@@ -11621,26 +12290,37 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     html = f"""
     <style>
         #{table_id}.tabela-container-resultado-canais {{
+            position: relative;
+            isolation: isolate;
             width: 100%;
             max-height: 500px;
             overflow-y: auto;
             overflow-x: auto;
-            border: 2px solid #790E09;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(121, 14, 9, 0.14);
+            border: 1px solid rgba(121,14,9,0.72);
+            border-radius: 4px;
+            box-shadow:
+                0 18px 38px rgba(90,10,6,0.14),
+                0 4px 12px rgba(15,23,42,0.07),
+                inset 0 0 0 1px rgba(255,255,255,0.92),
+                inset 0 0 0 5px rgba(121,14,9,0.025);
             font-family: 'Manrope', 'Segoe UI', sans-serif;
-            margin: 10px 0 18px 0;
-            background: #FFFFFF;
+            margin: 8px 0 16px 0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+        }}
+        #{table_id}.tabela-container-resultado-canais::before {{
+            content: none;
+            display: none;
         }}
         #{table_id} .tabela-resultado-canais {{
             width: 100%;
             min-width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
             border-spacing: 0;
-            font-size: 10px;
-            line-height: 1.14;
+            font-size: clamp(10.2px, 0.76vw, 11.6px);
+            line-height: 1.16;
             table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
+            background: #FFFFFF;
         }}
         #{table_id} .tabela-resultado-canais thead {{
             position: sticky;
@@ -11648,164 +12328,287 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             z-index: 100;
         }}
         #{table_id} .tabela-resultado-canais th {{
-            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+            background: linear-gradient(180deg, #790E09 0%, #4E0805 100%) !important;
             color: #FFFFFF !important;
-            font-weight: 700;
-            padding: 5px 5px;
+            font-weight: 800;
+            padding: 9px 6px;
             text-align: center;
             vertical-align: middle !important;
-            border-bottom: 3px solid #5A0A06;
-            border-right: 1px solid #FFFFFF;
+            border-bottom: 1px solid rgba(61,7,4,0.90);
+            border-right: 1px solid rgba(255,255,255,0.20);
             white-space: normal;
             overflow: visible;
             text-overflow: clip;
             overflow-wrap: break-word;
             word-break: normal;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-            line-height: 1.2;
-            font-size: 9px;
+            letter-spacing: 0.36px;
+            line-height: 1.08;
+            font-size: clamp(9.2px, 0.68vw, 10.7px);
+            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+        }}
+        #{table_id} .tabela-resultado-canais thead th:first-child {{
+            border-top-left-radius: 3px;
+        }}
+        #{table_id} .tabela-resultado-canais thead th:last-child {{
+            border-top-right-radius: 3px;
+        }}
+        #{table_id} .tabela-resultado-canais th:first-child {{
+            position: sticky;
+            left: 0;
+            z-index: 130;
+            background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%) !important;
+            text-align: left;
+            padding-left: 10px;
         }}
         #{table_id} .tabela-resultado-canais th.col-var {{
             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais th.col-meta {{
-            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+            background: linear-gradient(180deg, #A23B36 0%, #790E09 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais td {{
-            padding: 6px 5px 4px 5px;
+            padding: 8px 7px;
             text-align: right;
-            vertical-align: bottom !important;
-            border-bottom: 1px solid #FFFFFF;
-            border-right: 1px solid #FFFFFF;
-            font-weight: 400;
+            vertical-align: middle !important;
+            border-bottom: 1px solid rgba(121,14,9,0.07);
+            border-right: 1px solid rgba(121,14,9,0.06);
+            font-weight: 600;
             font-variant-numeric: tabular-nums;
-            color: #1F2937;
-            font-size: 10px;
+            color: #2F3747;
+            font-size: clamp(10px, 0.74vw, 11.4px);
             line-height: 1.16;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }}
-        #{table_id} .tabela-resultado-canais tbody td,
-        #{table_id} .tabela-resultado-canais tbody td * {{
-            font-weight: 400 !important;
-        }}
-        #{table_id} .tabela-resultado-canais tbody tr td {{
-            vertical-align: bottom !important;
+        #{table_id} .tabela-resultado-canais tbody td .valor-numero {{
+            font-weight: 650;
+            letter-spacing: -0.01em;
         }}
         #{table_id} .tabela-resultado-canais td.col-canal {{
+            position: sticky;
+            left: 0;
+            z-index: 8;
             text-align: left;
             color: #2F3747;
-            background: transparent !important;
-            padding-left: 6px;
+            padding-left: 10px;
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: break-word;
             overflow: visible;
             text-overflow: clip;
+            box-shadow: 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        #{table_id} .canal-label-resultado {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #2F3747;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            line-height: 1.12;
+        }}
+        #{table_id} .canal-label-resultado::before {{
+            content: "";
+            flex: 0 0 auto;
+            width: 8px;
+            height: 18px;
+            border-left: 3px solid #FF2800;
+            border-top: 1px solid rgba(121,14,9,0.24);
+            border-bottom: 1px solid rgba(121,14,9,0.24);
+            border-radius: 1px;
+            background: linear-gradient(90deg, rgba(255,40,0,0.10) 0%, rgba(255,40,0,0.00) 100%);
+            box-shadow: inset 1px 0 0 rgba(255,255,255,0.80);
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par td {{
-            background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+            background: #FFFFFF !important;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-impar td {{
-            background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+            background: #FFF7F6 !important;
+        }}
+        #{table_id} .linha-canal-resultado.linha-zebra-par td.col-canal {{
+            background: #FFFFFF !important;
+        }}
+        #{table_id} .linha-canal-resultado.linha-zebra-impar td.col-canal {{
+            background: #FFF7F6 !important;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par:hover,
         #{table_id} .linha-canal-resultado.linha-zebra-impar:hover {{
-            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
-            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12);
+            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par:hover td,
         #{table_id} .linha-canal-resultado.linha-zebra-impar:hover td {{
-            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
+        }}
+        #{table_id} .linha-canal-resultado.linha-zebra-par:hover td:first-child,
+        #{table_id} .linha-canal-resultado.linha-zebra-impar:hover td:first-child {{
+            box-shadow: inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.04);
+        }}
+        #{table_id} .linha-canal-resultado td:first-child {{
+            border-left: 1px solid rgba(121,14,9,0.06);
+        }}
+        #{table_id} .linha-canal-resultado td:last-child {{
+            border-right: 1px solid rgba(121,14,9,0.06);
+        }}
+        #{table_id} .linha-canal-resultado:last-child td:first-child {{
+            border-bottom-left-radius: 3px;
+        }}
+        #{table_id} .linha-canal-resultado:last-child td:last-child {{
+            border-bottom-right-radius: 3px;
         }}
         #{table_id} .tabela-resultado-canais td.col-meta {{
-            background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
+            background: linear-gradient(180deg, #FFF3F0 0%, #F8E4E1 100%) !important;
             color: #6B1F1A;
-            font-weight: 600;
-            border-left: 1px solid rgba(121, 14, 9, 0.08) !important;
-            border-right: 1px solid rgba(121, 14, 9, 0.08) !important;
+            font-weight: 800;
+            border-left: 1px solid rgba(121,14,9,0.07) !important;
+            border-right: 1px solid rgba(121,14,9,0.07) !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-var {{
             position: relative;
-            padding-left: 13px !important;
-            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
-            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
-            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
+            padding: 6px 5px !important;
+            background: #FBF1EF !important;
+            border-left: 1px solid rgba(121,14,9,0.06) !important;
+            border-right: 1px solid rgba(121,14,9,0.06) !important;
+            text-align: center;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-meta .valor-numero {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            min-width: 52px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.58);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+        }}
+        #{table_id} .var-pill-resultado {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 58px;
+            padding: 3px 7px;
+            border-radius: 3px;
+            font-size: clamp(9px, 0.66vw, 10px);
+            line-height: 1.0;
+            font-weight: 850;
+            letter-spacing: -0.01em;
+            border: 1px solid rgba(107,31,26,0.11);
+            background: rgba(255,255,255,0.86);
+            box-shadow: 0 1px 3px rgba(90,10,6,0.05), inset 0 1px 0 rgba(255,255,255,0.96);
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-positivo {{
             color: #1B5E20 !important;
-            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            background: #FBF1EF !important;
             font-weight: 700;
         }}
-        #{table_id} .tabela-resultado-canais td.col-var.status-positivo::before {{
-            content: "▲";
-            position: absolute;
-            left: 4px;
-            top: 50%;
-            transform: translateY(-50%);
+        #{table_id} .tabela-resultado-canais td.col-var.status-positivo .var-pill-resultado::before {{
+            content: "▲ ";
             color: #2E7D32;
             font-size: 8px;
+            margin-right: 2px;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-negativo {{
             color: #B71C1C !important;
-            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            background: #FBF1EF !important;
             font-weight: 700;
         }}
-        #{table_id} .tabela-resultado-canais td.col-var.status-negativo::before {{
-            content: "▼";
-            position: absolute;
-            left: 4px;
-            top: 50%;
-            transform: translateY(-50%);
+        #{table_id} .tabela-resultado-canais td.col-var.status-negativo .var-pill-resultado::before {{
+            content: "▼ ";
             color: #C62828;
             font-size: 8px;
+            margin-right: 2px;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-neutro {{
             color: #666666 !important;
-            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            background: #FBF1EF !important;
             font-weight: 500;
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-positivo .var-pill-resultado {{
+            border-color: rgba(27,94,32,0.18);
+            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(238,249,242,0.92) 100%);
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-negativo .var-pill-resultado {{
+            border-color: rgba(183,28,28,0.18);
+            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,238,236,0.92) 100%);
+        }}
+        #{table_id} .tabela-resultado-canais td.col-var.status-neutro .var-pill-resultado {{
+            border-color: rgba(100,116,139,0.18);
+            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.92) 100%);
         }}
         #{table_id} .linha-total-resultado {{
             position: sticky;
             /* Alinha o sticky da linha total com a altura real do header para
                evitar sobreposição visual na primeira linha de canal. */
-            top: 28px;
+            top: 34px;
             z-index: 95;
             border-bottom: 2px solid #790E09;
         }}
         #{table_id} .tabela-resultado-canais tbody tr.linha-canal-resultado td {{
             min-height: 24px;
             padding-top: 7px !important;
-            padding-bottom: 3px !important;
+            padding-bottom: 7px !important;
         }}
         #{table_id} .linha-total-resultado td {{
-            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
             color: #FFFFFF !important;
-            font-weight: 700;
-            border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
-            padding: 6px 5px 4px 5px !important;
-            font-size: 10px;
-            vertical-align: bottom !important;
+            font-weight: 900;
+            border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-top: 1px solid rgba(255,255,255,0.24) !important;
+            border-bottom: 1px solid rgba(61,7,4,0.92) !important;
+            padding: 9px 6px !important;
+            font-size: clamp(10.2px, 0.76vw, 11.8px);
+            vertical-align: middle !important;
+            text-transform: uppercase;
         }}
         #{table_id} .linha-total-resultado td.col-canal {{
-            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
             z-index: 80;
+        }}
+        #{table_id} .linha-total-resultado td:first-child {{
+            box-shadow: inset 4px 0 0 rgba(255,40,0,0.52);
+        }}
+        #{table_id} .linha-total-resultado .valor-numero {{
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: flex-end;
+            min-width: 58px !important;
+            padding: 2px 7px !important;
+            border-radius: 3px !important;
+            color: #FFFFFF !important;
+            background: rgba(255,255,255,0.18) !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.26);
+            font-weight: 900 !important;
+            letter-spacing: -0.01em;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.28);
         }}
         #{table_id} .linha-total-resultado td.col-meta,
         #{table_id} .linha-total-resultado td.col-var.status-positivo,
         #{table_id} .linha-total-resultado td.col-var.status-negativo,
         #{table_id} .linha-total-resultado td.col-var.status-neutro {{
-            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
             color: #FFFFFF !important;
         }}
         #{table_id} .linha-total-resultado td.col-var::before {{
             content: "" !important;
         }}
+        #{table_id} .linha-total-resultado .var-pill-resultado {{
+            color: #FFFFFF !important;
+            border-color: rgba(255,255,255,0.58);
+            background: rgba(255,255,255,0.24);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.22);
+            text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+            min-width: 64px;
+        }}
         #{table_id} .linha-total-resultado td.col-var.status-positivo::before,
         #{table_id} .linha-total-resultado td.col-var.status-negativo::before,
         #{table_id} .linha-total-resultado td.col-var.status-neutro::before {{
+            content: "" !important;
+        }}
+        #{table_id} .linha-total-resultado td.col-var.status-positivo .var-pill-resultado::before,
+        #{table_id} .linha-total-resultado td.col-var.status-negativo .var-pill-resultado::before {{
             content: "" !important;
         }}
     </style>
@@ -11840,9 +12643,15 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         for col_idx, col in enumerate(colunas):
             valor_fmt = escape(str(row[col]))
             classes = []
+            valor_html = f'<span class="valor-numero">{valor_fmt}</span>'
 
             if col == col_canal:
                 classes.append("col-canal")
+                valor_html = (
+                    valor_fmt
+                    if is_total
+                    else f'<span class="canal-label-resultado">{valor_fmt}</span>'
+                )
             elif col == col_meta:
                 classes.append("col-meta")
             elif col in {col_mom, col_var}:
@@ -11857,9 +12666,14 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
                         classes.append("status-neutro")
                 except Exception:
                     classes.append("status-neutro")
+                valor_html = (
+                    f'<span class="valor-numero">{valor_fmt}</span>'
+                    if is_total
+                    else f'<span class="var-pill-resultado">{valor_fmt}</span>'
+                )
 
             classe_celula = " ".join(classes)
-            html += f'<td class="{classe_celula}">{valor_fmt}</td>'
+            html += f'<td class="{classe_celula}">{valor_html}</td>'
 
         html += "</tr>"
 
@@ -11888,12 +12702,14 @@ def validate_data(df):
 # ==============================
 # BLOCO ADICIONAL - FUNIL FIXA E-COMMERCE
 # ==============================
-FUNIL_FIXA_FILE_PATH = Path(
-    DASHBOARD_FILES_DIR / "base_funil_ecomm_fixa.xlsx"
+FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
+    "base_funil_ecomm_fixa.xlsx",
+    DASHBOARD_LEGACY_MOBILITY_DIR / "base_funil_ecomm_fixa.xlsx"
 )
 
-TEND_FUNIL_FIXA_FILE_PATH = Path(
-    DASHBOARD_FILES_DIR / "tend_funil_ecom.xlsx"
+TEND_FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
+    "tend_funil_ecom.xlsx",
+    DASHBOARD_LEGACY_MOBILITY_DIR / "tend_funil_ecom.xlsx"
 )
 
 FUNIL_FIXA_INDICADORES_CONFIG = [
@@ -11980,7 +12796,7 @@ def _normalizar_segmento_funil_fixa(valor) -> str:
     return str(valor).strip()
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
 def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     _ = file_mtime
     path_obj = Path(path)
@@ -12184,7 +13000,7 @@ def _aplicar_tend_funil_fixa(df_funil: pd.DataFrame, df_tend: pd.DataFrame) -> p
     return df_out
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
 def load_funil_fixa_ecommerce_data(
     path: str,
     file_mtime: float | None = None,
@@ -12265,15 +13081,13 @@ def load_funil_fixa_ecommerce_data(
     df = df[df['MES_ANO_ORDEM'] > 0].copy()
     df['EH_TEND'] = 0
 
-    tend_candidates = []
-    if tend_path:
-        tend_candidates.append(Path(tend_path))
-    tend_candidates.extend([
+    tend_path_obj = resolver_arquivo_dashboard(
+        Path(tend_path) if tend_path else TEND_FUNIL_FIXA_FILE_PATH,
         TEND_FUNIL_FIXA_FILE_PATH,
         path_obj.with_name('tend_funil_ecom.xlsx'),
-        Path(__file__).with_name('tend_funil_ecom.xlsx'),
-    ])
-    tend_path_obj = next((cand for cand in tend_candidates if Path(cand).exists()), None)
+        'tend_funil_ecom.xlsx'
+    )
+    tend_path_obj = tend_path_obj if Path(tend_path_obj).exists() else None
     if tend_path_obj is not None:
         df_tend = load_tend_funil_fixa_data(str(tend_path_obj), tend_file_mtime)
         if not df_tend.empty:
@@ -12602,43 +13416,119 @@ def criar_tabela_html_funil_fixa_ecommerce(
     return f'''
     <div id="{escape(table_id, quote=True)}" class="ff-wrapper">
       <style>
-        #{table_id}.ff-wrapper {{font-family: 'Segoe UI', Arial, sans-serif; color:#312B2A;}}
+        #{table_id}.ff-wrapper {{font-family:'Manrope','Segoe UI',sans-serif; color:#312B2A; margin-top:2px;}}
         #{table_id} .ff-note {{margin:0 0 6px 2px; font-size:11px; color:#6B5C59;}}
-        #{table_id} .ff-table-box {{border:1px solid rgba(121,14,9,0.16); border-radius:18px; overflow-y:auto; overflow-x:hidden; max-height:{int(max_body_height)}px; background:linear-gradient(180deg, #FFFFFF 0%, #FCFBFB 100%); box-shadow:0 12px 30px rgba(121, 14, 9, 0.08);}}
-        #{table_id} table {{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed;}}
-        #{table_id} thead th {{position:sticky; top:0; z-index:3; background:linear-gradient(180deg, #790E09 0%, #5A0A06 100%); color:#FFFFFF; font-size:9px; letter-spacing:0.14px; text-transform:uppercase; padding:7px 5px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}}
-        #{table_id} thead th:first-child {{left:0; z-index:4; border-top-left-radius:16px;}}
-        #{table_id} thead th:last-child {{border-top-right-radius:16px;}}
-        #{table_id} thead th.ff-col-tend {{background:linear-gradient(180deg, #B65C56 0%, #92403A 100%); color:#FFFFFF;}}
-        #{table_id} tbody td {{padding:6px 5px; font-size:10.6px; border-bottom:1px solid rgba(121,14,9,0.08); white-space:nowrap; text-align:right; color:#312B2A; background:#FFFFFF; overflow:hidden; text-overflow:ellipsis;}}
-        #{table_id} tbody td.ff-col-tend {{background:linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%); color:#6B1F1A;}}
-        #{table_id} tbody tr.ff-row-parent td {{background:linear-gradient(180deg, rgba(255,248,247,0.95) 0%, rgba(255,255,255,1) 100%); font-weight:700;}}
-        #{table_id} tbody tr.ff-row-child td {{background:#FFFDFC;}}
-        #{table_id} tbody tr.ff-row-child td.ff-col-tend {{background:linear-gradient(180deg, rgba(121, 14, 9, 0.08) 0%, rgba(121, 14, 9, 0.030) 100%); color:#6B1F1A;}}
-        #{table_id} tbody tr:hover td {{background:#FFF5F4;}}
-        #{table_id} tbody tr:hover td.ff-col-tend {{background:linear-gradient(180deg, rgba(121, 14, 9, 0.10) 0%, rgba(121, 14, 9, 0.040) 100%);}}
-        #{table_id} .ff-sticky {{position:sticky; left:0; z-index:2; text-align:left !important; min-width:{largura_primeira_coluna}px; max-width:{largura_primeira_coluna}px; width:{largura_primeira_coluna}px;}}
-        #{table_id} .ff-row-parent .ff-sticky {{z-index:3;}}
-        #{table_id} .ff-row-label {{display:flex; align-items:center; gap:5px;}}
-        #{table_id} .ff-label-text {{overflow:hidden; text-overflow:ellipsis;}}
-        #{table_id} .ff-row-label-child {{padding-left:8px;}}
-        #{table_id} .ff-child-indent {{display:inline-block; width:8px; height:1px; background:rgba(121,14,9,0.30); margin-right:1px;}}
-        #{table_id} .ff-toggle {{width:18px; height:18px; border-radius:999px; border:1px solid rgba(121,14,9,0.22); background:#FFF1EF; color:#790E09; font-weight:900; line-height:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:12px; padding:0; flex:0 0 auto;}}
-        #{table_id} .ff-toggle:hover {{background:#FFE4E0;}}
-        #{table_id} .ff-toggle-placeholder {{border-color:transparent; background:transparent; cursor:default;}}
+        #{table_id} .ff-table-box {{
+            position:relative;
+            border:1px solid rgba(121,14,9,0.70);
+            border-radius:6px;
+            overflow-y:auto;
+            overflow-x:hidden;
+            max-height:{int(max_body_height)}px;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,248,247,0.96) 100%);
+            box-shadow:
+                0 18px 40px rgba(90,10,6,0.14),
+                0 4px 14px rgba(15,23,42,0.07),
+                inset 0 0 0 1px rgba(255,255,255,0.92);
+        }}
+        #{table_id} .ff-table-box::before {{
+            content:"";
+            position:sticky;
+            top:0;
+            display:block;
+            height:3px;
+            z-index:7;
+            background:linear-gradient(90deg, #FF2800 0%, #790E09 44%, rgba(121,14,9,0.18) 100%);
+        }}
+        #{table_id} table {{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; margin-top:-3px; font-variant-numeric:tabular-nums; background:#FFFFFF;}}
+        #{table_id} thead th {{
+            position:sticky;
+            top:0;
+            z-index:3;
+            background:linear-gradient(180deg, #790E09 0%, #4E0805 100%);
+            color:#FFFFFF;
+            font-size:9.4px;
+            letter-spacing:0.24px;
+            text-transform:uppercase;
+            padding:8px 5px;
+            border-right:1px solid rgba(255,255,255,0.18);
+            border-bottom:1px solid rgba(61,7,4,0.92);
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            font-weight:800;
+            text-shadow:0 1px 0 rgba(0,0,0,0.18);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,0.14);
+        }}
+        #{table_id} thead th:first-child {{left:0; z-index:4; border-top-left-radius:5px; text-align:left; padding-left:12px; background:linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);}}
+        #{table_id} thead th:last-child {{border-top-right-radius:5px; background:linear-gradient(180deg, #4F5861 0%, #343B43 100%);}}
+        #{table_id} thead th.ff-col-tend {{background:linear-gradient(135deg, #B7443B 0%, #8F241D 100%); color:#FFFFFF; box-shadow:inset 0 -3px 0 rgba(255,255,255,0.14);}}
+        #{table_id} tbody td {{
+            padding:7px 5px;
+            font-size:11.3px;
+            border-bottom:1px solid rgba(121,14,9,0.075);
+            border-right:1px solid rgba(121,14,9,0.045);
+            white-space:nowrap;
+            text-align:right;
+            color:#312B2A;
+            background:#FFFFFF;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            font-weight:520;
+        }}
+        #{table_id} tbody td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.075) 0%, rgba(183,68,59,0.030) 100%); color:#111827; box-shadow:inset 3px 0 0 rgba(183,68,59,0.24);}}
+        #{table_id} tbody tr.ff-row-parent td {{
+            background:linear-gradient(180deg, #FFF6F4 0%, #FFFFFF 100%);
+            font-weight:650;
+            color:#171717;
+            border-top:1px solid rgba(121,14,9,0.08);
+        }}
+        #{table_id} tbody tr.ff-row-parent td:not(.ff-sticky):not(.ff-mom-cell) {{
+            background:linear-gradient(180deg, #FFFDFC 0%, #FFFFFF 100%);
+            color:#111827;
+            letter-spacing:-0.02em;
+        }}
+        #{table_id} tbody tr.ff-row-parent td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.085) 0%, rgba(183,68,59,0.035) 100%); color:#111827;}}
+        #{table_id} tbody tr.ff-row-child td {{background:#FFFDFC; color:#3E454E; font-weight:510;}}
+        #{table_id} tbody tr.ff-row-child:nth-child(even) td {{background:#FFF8F7;}}
+        #{table_id} tbody tr.ff-row-child td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.070) 0%, rgba(183,68,59,0.028) 100%); color:#111827;}}
+        #{table_id} tbody tr:hover td {{background:linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;}}
+        #{table_id} tbody tr:hover td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.10) 0%, rgba(183,68,59,0.042) 100%) !important;}}
+        #{table_id} .ff-sticky {{
+            position:sticky;
+            left:0;
+            z-index:2;
+            text-align:left !important;
+            min-width:{largura_primeira_coluna}px;
+            max-width:{largura_primeira_coluna}px;
+            width:{largura_primeira_coluna}px;
+            box-shadow:inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        #{table_id} .ff-row-parent .ff-sticky {{z-index:3; color:#111827; background:linear-gradient(180deg, #FFF4F1 0%, #FFFDFC 100%);}}
+        #{table_id} .ff-row-child .ff-sticky {{box-shadow:inset 3px 0 0 rgba(121,14,9,0.28), 5px 0 12px rgba(90,10,6,0.025);}}
+        #{table_id} .ff-row-label {{display:flex; align-items:center; gap:6px;}}
+        #{table_id} .ff-label-text {{overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.01em;}}
+        #{table_id} .ff-row-parent .ff-label-text {{text-transform:uppercase; font-size:11.2px; font-weight:650;}}
+        #{table_id} .ff-row-label-child {{padding-left:8px; color:#4B5563 !important;}}
+        #{table_id} .ff-child-indent {{display:inline-block; width:12px; height:1px; background:linear-gradient(90deg, rgba(121,14,9,0.42), rgba(121,14,9,0.08)); margin-right:1px;}}
+        #{table_id} .ff-toggle {{width:18px; height:18px; border-radius:3px; border:1px solid rgba(121,14,9,0.26); background:linear-gradient(180deg,#FFFFFF 0%,#FFEAE6 100%); color:#790E09; font-weight:900; line-height:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:12px; padding:0; flex:0 0 auto; box-shadow:0 1px 0 rgba(255,255,255,0.9), 0 4px 10px rgba(121,14,9,0.08);}}
+        #{table_id} .ff-toggle:hover {{background:linear-gradient(180deg,#FFFFFF 0%,#FFDCD5 100%); transform:translateY(-1px);}}
+        #{table_id} .ff-toggle-placeholder {{border-color:transparent; background:transparent; cursor:default; box-shadow:none;}}
         #{table_id} .ff-col-mes {{min-width:0;}}
         #{table_id} .ff-mom-cell {{text-align:center !important; width:{largura_coluna_mom}px; min-width:{largura_coluna_mom}px;}}
-        #{table_id} .ff-data-cell {{padding:3px 2px;}}
-        #{table_id} .ff-data-bar-wrap {{position:relative; width:100%; min-width:0; height:17px; border-radius:6px; background:linear-gradient(180deg, rgba(121,14,9,0.04) 0%, rgba(121,14,9,0.08) 100%); overflow:hidden;}}
-        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-wrap {{background:linear-gradient(180deg, rgba(121,14,9,0.08) 0%, rgba(121,14,9,0.14) 100%);}}
-        #{table_id} .ff-data-bar-fill {{position:absolute; inset:0 auto 0 0; background:linear-gradient(90deg, rgba(121,14,9,0.18) 0%, rgba(208,36,5,0.28) 100%); border-right:1px solid rgba(121,14,9,0.10);}}
-        #{table_id} .ff-data-bar-text {{position:relative; z-index:1; display:flex; align-items:center; justify-content:flex-end; height:100%; padding:0 4px; font-size:9.6px; color:#312B2A; letter-spacing:-0.05px;}}
-        #{table_id} .mom-pill {{display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:0; border-radius:0; font-size:10.4px; font-weight:800; letter-spacing:0.10px; border:none; background:transparent;}}
-        #{table_id} .mom-up {{color:#14532D; background:transparent; border:none;}}
-        #{table_id} .mom-down {{color:#991B1B; background:transparent; border:none;}}
-        #{table_id} .mom-flat {{color:#334155; background:transparent; border:none;}}
+        #{table_id} .ff-data-cell {{padding:4px 3px;}}
+        #{table_id} .ff-data-bar-wrap {{position:relative; width:100%; min-width:0; height:20px; border-radius:3px; background:linear-gradient(180deg, rgba(121,14,9,0.035) 0%, rgba(121,14,9,0.075) 100%); overflow:hidden; border:1px solid rgba(121,14,9,0.055); box-shadow:inset 0 1px 0 rgba(255,255,255,0.82);}}
+        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-wrap {{background:linear-gradient(180deg, rgba(183,68,59,0.045) 0%, rgba(183,68,59,0.085) 100%); border-color:rgba(183,68,59,0.10);}}
+        #{table_id} .ff-data-bar-fill {{position:absolute; inset:0 auto 0 0; background:linear-gradient(90deg, rgba(121,14,9,0.13) 0%, rgba(255,40,0,0.15) 100%); border-right:1px solid rgba(121,14,9,0.10);}}
+        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-fill {{background:linear-gradient(90deg, rgba(183,68,59,0.16) 0%, rgba(183,68,59,0.08) 100%); border-right-color:rgba(183,68,59,0.12);}}
+        #{table_id} .ff-data-bar-text {{position:relative; z-index:1; display:flex; align-items:center; justify-content:flex-end; height:100%; padding:0 5px; font-size:10.7px; color:#2F3747; letter-spacing:-0.04em; font-weight:600; text-shadow:0 1px 0 rgba(255,255,255,0.75);}}
+        #{table_id} .mom-pill {{display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:2px 4px; border-radius:3px; font-size:10.7px; font-weight:650; letter-spacing:0.02em; border:1px solid rgba(100,116,139,0.14); background:rgba(255,255,255,0.70); box-shadow:inset 0 1px 0 rgba(255,255,255,0.88);}}
+        #{table_id} .mom-up {{color:#14532D; border-color:rgba(20,83,45,0.16); background:linear-gradient(180deg, rgba(240,253,244,0.90) 0%, rgba(255,255,255,0.70) 100%);}}
+        #{table_id} .mom-down {{color:#991B1B; border-color:rgba(153,27,27,0.16); background:linear-gradient(180deg, rgba(254,242,242,0.90) 0%, rgba(255,255,255,0.72) 100%);}}
+        #{table_id} .mom-flat {{color:#334155; border-color:rgba(100,116,139,0.16); background:linear-gradient(180deg, rgba(248,250,252,0.92) 0%, rgba(255,255,255,0.72) 100%);}}
         #{table_id} ::-webkit-scrollbar {{height:10px; width:10px;}}
-        #{table_id} ::-webkit-scrollbar-thumb {{background:rgba(121,14,9,0.26); border-radius:999px;}}
+        #{table_id} ::-webkit-scrollbar-thumb {{background:linear-gradient(180deg, rgba(121,14,9,0.34), rgba(121,14,9,0.20)); border-radius:999px; border:2px solid rgba(255,248,247,0.92);}}
         #{table_id} ::-webkit-scrollbar-track {{background:rgba(121,14,9,0.04);}}
       </style>
       {observacao}
@@ -13008,18 +13898,18 @@ def criar_grafico_funil_segmentado_fixa(
 
 
 def render_visual_funil_fixa_ecommerce() -> None:
-    funil_candidates = [
+    funil_path = resolver_arquivo_dashboard(
         FUNIL_FIXA_FILE_PATH,
-        Path(r"base_funil_ecomm_fixa.xlsx"),
-        Path(__file__).with_name('base_funil_ecomm_fixa.xlsx')
-    ]
-    funil_path = next((path for path in funil_candidates if Path(path).exists()), None)
-    tend_candidates = [
+        'base_funil_ecomm_fixa.xlsx',
+        DASHBOARD_LEGACY_MOBILITY_DIR / 'base_funil_ecomm_fixa.xlsx'
+    )
+    funil_path = funil_path if Path(funil_path).exists() else None
+    tend_path = resolver_arquivo_dashboard(
         TEND_FUNIL_FIXA_FILE_PATH,
-        Path(__file__).with_name('tend_funil_ecom.xlsx'),
-        Path(r"tend_funil_ecom.xlsx")
-    ]
-    tend_path = next((path for path in tend_candidates if Path(path).exists()), None)
+        'tend_funil_ecom.xlsx',
+        DASHBOARD_LEGACY_MOBILITY_DIR / 'tend_funil_ecom.xlsx'
+    )
+    tend_path = tend_path if Path(tend_path).exists() else None
 
     st.markdown(
         build_visual_title_html(
@@ -13415,8 +14305,6 @@ with tab1:
     )
 
     with st.container():
-        st.markdown('<div class="filter-title">📅 SELECIONE O MÊS PARA ANÁLISE</div>', unsafe_allow_html=True)
-        
         meses_disponiveis_cards = df_filtered['dat_tratada'].unique()
         
         meses_com_datas = []
@@ -13440,9 +14328,10 @@ with tab1:
         else:
             idx_padrao = 0
         
-        col_filtro1, col_filtro2 = st.columns([1, 3])
+        col_filtro1, col_filtro2 = st.columns([1.15, 2.85], gap="medium")
         
         with col_filtro1:
+            render_filter_label("SELECIONE O MÊS PARA ANÁLISE")
             mes_selecionado_cards = st.selectbox(
                 "Selecione o mês para análise",
                 options=meses_ordenados,
@@ -13455,7 +14344,7 @@ with tab1:
         
         with col_filtro2:
             st.markdown(f"""
-                <div class="info-box" style="margin: 0; padding: 12px 15px;">
+                <div class="info-box" style="margin: 21px 0 0 0; padding: 9px 14px; min-height: 38px; display: flex; align-items: center;">
                     <div style="display: flex; align-items: center; gap: 15px; flex-wrap: nowrap; height: 100%;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-size: 13px; color: #333333; font-weight: 600;">Mês Atual:</span>
@@ -13604,12 +14493,16 @@ with tab1:
         realizado_atual = float(kpi_lookup_qtde.get(chave_atual, 0))
         tendencia_atual = float(kpi_lookup_tend.get(chave_atual, 0))
 
-        usar_tendencia_mes = mes_atual_norm == mes_corrente_ref
+        usar_tendencia_mes = eh_mes_atual_dashboard(mes_atual_norm, mes_corrente_ref)
         if usar_tendencia_mes and tendencia_atual <= 0:
             tendencia_atual = float(kpi_lookup_tend_global.get(chave_atual, 0))
 
-        usar_tendencia = usar_tendencia_mes and (tendencia_atual > 0)
-        atual = tendencia_atual if usar_tendencia else realizado_atual
+        atual, usar_tendencia = escolher_valor_realizado_ou_tendencia(
+            realizado_atual,
+            tendencia_atual,
+            mes_atual_norm,
+            mes_corrente_ref
+        )
         
         anterior = float(kpi_lookup_qtde.get(chave_anterior, 0))
         if anterior <= 0:
@@ -13985,7 +14878,7 @@ with tab1:
         if df_distribuicao_mensal_plot.empty:
             st.info("Sem dados para o recorte selecionado em DISTRIBUIÇÃO POR CANAL E PRODUTO.")
         else:
-            meses_janela_distribuicao = gerar_intervalo_meses_retroativos(mes_distribuicao_mensal_sel, qtd_meses=12)
+            meses_janela_distribuicao = gerar_intervalo_meses_retroativos(mes_distribuicao_mensal_sel, qtd_meses=13)
             mes_foco_distribuicao = str(mes_distribuicao_mensal_sel).strip().lower()
             mes_m1_distribuicao = get_mes_anterior(mes_foco_distribuicao)
             mes_corrente_distribuicao = get_mes_atual_formatado().strip().lower()
@@ -14058,7 +14951,7 @@ with tab1:
                         )
                     valores_demanda_dist.append(float(valor_demanda_mes))
 
-            filtros_dist = [f"12 meses até {rotulo_mes_foco_dist}"]
+            filtros_dist = [f"13 meses até {rotulo_mes_foco_dist}"]
             if canal_distribuicao_mensal_sel != "Todos":
                 filtros_dist.append(canal_distribuicao_mensal_sel)
             if produto_distribuicao_mensal_sel != "Todos":
@@ -14416,8 +15309,12 @@ with tab1:
             mes_atual_valor = df_regional[df_regional['mes_ano'] == mes_atual]['QTDE'].sum()
             tend_mes_atual_valor = df_regional[df_regional['mes_ano'] == mes_atual]['TEND_QTD'].sum()
             mes_anterior_valor = df_regional[df_regional['mes_ano'] == mes_anterior]['QTDE'].sum()
-            usar_tendencia = (str(mes_atual).strip().lower() == mes_corrente_local) and (tend_mes_atual_valor > 0)
-            valor_base_meta = tend_mes_atual_valor if usar_tendencia else mes_atual_valor
+            valor_base_meta, usar_tendencia = escolher_valor_realizado_ou_tendencia(
+                mes_atual_valor,
+                tend_mes_atual_valor,
+                mes_atual,
+                mes_corrente_local
+            )
             variacao_mom = ((valor_base_meta - mes_anterior_valor) / mes_anterior_valor * 100) if mes_anterior_valor > 0 else 0
 
             meta_mes_atual = df_regional[df_regional['mes_ano'] == mes_atual]['DESAFIO_QTD'].sum()
@@ -14478,8 +15375,12 @@ with tab1:
     mes_anterior_geral = get_mes_anterior(mes_atual_tabela)
     mes_atual_valor_geral = df_total[df_total['mes_ano'] == mes_atual_tabela]['QTDE'].sum()
     mes_anterior_valor_geral = df_total[df_total['mes_ano'] == mes_anterior_geral]['QTDE'].sum()
-    usar_tendencia_geral = (str(mes_atual_tabela).strip().lower() == mes_corrente_ref) and (tend_mes_atual_geral > 0)
-    valor_base_meta_geral = tend_mes_atual_geral if usar_tendencia_geral else mes_atual_valor_geral
+    valor_base_meta_geral, usar_tendencia_geral = escolher_valor_realizado_ou_tendencia(
+        mes_atual_valor_geral,
+        tend_mes_atual_geral,
+        mes_atual_tabela,
+        mes_corrente_ref
+    )
     variacao_mom_geral = ((valor_base_meta_geral - mes_anterior_valor_geral) / mes_anterior_valor_geral * 100) if mes_anterior_valor_geral > 0 else 0
     
     alcance_meta_geral = (((valor_base_meta_geral / meta_mes_atual_geral)-1) * 100) if meta_mes_atual_geral > 0 else 0
@@ -14529,6 +15430,13 @@ with tab1:
             else:
                 return f'{valor:,.1f}'.replace(',', '.')
         return valor
+
+    def formatar_numero_inteiro(valor):
+        if isinstance(valor, (int, float, np.integer, np.floating)):
+            if pd.isna(valor):
+                return '0'
+            return f'{int(round(float(valor))):,}'.replace(',', '.')
+        return valor
     
     def formatar_percentual(valor):
         if isinstance(valor, (int, float)):
@@ -14536,8 +15444,11 @@ with tab1:
         return valor
     
     df_exibicao = df_final.copy()
+    colunas_tend_arredondar = {col_atual_exib} if usar_coluna_tend else set()
     for col in df_exibicao.columns:
-        if col not in ['Regional', 'MOM', 'TEND vs ORÇ']:
+        if col in colunas_tend_arredondar or str(col).strip().lower().startswith('tend '):
+            df_exibicao[col] = df_exibicao[col].apply(formatar_numero_inteiro)
+        elif col not in ['Regional', 'MOM', 'TEND vs ORÇ']:
             df_exibicao[col] = df_exibicao[col].apply(formatar_numero)
         else:
             df_exibicao[col] = df_exibicao[col].apply(formatar_percentual)
@@ -14547,19 +15458,19 @@ with tab1:
         def _largura_coluna_tabela(coluna: str) -> str:
             col_txt = str(coluna)
             if col_txt == 'Regional':
-                return '110px'
+                return '84px'
             if col_txt == 'Total 2025':
-                return '54px'
+                return '56px'
             if '/25' in col_txt or '/26' in col_txt:
-                return '48px'
+                return '49px'
             if 'Real' in col_txt:
-                return '54px'
+                return '56px'
             if 'Tend' in col_txt:
-                return '54px'
+                return '56px'
             if 'Orç' in col_txt and col_txt != 'TEND vs ORÇ':
-                return '54px'
+                return '56px'
             if col_txt in {'MOM', 'TEND vs ORÇ'} or 'Alcance' in col_txt or 'Var' in col_txt:
-                return '58px'
+                return '59px'
             return '54px'
 
         colgroup_html = "<colgroup>" + "".join(
@@ -16071,6 +16982,13 @@ with tab2:
                 else:
                     return f'{valor:,.1f}'.replace(',', '.')
             return valor
+
+        def formatar_numero_inteiro(valor):
+            if isinstance(valor, (int, float, np.integer, np.floating)):
+                if pd.isna(valor):
+                    return '0'
+                return f'{int(round(float(valor))):,}'.replace(',', '.')
+            return valor
         
         def formatar_percentual(valor):
             if isinstance(valor, (int, float)):
@@ -16079,7 +16997,9 @@ with tab2:
         
         df_exibicao = df_final.copy()
         for col in df_exibicao.columns:
-            if col not in ['Regional', 'Var MoM', '% Silentes']:
+            if str(col).strip().lower().startswith('tend '):
+                df_exibicao[col] = df_exibicao[col].apply(formatar_numero_inteiro)
+            elif col not in ['Regional', 'Var MoM', '% Silentes']:
                 df_exibicao[col] = df_exibicao[col].apply(formatar_numero)
             else:
                 df_exibicao[col] = df_exibicao[col].apply(formatar_percentual)
@@ -16087,8 +17007,19 @@ with tab2:
         def criar_tabela_html_desativados(df):
             total_colunas = max(len(df.columns), 1)
             largura_col_pct = 100.0 / total_colunas
+            largura_regional_pct = (
+                100.0 if total_colunas == 1
+                else min(4.6, max(4.1, largura_col_pct * 0.76))
+            )
+            largura_demais_pct = (
+                0.0 if total_colunas == 1
+                else (100.0 - largura_regional_pct) / float(total_colunas - 1)
+            )
             colgroup_html = "<colgroup>" + "".join(
-                [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+                [
+                    f'<col style="width:{(largura_regional_pct if i == 0 else largura_demais_pct):.4f}%;">'
+                    for i in range(total_colunas)
+                ]
             ) + "</colgroup>"
             html = """
             <style>
@@ -16676,9 +17607,13 @@ with tab3:
 
             tendencia_atual = float(pedidos_lookup_tend.get(chave_atual, 0))
 
-            usar_tendencia_mes = str(mes_atual).strip().lower() == mes_corrente_ref_pedidos
-            usar_tendencia = usar_tendencia_mes and (tendencia_atual > 0)
-            valor_atual = tendencia_atual if usar_tendencia else realizado_atual
+            usar_tendencia_mes = eh_mes_atual_dashboard(mes_atual, mes_corrente_ref_pedidos)
+            valor_atual, usar_tendencia = escolher_valor_realizado_ou_tendencia(
+                realizado_atual,
+                tendencia_atual,
+                mes_atual,
+                mes_corrente_ref_pedidos
+            )
             
             realizado_anterior = float(pedidos_lookup_qtde.get(chave_anterior, 0))
             
@@ -17199,8 +18134,12 @@ with tab3:
                 meta_foco = dfr[dfr['mes_ano'] == mes_foco]['DESAFIO_QTD'].sum()
                 mes_ant = get_mes_anterior(mes_foco)
                 real_ant = dfr[dfr['mes_ano'] == mes_ant]['QTDE'].sum()
-                usar_tendencia = (str(mes_foco).strip().lower() == mes_corrente_local) and (tend_foco > 0)
-                valor_base_meta = tend_foco if usar_tendencia else real_foco
+                valor_base_meta, usar_tendencia = escolher_valor_realizado_ou_tendencia(
+                    real_foco,
+                    tend_foco,
+                    mes_foco,
+                    mes_corrente_local
+                )
                 alcance = (((valor_base_meta / meta_foco) - 1) * 100) if meta_foco > 0 else 0
                 var_mom = ((valor_base_meta - real_ant) / real_ant * 100) if real_ant > 0 else 0
 
@@ -17303,8 +18242,12 @@ with tab3:
             
             mes_anterior_foco_pedidos = get_mes_anterior(mes_foco_tabela_pedidos)
             valor_mes_anterior_foco_pedidos = df_total_pedidos[df_total_pedidos['mes_ano'] == mes_anterior_foco_pedidos]['QTDE'].sum()
-            usar_tendencia_geral = (str(mes_foco_tabela_pedidos).strip().lower() == mes_corrente_ref) and (tend_foco_geral_pedidos > 0)
-            valor_base_meta_geral_pedidos = tend_foco_geral_pedidos if usar_tendencia_geral else real_foco_geral_pedidos
+            valor_base_meta_geral_pedidos, usar_tendencia_geral = escolher_valor_realizado_ou_tendencia(
+                real_foco_geral_pedidos,
+                tend_foco_geral_pedidos,
+                mes_foco_tabela_pedidos,
+                mes_corrente_ref
+            )
             variacao_mom_geral_pedidos = ((valor_base_meta_geral_pedidos - valor_mes_anterior_foco_pedidos) / valor_mes_anterior_foco_pedidos * 100) if valor_mes_anterior_foco_pedidos > 0 else 0
             
             alcance_meta_geral_pedidos = (((valor_base_meta_geral_pedidos / meta_foco_geral_pedidos)-1) * 100) if meta_foco_geral_pedidos > 0 else 0
@@ -17353,7 +18296,8 @@ with tab3:
             col_tend_ped = f'Tend {mes_foco_tabela_pedidos}'
             col_real_ped = f'Real {mes_foco_tabela_pedidos}'
             col_mes_ped_exib = str(mes_foco_tabela_pedidos).strip()
-            if col_tend_ped in df_final_pedidos.columns:
+            usar_coluna_tend_ped = col_tend_ped in df_final_pedidos.columns
+            if usar_coluna_tend_ped:
                 serie_mes_base = (
                     pd.to_numeric(df_final_pedidos[col_mes_ped_exib], errors='coerce')
                     if col_mes_ped_exib in df_final_pedidos.columns
@@ -17403,6 +18347,16 @@ with tab3:
                     except Exception:
                         return str(valor)
                 return str(valor)
+
+            def formatar_numero_inteiro_pedidos(valor):
+                if pd.isna(valor):
+                    return "0"
+                if isinstance(valor, (int, float, np.integer, np.floating)):
+                    try:
+                        return f'{int(round(float(valor))):,}'.replace(',', '.')
+                    except Exception:
+                        return str(valor)
+                return str(valor)
             
             def formatar_percentual_pedidos(valor):
                 if isinstance(valor, (int, float)):
@@ -17415,14 +18369,35 @@ with tab3:
                     df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(formatar_percentual_pedidos)
                 elif col == 'Regional':
                     df_exibicao_pedidos[col] = df_exibicao_pedidos[col].astype(str)
+                elif col == col_mes_ped_exib and usar_coluna_tend_ped:
+                    df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(lambda v: formatar_numero_inteiro_pedidos(v if not isinstance(v, pd.Series) else v.iloc[0]))
+                elif str(col).strip().lower().startswith('tend '):
+                    df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(lambda v: formatar_numero_inteiro_pedidos(v if not isinstance(v, pd.Series) else v.iloc[0]))
                 else:
                     df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(lambda v: formatar_numero_pedidos(v if not isinstance(v, pd.Series) else v.iloc[0]))
             
             def criar_tabela_html_pedidos(df):
                 total_colunas = max(len(df.columns), 1)
-                largura_col_pct = 100.0 / total_colunas
+                def _largura_coluna_tabela_pedidos(coluna: str) -> str:
+                    col_txt = str(coluna)
+                    if col_txt == 'Regional':
+                        return '84px'
+                    if col_txt == 'Total 2025':
+                        return '56px'
+                    if '/25' in col_txt or '/26' in col_txt:
+                        return '49px'
+                    if col_txt.startswith('Tend ') or 'Real' in col_txt:
+                        return '56px'
+                    if 'Orç' in col_txt and col_txt != 'TEND vs ORÇ':
+                        return '56px'
+                    if col_txt in {'MOM', 'TEND vs ORÇ'} or 'Alcance' in col_txt or 'Var' in col_txt:
+                        return '59px'
+                    return '54px'
                 colgroup_html = "<colgroup>" + "".join(
-                    [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+                    [
+                        f'<col style="width:{_largura_coluna_tabela_pedidos(col)};">'
+                        for col in df.columns
+                    ]
                 ) + "</colgroup>"
                 html = dedent("""
                 <style>
@@ -17430,7 +18405,7 @@ with tab3:
                         width: 100%;
                         max-height: 650px;
                         overflow-y: auto;
-                        overflow-x: hidden;
+                        overflow-x: auto;
                         border: 2px solid #790E09;
                         border-radius: 10px;
                         box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
@@ -17440,12 +18415,13 @@ with tab3:
                     }
                     
                     .tabela-pedidos {
-                        width: 100%;
+                        width: max-content;
+                        min-width: 100%;
                         border-collapse: collapse;
                         border-spacing: 0;
-                        font-size: 10px;
-                        line-height: 1.1;
-                        table-layout: fixed;
+                        font-size: 9px;
+                        line-height: 1.04;
+                        table-layout: auto;
                     }
                     
                     .tabela-pedidos thead {
@@ -17554,7 +18530,9 @@ with tab3:
                     
                     .linha-total-pedidos td.col-total-anual-pedidos,
                     .linha-total-pedidos td.col-mes-pedidos,
+                    .linha-total-pedidos td.col-mes-2026-pedidos,
                     .linha-total-pedidos td.col-real-jan26-pedidos,
+                    .linha-total-pedidos td.col-tend-pedidos,
                     .linha-total-pedidos td.col-meta-pedidos,
                     .linha-total-pedidos td.col-alcance-pedidos,
                     .linha-total-pedidos td.col-variacao-pedidos {
@@ -17759,15 +18737,23 @@ with tab3:
                         font-size: 9px !important;
                         box-shadow: none !important;
                         font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+                        white-space: normal !important;
+                        overflow-wrap: anywhere !important;
+                        word-break: break-word !important;
                     }
 
                     .tabela-pedidos td {
-                        padding: 4.8px 4px !important;
-                        font-size: 10px !important;
-                        line-height: 1.18 !important;
+                        padding: 3.6px 4px !important;
+                        font-size: 9.3px !important;
+                        line-height: 1.12 !important;
                         box-shadow: none !important;
                         font-weight: 400 !important;
                         font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+                        white-space: nowrap !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                        overflow-wrap: normal !important;
+                        word-break: normal !important;
                     }
 
                     .tabela-pedidos td:not(:first-child) {
@@ -17786,15 +18772,18 @@ with tab3:
                     }
 
                     .tabela-pedidos tr:not(.linha-total-pedidos) td:first-child {
-                        font-weight: 600 !important;
+                        font-weight: 400 !important;
+                        white-space: nowrap !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
                     }
 
                     .linha-total-pedidos td {
-                        font-weight: 700 !important;
+                        font-weight: 400 !important;
                     }
 
                     .linha-total-pedidos td:first-child {
-                        font-weight: 800 !important;
+                        font-weight: 400 !important;
                     }
                 </style>
                 
@@ -17913,7 +18902,8 @@ with tab3:
                 return html
             
             html_tabela_pedidos = criar_tabela_html_pedidos(df_exibicao_pedidos)
-            components.html(html_tabela_pedidos, height=700, scrolling=True)
+            altura_tabela_pedidos = min(560, max(340, 118 + (len(df_exibicao_pedidos) * 26)))
+            components.html(html_tabela_pedidos, height=altura_tabela_pedidos, scrolling=True)
             
             st.caption(f"""
             **Resumo da Tabela:** {len(pivot_data_pedidos)} Regionais | 
@@ -18222,7 +19212,7 @@ with tab3:
                             for _, row in agg_pedidos_series.iterrows()
                         }
 
-                        filtros_pedidos_series = [f"12 meses até {str(mes_series_pedidos_sel).strip().upper()}"]
+                        filtros_pedidos_series = [f"13 meses até {str(mes_series_pedidos_sel).strip().upper()}"]
                         if produto_series_pedidos_sel != "Todas":
                             filtros_pedidos_series.append(produto_series_pedidos_sel)
                         if regional_series_pedidos_sel != "Todas":
@@ -18254,6 +19244,7 @@ with tab4:
         unsafe_allow_html=True
     )
     
+    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def load_ligacoes_base(ligacoes_mtime: float | None = None):
         """Carrega dados REAIS de ligações (arquivo televendas_ligacoes.xlsx)"""
         try:
@@ -19233,7 +20224,7 @@ with tab4:
                             calcular_meta_total_projetada_ligacoes(df_lig, df_metas_lig, mes_ref_lig, regional_series_lig_sel) or 0.0
                         )
 
-                filtros_lig_series = [f"12 meses até {str(mes_series_lig_sel).strip().upper()}"]
+                filtros_lig_series = [f"13 meses até {str(mes_series_lig_sel).strip().upper()}"]
                 if produto_series_lig_sel != "Todas":
                     filtros_lig_series.append(produto_series_lig_sel)
                 if regional_series_lig_sel != "Todas":
@@ -19565,8 +20556,19 @@ with tab4:
                     """Cria tabela HTML estilizada para ligações"""
                     total_colunas = max(len(df_formatado.columns), 1)
                     largura_col_pct = 100.0 / total_colunas
+                    largura_regional_pct = (
+                        100.0 if total_colunas == 1
+                        else min(4.6, max(4.1, largura_col_pct * 0.76))
+                    )
+                    largura_demais_pct = (
+                        0.0 if total_colunas == 1
+                        else (100.0 - largura_regional_pct) / float(total_colunas - 1)
+                    )
                     colgroup_html = "<colgroup>" + "".join(
-                        [f'<col style="width:{largura_col_pct:.4f}%;">' for _ in range(total_colunas)]
+                        [
+                            f'<col style="width:{(largura_regional_pct if i == 0 else largura_demais_pct):.4f}%;">'
+                            for i in range(total_colunas)
+                        ]
                     ) + "</colgroup>"
                     
                     html = """
@@ -20212,6 +21214,7 @@ with tab5:
         except Exception:
             return mes_ref
 
+    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def preparar_base_analitica(df_in: pd.DataFrame) -> pd.DataFrame:
         """Normaliza campos de uso recorrente para acelerar filtros/consultas no analítico."""
         if df_in is None or df_in.empty:
@@ -20241,6 +21244,7 @@ with tab5:
         gc.collect()
         return df_saida
 
+    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def preparar_contexto_evolucao_semanal_analitico(df_base: pd.DataFrame):
         """Prepara a base e os metadados recorrentes usados na evolução semanal/resumo."""
         if df_base is None or df_base.empty:
@@ -20276,6 +21280,7 @@ with tab5:
         gc.collect()
         return df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem
 
+    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def load_ligacoes_para_performance(ligacoes_mtime: float | None = None):
         colunas_saida = [
             'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
@@ -20303,6 +21308,7 @@ with tab5:
         except Exception:
             return pd.DataFrame(columns=colunas_saida)
 
+    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
     def preparar_base_performance(df_base):
         colunas_saida = [
             'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
@@ -21337,11 +22343,12 @@ with tab5:
             unsafe_allow_html=True
         )
 
-        backlog_candidates = [
+        backlog_path = resolver_arquivo_dashboard(
             BACKLOG_CONSOLIDADO_FILE_PATH,
-            Path(__file__).resolve().parent /"backlog_consolidado.csv"
-        ]
-        backlog_path = next((path for path in backlog_candidates if Path(path).exists()), None)
+            "backlog_consolidado.csv",
+            DASHBOARD_APP_DIR / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
+        )
+        backlog_path = backlog_path if Path(backlog_path).exists() else None
 
         if backlog_path is None:
             st.info("Arquivo `backlog_consolidado.csv` não encontrado no caminho configurado.")
@@ -21704,11 +22711,11 @@ with tab5:
             unsafe_allow_html=True
         )
 
-        migracoes_candidates = [
+        migracoes_path = resolver_arquivo_dashboard(
             ANALITICO_MIGRACOES_FILE_PATH,
-            Path(__file__).resolve().parent / "ANALITICO_MIGRACOES_fev26.xlsx"
-        ]
-        migracoes_path = next((path for path in migracoes_candidates if Path(path).exists()), None)
+            "ANALITICO_MIGRACOES_fev26.xlsx"
+        )
+        migracoes_path = migracoes_path if Path(migracoes_path).exists() else None
 
         if migracoes_path is None:
             st.info("Arquivo `ANALITICO_MIGRACOES_fev26.xlsx` não encontrado no caminho configurado.")
@@ -23073,11 +24080,15 @@ with tab5:
                         .{table_id}-container {{
                             width: 100%;
                             overflow-x: auto;
-                            border: 2px solid #790E09;
-                            border-radius: 12px;
-                            box-shadow: 0 6px 18px rgba(121,14,9,0.16);
+                            border: 1px solid rgba(121,14,9,0.74);
+                            border-radius: 4px;
+                            box-shadow:
+                                0 16px 34px rgba(90,10,6,0.13),
+                                0 3px 10px rgba(15,23,42,0.07),
+                                inset 0 0 0 1px rgba(255,255,255,0.92);
                             margin: 8px 0 4px 0;
                             background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+                            font-family: 'Manrope', 'Segoe UI', sans-serif;
                         }}
                         table.{table_id} {{
                             border-collapse: collapse;
@@ -23085,6 +24096,8 @@ with tab5:
                             min-width: 1680px;
                             table-layout: fixed;
                             font-size: clamp(9px, 0.72vw, 11px);
+                            font-family: 'Manrope', 'Segoe UI', sans-serif;
+                            font-variant-numeric: tabular-nums;
                         }}
                         .{table_id} thead th {{
                             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
@@ -23093,14 +24106,19 @@ with tab5:
                             text-align: center;
                             font-weight: 800;
                             letter-spacing: 0.15px;
-                            border-right: 1px solid rgba(255,255,255,0.90);
+                            border-right: 1px solid rgba(255,255,255,0.24);
+                            border-bottom: 1px solid rgba(61,7,4,0.92);
                             white-space: normal;
                             line-height: 1.0;
                             font-size: clamp(8.2px, 0.66vw, 10.2px);
+                            text-transform: uppercase;
+                            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+                            box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
                         }}
                         .{table_id} thead th.th-semana {{
                             font-size: clamp(8.6px, 0.70vw, 10.8px);
-                            border-bottom: 2px solid rgba(255,255,255,0.22);
+                            border-bottom: 1px solid rgba(255,255,255,0.22);
+                            box-shadow: inset 0 -2px 0 rgba(255,40,0,0.24);
                         }}
                         .{table_id} thead th.th-semana.w1,
                         .{table_id} thead th.th-semana.w2,
@@ -23110,19 +24128,22 @@ with tab5:
                             background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
                         }}
                         .{table_id} thead th.th-dia.week-start {{
-                            border-left: 1px solid rgba(255,255,255,0.90);
+                            border-left: 1px solid rgba(255,255,255,0.42);
                         }}
                         .{table_id} thead th.th-dia-tot {{
                             background: linear-gradient(135deg, #B23A31 0%, #8F1B14 100%) !important;
-                            border: 1px solid rgba(255,255,255,0.90) !important;
+                            border: 1px solid rgba(255,255,255,0.28) !important;
+                            box-shadow: inset 0 -2px 0 rgba(255,255,255,0.14);
                         }}
                         .{table_id} thead th.th-resumo {{
                             background: linear-gradient(135deg, #6B7280 0%, #475569 100%) !important;
                             border-left: 1px solid rgba(255,255,255,0.20);
+                            box-shadow: inset 0 -2px 0 rgba(255,255,255,0.12);
                         }}
                         .{table_id} thead th.th-kpi {{
                             background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%) !important;
                             border-left: 1px solid rgba(255,255,255,0.22);
+                            box-shadow: inset 0 -2px 0 rgba(255,40,0,0.28);
                         }}
                         .{table_id} thead tr:first-child th:first-child {{
                             position: sticky;
@@ -23159,14 +24180,14 @@ with tab5:
                         .{table_id} tbody td {{
                             padding: 4px 3px;
                             text-align: center;
-                            border-bottom: 1px solid #FFFFFF;
-                            border-right: 1px solid #FFFFFF;
-                            font-weight: 400;
+                            border-bottom: 1px solid rgba(121,14,9,0.07);
+                            border-right: 1px solid rgba(121,14,9,0.055);
+                            font-weight: 520;
                             color: #2F3747;
                             font-size: clamp(8.6px, 0.68vw, 10.5px);
                         }}
                         .{table_id} tbody td.col-dia.week-start {{
-                            border-left: 1px solid #FFFFFF;
+                            border-left: 1px solid rgba(121,14,9,0.18);
                         }}
                         .{table_id} tbody td.col-dia.w1,
                         .{table_id} tbody td.col-dia.w3 {{
@@ -23185,12 +24206,13 @@ with tab5:
                         .{table_id} tbody td.col-canal {{
                             text-align: left;
                             padding-left: 5px;
-                            font-weight: 500;
+                            font-weight: 700;
                             white-space: nowrap;
                             line-height: 1.05;
                             position: sticky;
                             left: 0;
                             z-index: 6;
+                            box-shadow: inset 3px 0 0 rgba(255,40,0,0.22), 4px 0 10px rgba(90,10,6,0.025);
                         }}
                         .{table_id} tbody td.col-canal.col-canal-grupo {{
                             z-index: 7;
@@ -23200,42 +24222,48 @@ with tab5:
                         .{table_id} tbody tr:nth-child(even) td.col-canal {{ background: #FDF3F2 !important; }}
                         .{table_id} tbody tr.linha-grupo-resumo td.col-canal {{
                             background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+                            box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
                         }}
                         .{table_id} tbody tr.linha-total-secao td {{
-                            font-weight: 700;
-                            border-top: 1px solid #FFFFFF !important;
-                            border-bottom: 1px solid #FFFFFF !important;
+                            font-weight: 850;
+                            border-top: 1px solid rgba(255,255,255,0.18) !important;
+                            border-bottom: 1px solid rgba(61,7,4,0.92) !important;
                         }}
                         .{table_id} tbody tr.linha-total-secao td.col-canal {{
-                            font-weight: 800;
+                            font-weight: 900;
                         }}
                         .{table_id} tbody td.col-total-sem {{
-                            background: #F5E9E7 !important;
-                            font-weight: 500;
+                            background: linear-gradient(180deg, #F3F5F7 0%, #E9EDF1 100%) !important;
+                            font-weight: 850;
                             color: #5A0A06;
-                            border: 1px solid #FFFFFF !important;
+                            border: 1px solid rgba(121,14,9,0.08) !important;
                         }}
                         .{table_id} tbody td.col-kpi {{
-                            background: #F8EEEC !important;
+                            background: linear-gradient(180deg, #FFF0ED 0%, #F8D9D4 100%) !important;
                             color: #5A0A06;
+                            font-weight: 850;
                         }}
                         .{table_id} tbody td.col-var {{
-                            font-weight: 500;
+                            font-weight: 850;
+                            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
                         }}
                         .{table_id} tbody td.col-var-semanal {{
-                            border-left: 1px solid #FFFFFF;
+                            border-left: 1px solid rgba(100,116,139,0.20);
                         }}
                         .{table_id} tbody td.col-var-mensal {{
-                            border-left: 1px solid #FFFFFF;
+                            border-left: 1px solid rgba(100,116,139,0.20);
                         }}
                         .{table_id} tbody td.col-var.var-positivo {{
                             color: #1B5E20 !important;
+                            background: linear-gradient(180deg, #F2FAF4 0%, #EAF6EE 100%) !important;
                         }}
                         .{table_id} tbody td.col-var.var-negativo {{
                             color: #B71C1C !important;
+                            background: linear-gradient(180deg, #FFF3F1 0%, #FBE4E0 100%) !important;
                         }}
                         .{table_id} tbody td.col-var.var-neutro {{
                             color: #475569 !important;
+                            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
                         }}
                         .{table_id} tbody tr.linha-grupo-resumo td {{
                             background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
@@ -23244,8 +24272,9 @@ with tab5:
                             font-weight: 800;
                             letter-spacing: 0.4px;
                             padding: 6px 8px !important;
-                            border-top: 1px solid #FFFFFF !important;
-                            border-bottom: 1px solid #FFFFFF !important;
+                            border-top: 1px solid rgba(255,255,255,0.18) !important;
+                            border-bottom: 1px solid rgba(61,7,4,0.92) !important;
+                            box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
                         }}
                         .{table_id} tbody tr.linha-grupo-resumo.grupo-demanda td {{
                             background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
@@ -23329,6 +24358,7 @@ with tab5:
                         df_out_export = pd.DataFrame(rows_export, columns=colunas_export)
                         return html_out, df_out_export
 
+                    @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
                     def load_ligacoes_demanda_diaria(lig_mtime: float | None = None) -> pd.DataFrame:
                         try:
                             df_lig_raw = load_ligacoes_raw_tratada(LIGACOES_FILE_PATH, lig_mtime)
@@ -23510,6 +24540,7 @@ with tab5:
         if render_blocos_home_only_no_funil_movel:
             st.warning("Não há dados disponíveis para montar a visão regional.")
     else:
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
         def load_ligacoes_resumo(ligacoes_mtime: float | None = None):
             """Carrega ligações reais (televendas_ligacoes2.xlsx) já tratadas para REGIONAL/mes/plataforma."""
             try:
@@ -23910,97 +24941,199 @@ with tab5:
             .{tabela_id}-container {{
                 width: 100%;
                 overflow-x: auto;
-                border: 2px solid #790E09;
-                border-radius: 12px;
-                box-shadow: 0 6px 18px rgba(121,14,9,0.16);
-                margin: 12px 0 6px 0;
-                background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+                border: 1px solid rgba(121,14,9,0.74);
+                border-radius: 4px;
+                box-shadow:
+                    0 16px 34px rgba(90,10,6,0.13),
+                    0 3px 10px rgba(15,23,42,0.07),
+                    inset 0 0 0 1px rgba(255,255,255,0.92),
+                    inset 0 0 0 4px rgba(121,14,9,0.025);
+                margin: 10px 0 6px 0;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+                font-family: 'Manrope', 'Segoe UI', sans-serif;
             }}
             table.{tabela_id} {{
-                border-collapse: collapse;
+                border-collapse: separate;
+                border-spacing: 0;
                 width: 100%;
                 min-width: 100%;
                 table-layout: fixed;
-                font-size: 9.5px;
+                font-size: clamp(9.1px, 0.62vw, 9.9px);
                 line-height: 1.05;
+                font-family: 'Manrope', 'Segoe UI', sans-serif;
+                font-variant-numeric: tabular-nums;
+                background: #FFFFFF;
             }}
             .{tabela_id} thead th {{
                 position: sticky;
                 top: 0;
-                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+                background: linear-gradient(180deg, #790E09 0%, #4E0805 100%);
                 color: #fff;
-                padding: 4px 5px;
+                padding: 5px 5px;
                 text-align: center;
-                font-weight: 700;
-                letter-spacing: 0.2px;
+                font-weight: 800;
+                letter-spacing: 0.28px;
                 white-space: nowrap;
-                font-size: 9px;
-                border-right: 1px solid rgba(255,255,255,0.85);
-                border-bottom: 1px solid rgba(255,255,255,0.25);
+                font-size: clamp(8.7px, 0.58vw, 9.5px);
+                text-transform: uppercase;
+                border-right: 1px solid rgba(255,255,255,0.20);
+                border-bottom: 1px solid rgba(61,7,4,0.90);
+                text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
             }}
             .{tabela_id} thead tr:first-child th {{
-                background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
-                font-size: 9.2px;
+                background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);
+                font-size: clamp(8.9px, 0.60vw, 9.7px);
+                padding-top: 6px;
+                padding-bottom: 6px;
+            }}
+            .{tabela_id} thead tr:first-child th:first-child {{
+                border-top-left-radius: 3px;
+            }}
+            .{tabela_id} thead tr:first-child th:last-child {{
+                border-top-right-radius: 3px;
             }}
             .{tabela_id} thead th.th-sub {{
-                background: linear-gradient(135deg, #8F1B14 0%, #6C0C08 100%);
+                background: linear-gradient(180deg, #8F1B14 0%, #6C0C08 100%);
             }}
             .{tabela_id} thead th.th-sub.th-pct {{
-                background: linear-gradient(135deg, #6B7280 0%, #475569 100%);
+                background: linear-gradient(180deg, #5A6268 0%, #3E444A 100%);
             }}
             .{tabela_id} thead th.th-conv {{
-                background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%);
+                background: linear-gradient(180deg, #A23B36 0%, #790E09 100%);
             }}
             .{tabela_id} tbody td {{
-                padding: 3px 5px;
+                padding: 4px 5px;
                 text-align: right;
-                border-bottom: 1px solid #F0E4E2;
-                font-weight: 400;
+                border-bottom: 1px solid rgba(121,14,9,0.07);
+                border-right: 1px solid rgba(121,14,9,0.06);
+                font-weight: 600;
                 color: #2F3747;
-                font-size: 9.5px;
+                font-size: clamp(9.1px, 0.62vw, 9.9px);
+                line-height: 1.05;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
             }}
-            .{tabela_id} tbody td * {{ font-weight: 400 !important; }}
-            .{tabela_id} tbody tr:nth-child(odd) td {{ background: #FFF9F8; }}
-            .{tabela_id} tbody tr:nth-child(even) td {{ background: #FDF3F2; }}
+            .{tabela_id} tbody tr:nth-child(odd) td {{ background: #FFFFFF; }}
+            .{tabela_id} tbody tr:nth-child(even) td {{ background: #FFF7F6; }}
+            .{tabela_id} tbody tr:not(.linha-total):hover td {{
+                background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
+            }}
             .{tabela_id} tbody tr:first-child td {{
-                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%);
+                background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
                 color: #fff;
-                font-weight: 400;
-                border-bottom: 2px solid #A23B36;
+                font-weight: 900;
+                padding: 6px 5px !important;
+                font-size: clamp(9.4px, 0.64vw, 10.2px);
+                border-bottom: 1px solid rgba(61,7,4,0.92);
+                border-right: 1px solid rgba(255,255,255,0.15);
+                text-shadow: 0 1px 1px rgba(0,0,0,0.28);
             }}
             .{tabela_id} tbody tr.linha-total td.col-pct {{
                 color: #FFFFFF !important;
-                font-weight: 600;
+                font-weight: 900;
+                background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
             }}
             .{tabela_id} tbody td.col-regional {{
+                position: relative;
                 text-align: left;
-                padding-left: 6px;
+                padding-left: 12px;
                 white-space: normal;
                 overflow-wrap: anywhere;
                 word-break: break-word;
                 overflow: visible;
                 text-overflow: clip;
+                font-weight: 800;
+                letter-spacing: -0.01em;
+            }}
+            .{tabela_id} tbody tr:not(.linha-total) td.col-regional::before {{
+                content: "";
+                position: absolute;
+                left: 4px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 5px;
+                height: 17px;
+                border-left: 3px solid #FF2800;
+                border-top: 1px solid rgba(121,14,9,0.22);
+                border-bottom: 1px solid rgba(121,14,9,0.22);
+                border-radius: 1px;
+                background: linear-gradient(90deg, rgba(255,40,0,0.10) 0%, rgba(255,40,0,0.00) 100%);
+            }}
+            .{tabela_id} tbody tr.linha-total td.col-regional {{
+                padding-left: 8px;
+                box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
+            }}
+            .{tabela_id} tbody td:nth-child(3),
+            .{tabela_id} tbody td:nth-child(6),
+            .{tabela_id} tbody td:nth-child(9) {{
+                background: linear-gradient(180deg, #FFF3F0 0%, #F8E4E1 100%) !important;
+                color: #6B1F1A;
+                font-weight: 800;
             }}
             .{tabela_id} tbody td.col-pct.pct-positivo {{
                 color: #1B5E20 !important;
-                font-weight: 600;
+                background: #FBF1EF !important;
+                font-weight: 850;
             }}
             .{tabela_id} tbody td.col-pct.pct-negativo {{
                 color: #B71C1C !important;
-                font-weight: 600;
+                background: #FBF1EF !important;
+                font-weight: 850;
             }}
             .{tabela_id} tbody td.col-pct.pct-neutro {{
                 color: #475569 !important;
-                font-weight: 600;
+                background: #FBF1EF !important;
+                font-weight: 850;
+            }}
+            .{tabela_id} tbody td.col-pct {{
+                padding-left: 3px !important;
+                padding-right: 3px !important;
+                letter-spacing: -0.02em;
+            }}
+            .{tabela_id} tbody tr.linha-total td:nth-child(3),
+            .{tabela_id} tbody tr.linha-total td:nth-child(6),
+            .{tabela_id} tbody tr.linha-total td:nth-child(9) {{
+                background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+                color: #FFFFFF !important;
+            }}
+            .{tabela_id} tbody tr.linha-total td:first-child {{
+                border-bottom-left-radius: 3px;
+                box-shadow: inset 4px 0 0 rgba(255,40,0,0.52);
+            }}
+            .{tabela_id} tbody tr:last-child td:first-child {{
+                border-bottom-left-radius: 3px;
+            }}
+            .{tabela_id} tbody tr:last-child td:last-child {{
+                border-bottom-right-radius: 3px;
             }}
             </style>
             """
-            largura_regional_pct = 12.0
-            largura_demais_pct = (100.0 - largura_regional_pct) / 11.0
-            larguras_cols_pct = [largura_regional_pct] + [largura_demais_pct] * 11
+            largura_regional_pct = 9.0
+            largura_valor_pct = 7.95
+            largura_pct_orc_pct = 8.80
+            largura_conv_pct = (
+                100.0
+                - largura_regional_pct
+                - (largura_valor_pct * 6)
+                - (largura_pct_orc_pct * 3)
+            ) / 2.0
+            larguras_cols_pct = [
+                largura_regional_pct,
+                largura_valor_pct,
+                largura_valor_pct,
+                largura_pct_orc_pct,
+                largura_valor_pct,
+                largura_valor_pct,
+                largura_pct_orc_pct,
+                largura_valor_pct,
+                largura_valor_pct,
+                largura_pct_orc_pct,
+                largura_conv_pct,
+                largura_conv_pct,
+            ]
             colgroup_html = "<colgroup>" + "".join(
                 [f'<col style="width:{w:.4f}%;">' for w in larguras_cols_pct]
             ) + "</colgroup>"
@@ -24222,11 +25355,11 @@ with tab6:
         unsafe_allow_html=True
     )
 
-    cotacoes_candidates = [
+    cotacoes_path = resolver_arquivo_dashboard(
         COTACOES_FILE_PATH,
-        Path(__file__).with_name("RelatorioFluxoVidaCotacao.xlsx")
-    ]
-    cotacoes_path = next((path for path in cotacoes_candidates if Path(path).exists()), None)
+        "RelatorioFluxoVidaCotacao.xlsx"
+    )
+    cotacoes_path = cotacoes_path if Path(cotacoes_path).exists() else None
 
     if cotacoes_path is None:
         st.warning("Arquivo de COTAÇÕES não encontrado no caminho configurado.")
@@ -24477,7 +25610,7 @@ with tab6:
                     else meses_funil_fixa_disp[-1]
                 )
 
-                col_funil_fixa_canal, col_funil_fixa_mes, col_funil_fixa_info = st.columns([0.95, 0.85, 2.20], gap="medium")
+                col_funil_fixa_canal, col_funil_fixa_mes, col_funil_fixa_spacer = st.columns([0.95, 0.85, 2.20], gap="medium")
                 with col_funil_fixa_canal:
                     render_filter_label("Canal")
                     canal_funil_fixa_sel = st.selectbox(
@@ -24496,19 +25629,8 @@ with tab6:
                         key="funil_fixa_legado_mes",
                         label_visibility="collapsed"
                     )
-                with col_funil_fixa_info:
-                    mes_funil_fixa_m1 = get_mes_anterior(mes_funil_fixa_sel)
-                    st.markdown(
-                        f"""
-                        <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
-                                    border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-                                    color: #6B1F1A; font-size: 12px; font-weight: 600;">
-                            Mês atual: {mes_funil_fixa_sel.upper()} | MoM: {mes_funil_fixa_sel.upper()} vs {mes_funil_fixa_m1.upper()}.
-                            A tabela do funil FIXA também respeita o mês selecionado para encerrar a série e calcular a variação mensal.
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                with col_funil_fixa_spacer:
+                    st.empty()
 
                 tabela_funil_fixa_fmt, tabela_funil_fixa_num = montar_tabela_funil_fixa(
                     df_base_principal=base_funil_cotacoes,
@@ -24525,12 +25647,6 @@ with tab6:
                             table_id="tabela-cotacoes-funil-fixa"
                         ),
                         unsafe_allow_html=True
-                    )
-                    st.caption(
-                        "Série exibida do mesmo mês do ano anterior até o mês foco selecionado. "
-                        "No funil FIXA, os indicadores vêm da base principal do produto FIXA; para Televendas Receptivo, a entrada passa a ser LIGAÇÕES. "
-                        "Nos demais canais sem demanda de entrada, as linhas de PEDIDOS/LIGAÇÕES e da conversão inicial ficam ocultas. "
-                        "A coluna MoM passa a comparar exatamente o mês foco escolhido contra o M-1 correspondente."
                     )
 
 with tab5:
@@ -24619,7 +25735,7 @@ with tab5:
             else meses_funil_cotacoes_disp[-1]
         )
 
-        col_funil_filtro, col_funil_mes, col_funil_info = st.columns([0.85, 0.85, 2.10], gap="medium")
+        col_funil_filtro, col_funil_mes, col_funil_spacer = st.columns([0.85, 0.85, 2.10], gap="medium")
         with col_funil_filtro:
             render_filter_label("Canal")
             canal_funil_cotacoes = st.selectbox(
@@ -24638,20 +25754,8 @@ with tab5:
                 key="funil_movel_cotacoes_funil_mes",
                 label_visibility="collapsed"
             )
-        with col_funil_info:
-            mes_funil_cotacoes_m1 = get_mes_anterior(mes_funil_cotacoes_sel)
-            st.markdown(
-                f"""
-                <div style="margin-top: 18px; padding: 10px 14px; border: 1px solid rgba(162,59,54,0.14);
-                            border-radius: 12px; background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-                            color: #6B1F1A; font-size: 12px; font-weight: 600;">
-                    Mês atual: {mes_funil_cotacoes_sel.upper()} | MoM: {mes_funil_cotacoes_sel.upper()} vs {mes_funil_cotacoes_m1.upper()}.
-                    A tabela carrega a série até o mês selecionado. Se o mês selecionado for o atual, o funil usa
-                    tendência nas bases que já trazem projeção e, em COTAÇÃO, aplica pace por dias úteis.
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        with col_funil_spacer:
+            st.empty()
 
         tabela_funil_fmt, tabela_funil_num = montar_tabela_funil_cotacoes(
             df_base_principal=base_funil_cotacoes,
@@ -24669,12 +25773,6 @@ with tab5:
                     table_id="tabela-funil-movel-cotacoes-funil-integrado"
                 ),
                 unsafe_allow_html=True
-            )
-            st.caption(
-                "Série exibida do mesmo mês do ano anterior até o mês atual selecionado. "
-                "ATIVAÇÃO considera apenas o produto CONTA; para Televendas Receptivo, a entrada passa a ser LIGAÇÕES. "
-                "Nos demais canais sem demanda de entrada, as linhas de PEDIDOS/LIGAÇÕES e da conversão inicial ficam ocultas. "
-                "A coluna MoM passa a comparar exatamente o mês atual escolhido contra o M-1 correspondente."
             )
 
 def build_home_source_filters_html(info_text: object, titulo: str = "Filtros de Origem") -> str:
@@ -24758,7 +25856,6 @@ def render_home_synced_selectbox(
     selecionado = st.selectbox(
         widget_label,
         options=opcoes,
-        index=opcoes.index(st.session_state.get(home_key, valor_source)),
         key=home_key,
         label_visibility="collapsed"
     )
@@ -24768,7 +25865,7 @@ def render_home_synced_selectbox(
         st.session_state[sync_key] = selecionado
         st.rerun()
 
-    st.session_state[sync_key] = valor_source
+    st.session_state[sync_key] = selecionado
     return selecionado
 
 with tab0:
