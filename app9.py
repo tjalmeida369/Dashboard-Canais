@@ -137,6 +137,20 @@ def fragmento_dashboard(func=None, **fragment_kwargs):
         return decorator_fragmento(func, **fragment_kwargs)
     return decorator_fragmento(**fragment_kwargs)
 
+def obter_cache_session_dashboard(cache_id: str, cache_key, calcular_fn):
+    """Memoiza resultados pesados por chave simples, sem hashear DataFrames grandes em todo rerun."""
+    cache = st.session_state.setdefault("_dashboard_session_result_cache", {})
+    registro = cache.get(cache_id)
+    if isinstance(registro, dict) and registro.get("key") == cache_key:
+        return registro.get("value")
+
+    valor = calcular_fn()
+    cache[cache_id] = {"key": cache_key, "value": valor}
+    if len(cache) > CACHE_MAX_ENTRIES_VIEW:
+        for chave_antiga in list(cache.keys())[:-CACHE_MAX_ENTRIES_VIEW]:
+            cache.pop(chave_antiga, None)
+    return valor
+
 PRIMARY_BASE_USECOLS = [
     'REGIONAL', 'DSC_REGIONAL_CMV',
     'CANAL_PLAN', 'DSC_CANAL',
@@ -14853,7 +14867,7 @@ render_header_logo()
 
 st.markdown("""
     <div class="main-title">
-        CANAIS ESTRATÉGICOS
+        CANAIS ESTRATÉGICOS PME
     </div>
 """, unsafe_allow_html=True)
 
@@ -22874,10 +22888,18 @@ with tab5:
             partes.append("</div>")
             return "".join(partes)
 
-        df_perf_base = preparar_base_performance(df)
+        df_perf_base = obter_cache_session_dashboard(
+            "df_perf_base_principal_v1",
+            ("principal", file_mtime),
+            lambda: preparar_base_performance(df)
+        )
         ligacoes_perf_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
         df_lig_raw = load_ligacoes_para_performance(ligacoes_perf_mtime)
-        df_lig_perf = preparar_base_performance(df_lig_raw)
+        df_lig_perf = obter_cache_session_dashboard(
+            "df_perf_base_ligacoes_v1",
+            ("ligacoes", ligacoes_perf_mtime),
+            lambda: preparar_base_performance(df_lig_raw)
+        )
 
         if not df_lig_perf.empty:
             base_ligacoes_origem = df_perf_base[
@@ -22950,7 +22972,11 @@ with tab5:
             )
             df_perf_base = pd.concat([df_perf_base[~mask_remove_lig], df_lig_perf], ignore_index=True)
 
-        base_analitica = preparar_base_analitica(df)
+        base_analitica = obter_cache_session_dashboard(
+            "base_analitica_v1",
+            ("principal", file_mtime),
+            lambda: preparar_base_analitica(df)
+        )
 
         meses_analitico = sorted(
             base_analitica['dat_tratada'].dropna().unique().tolist(),
@@ -23091,7 +23117,11 @@ with tab5:
             )
 
             df_gross_motivo = (
-                preparar_base_gross_motivo_status(df)
+                obter_cache_session_dashboard(
+                    "base_gross_motivo_status_v1",
+                    ("principal", file_mtime),
+                    lambda: preparar_base_gross_motivo_status(df)
+                )
                 if tab_funil_movel_ativa
                 else pd.DataFrame()
             )
@@ -23421,11 +23451,15 @@ with tab5:
                 render_bloco_migracoes_pme()
 
 
-        if base_analitica.empty:
+        if not tab_inicio_ativa:
+            pass
+        elif base_analitica.empty:
             st.info("Nao ha dados para montar a evolucao semanal.")
         else:
-            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(
-                base_analitica
+            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = obter_cache_session_dashboard(
+                "ctx_evolucao_semanal_analitico_v1",
+                ("principal", file_mtime),
+                lambda: preparar_contexto_evolucao_semanal_analitico(base_analitica)
             )
 
             if not meses_disp_sem:
@@ -25138,7 +25172,7 @@ with tab5:
                 unsafe_allow_html=True
             )
 
-        df_reg_base = base_analitica.copy()
+        df_reg_base = base_analitica.copy() if tab_inicio_ativa else pd.DataFrame()
         if df_reg_base.empty:
             if render_blocos_home_only_no_funil_movel:
                 st.warning("Não há dados disponíveis para montar a visão regional.")
@@ -25841,7 +25875,7 @@ with tab5:
                 home_inicio_ctx["regional_info"] = f"Mês: {str(mes_reg_sel).upper()} | Canal: {canal_reg_sel}"
 
 
-        if tem_meses_analitico:
+        if tab_inicio_ativa and tem_meses_analitico:
             if render_blocos_home_only_no_funil_movel:
                 st.markdown(
                     build_visual_title_html(
