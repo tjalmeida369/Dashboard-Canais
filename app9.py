@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -14867,7 +14867,7 @@ render_header_logo()
 
 st.markdown("""
     <div class="main-title">
-        CANAIS ESTRATÉGICOS PME
+        CANAIS ESTRATÉGICOS
     </div>
 """, unsafe_allow_html=True)
 
