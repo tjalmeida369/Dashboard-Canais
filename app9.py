@@ -413,6 +413,54 @@ def _config_plotly_exportacao(fig, config_usuario: dict | None) -> dict:
     config.setdefault("responsive", True)
     return config
 
+
+def obter_bases_funil_home() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Resolve as bases do funil da capa sem depender da ordem de execução das abas."""
+    base_funil_home = globals().get("base_funil_cotacoes", pd.DataFrame())
+    if base_funil_home is None or getattr(base_funil_home, "empty", True):
+        base_funil_home = globals().get("df_perf_base", pd.DataFrame())
+    if (base_funil_home is None or getattr(base_funil_home, "empty", True)) and "preparar_base_performance" in globals() and "df" in globals():
+        try:
+            df_origem = globals().get("df", pd.DataFrame())
+            if df_origem is not None and not getattr(df_origem, "empty", True):
+                file_mtime_ref = globals().get("file_mtime", None)
+                cache_key = ("base_performance_home", file_mtime_ref)
+                base_funil_home = obter_cache_session_dashboard(
+                    "home_funil_base_performance_v1",
+                    cache_key,
+                    lambda: preparar_base_performance(df_origem)
+                )
+        except Exception:
+            base_funil_home = pd.DataFrame()
+
+    df_cotacoes_home = globals().get("df_cotacoes_base", pd.DataFrame())
+    if df_cotacoes_home is None or getattr(df_cotacoes_home, "empty", True):
+        try:
+            cotacoes_path_ref = globals().get("COTACOES_FILE_PATH", None)
+            if cotacoes_path_ref:
+                cotacoes_path = resolver_arquivo_dashboard(cotacoes_path_ref, "RelatorioFluxoVidaCotacao.xlsx")
+                cotacoes_path = cotacoes_path if Path(cotacoes_path).exists() else None
+                if cotacoes_path is not None:
+                    cotacoes_mtime = Path(cotacoes_path).stat().st_mtime
+                    cache_key = (str(cotacoes_path), cotacoes_mtime, COTACOES_CACHE_VERSION)
+                    df_cotacoes_home = obter_cache_session_dashboard(
+                        "home_funil_cotacoes_base_v1",
+                        cache_key,
+                        lambda: load_cotacoes_data(
+                            str(cotacoes_path),
+                            cotacoes_mtime,
+                            COTACOES_CACHE_VERSION
+                        )
+                    )
+        except Exception:
+            df_cotacoes_home = pd.DataFrame()
+
+    if base_funil_home is None:
+        base_funil_home = pd.DataFrame()
+    if df_cotacoes_home is None:
+        df_cotacoes_home = pd.DataFrame()
+    return base_funil_home, df_cotacoes_home
+
 def _aplicar_autoscale_inicial_linhas(fig) -> None:
     """Evita gráficos de linha iniciarem com range travado após filtros."""
     try:
@@ -26645,8 +26693,7 @@ with tab0:
             build_visual_title_html("FUNIL CONTA E FIXA - FILTRO ÚNICO", "grid", "subsection-title", extra_style="margin-top:14px;"),
             unsafe_allow_html=True
         )
-        base_funil_home = globals().get("base_funil_cotacoes", pd.DataFrame())
-        df_cotacoes_home = globals().get("df_cotacoes_base", pd.DataFrame())
+        base_funil_home, df_cotacoes_home = obter_bases_funil_home()
         canais_funil_home: list[str] = []
         if base_funil_home is not None and not getattr(base_funil_home, "empty", True) and "CANAL_PLAN" in base_funil_home.columns:
             canais_funil_home.extend([
