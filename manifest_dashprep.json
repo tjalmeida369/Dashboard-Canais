@@ -1,0 +1,89 @@
+{
+  "gerado_em": "2026-04-15T07:12:12",
+  "base_dir": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard",
+  "derivados": {
+    "base_principal": "base_final_trt_new3_dashprep.parquet",
+    "ligacoes": "televendas_ligacoes2_dashprep.parquet",
+    "cotacoes": "RelatorioFluxoVidaCotacao_dashprep.parquet",
+    "cotacoes_agregado": "RelatorioFluxoVidaCotacao_agregado_dashprep.parquet",
+    "backlog": "backlog_consolidado_dashprep.parquet",
+    "migracoes": "ANALITICO_MIGRACOES_fev26_dashprep.parquet",
+    "funil_fixa": "base_funil_ecomm_fixa_dashprep.parquet",
+    "tend_funil_fixa": "tend_funil_ecom_dashprep.parquet",
+    "manifest": "manifest_dashprep.json"
+  },
+  "resultados": [
+    {
+      "nome": "base_principal",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\base_final_trt_new3.xlsx",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\base_final_trt_new3_dashprep.parquet",
+      "linhas": 267859,
+      "colunas": 13,
+      "status": "ok",
+      "detalhe": ""
+    },
+    {
+      "nome": "ligacoes",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\televendas_ligacoes2.xlsx",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\televendas_ligacoes2_dashprep.parquet",
+      "linhas": 144177,
+      "colunas": 14,
+      "status": "ok",
+      "detalhe": ""
+    },
+    {
+      "nome": "cotacoes",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\RelatorioFluxoVidaCotacao.xlsx",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\RelatorioFluxoVidaCotacao_dashprep.parquet",
+      "linhas": 46866,
+      "colunas": 9,
+      "status": "ok",
+      "detalhe": ""
+    },
+    {
+      "nome": "cotacoes_agregado",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\RelatorioFluxoVidaCotacao.xlsx",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\RelatorioFluxoVidaCotacao_agregado_dashprep.parquet",
+      "linhas": 258,
+      "colunas": 5,
+      "status": "ok",
+      "detalhe": ""
+    },
+    {
+      "nome": "backlog",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\backlog_consolidado.csv",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\backlog_consolidado_dashprep.parquet",
+      "linhas": 624,
+      "colunas": 5,
+      "status": "ok",
+      "detalhe": ""
+    },
+    {
+      "nome": "migracoes",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\ANALITICO_MIGRACOES_fev26.xlsx",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\ANALITICO_MIGRACOES_fev26_dashprep.parquet",
+      "linhas": 4010,
+      "colunas": 3,
+      "status": "ok",
+      "detalhe": ""
+    },
+    {
+      "nome": "tend_funil_fixa",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\tend_funil_ecom.xlsx",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\tend_funil_ecom_dashprep.parquet",
+      "linhas": 18,
+      "colunas": 8,
+      "status": "ok",
+      "detalhe": ""
+    },
+    {
+      "nome": "funil_fixa",
+      "origem": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\base_funil_ecomm_fixa.xlsx",
+      "destino": "C:\\Users\\thiag\\Claro SA\\USER-Canais Estratégicos - Arquivos - Dashboard Canais Estratégicos\\Arquivos_Dashboard\\base_funil_ecomm_fixa_dashprep.parquet",
+      "linhas": 3105,
+      "colunas": 11,
+      "status": "ok",
+      "detalhe": ""
+    }
+  ]
+}
