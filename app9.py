@@ -8,6 +8,7 @@ import streamlit.components.v1 as components
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from collections import OrderedDict
 import locale
 import re
 import shutil
@@ -114,12 +115,15 @@ def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
 CACHE_MAX_ENTRIES_LARGE = 4
 CACHE_MAX_ENTRIES_MEDIUM = 8
 CACHE_MAX_ENTRIES_VIEW = 24
+CACHE_SESSION_VARIATIONS = 3
 COTACOES_CACHE_VERSION = "2026-04-02-cotacoes-otimizadas-v7"
 ALLOWED_CANAIS_VENDA_COTACOES = {
     normalizar_chave_visual("CORPPME"),
     normalizar_chave_visual("CORPLP"),
     normalizar_chave_visual("NETPME"),
 }
+HTML_STYLE_BLOCK_RE = re.compile(r"<style[^>]*>.*?</style>", re.IGNORECASE | re.DOTALL)
+_RUN_CSS_RENDERED: set[str] = set()
 
 def fragmento_dashboard(func=None, **fragment_kwargs):
     """Usa st.fragment quando disponível, mantendo fallback seguro para versões antigas."""
@@ -137,19 +141,127 @@ def fragmento_dashboard(func=None, **fragment_kwargs):
         return decorator_fragmento(func, **fragment_kwargs)
     return decorator_fragmento(**fragment_kwargs)
 
-def obter_cache_session_dashboard(cache_id: str, cache_key, calcular_fn):
-    """Memoiza resultados pesados por chave simples, sem hashear DataFrames grandes em todo rerun."""
-    cache = st.session_state.setdefault("_dashboard_session_result_cache", {})
-    registro = cache.get(cache_id)
-    if isinstance(registro, dict) and registro.get("key") == cache_key:
-        return registro.get("value")
+def _normalizar_chave_cache_session(cache_key):
+    try:
+        hash(cache_key)
+        return cache_key
+    except Exception:
+        return repr(cache_key)
+
+
+def obter_cache_session_dashboard(
+    cache_id: str,
+    cache_key,
+    calcular_fn,
+    max_variacoes: int = CACHE_SESSION_VARIATIONS
+):
+    """Memoiza resultados pesados por chave simples, preservando poucas variações recentes por bloco."""
+    cache_raiz = st.session_state.setdefault("_dashboard_session_result_cache", OrderedDict())
+    if not isinstance(cache_raiz, OrderedDict):
+        cache_raiz = OrderedDict(cache_raiz)
+
+    chave_normalizada = _normalizar_chave_cache_session(cache_key)
+    bucket = cache_raiz.get(cache_id)
+    if isinstance(bucket, dict) and not isinstance(bucket, OrderedDict) and {"key", "value"}.issubset(bucket.keys()):
+        bucket = OrderedDict([(bucket.get("key"), bucket.get("value"))])
+    elif not isinstance(bucket, OrderedDict):
+        bucket = OrderedDict(bucket) if isinstance(bucket, dict) else OrderedDict()
+
+    if chave_normalizada in bucket:
+        valor = bucket.pop(chave_normalizada)
+        bucket[chave_normalizada] = valor
+        cache_raiz.move_to_end(cache_id)
+        cache_raiz[cache_id] = bucket
+        st.session_state["_dashboard_session_result_cache"] = cache_raiz
+        return valor
 
     valor = calcular_fn()
-    cache[cache_id] = {"key": cache_key, "value": valor}
-    if len(cache) > CACHE_MAX_ENTRIES_VIEW:
-        for chave_antiga in list(cache.keys())[:-CACHE_MAX_ENTRIES_VIEW]:
-            cache.pop(chave_antiga, None)
+    bucket[chave_normalizada] = valor
+    while len(bucket) > max(1, int(max_variacoes or 1)):
+        bucket.popitem(last=False)
+
+    cache_raiz[cache_id] = bucket
+    cache_raiz.move_to_end(cache_id)
+    while len(cache_raiz) > CACHE_MAX_ENTRIES_VIEW:
+        cache_raiz.popitem(last=False)
+
+    st.session_state["_dashboard_session_result_cache"] = cache_raiz
     return valor
+
+
+def renderizar_html_otimizado(html: object) -> None:
+    """Renderiza HTML pesado reutilizando blocos <style> iguais apenas uma vez por execução."""
+    if html is None:
+        return
+    html_texto = str(html)
+    if not html_texto.strip():
+        return
+
+    estilos = HTML_STYLE_BLOCK_RE.findall(html_texto)
+    corpo = HTML_STYLE_BLOCK_RE.sub("", html_texto)
+    for estilo in estilos:
+        if estilo not in _RUN_CSS_RENDERED:
+            st.markdown(estilo, unsafe_allow_html=True)
+            _RUN_CSS_RENDERED.add(estilo)
+
+    if corpo.strip():
+        st.markdown(corpo, unsafe_allow_html=True)
+
+
+def obter_opcao_preferida_dashboard(
+    options,
+    preferidos,
+    fallback=None
+):
+    """Seleciona uma opção preferida preservando robustez contra variações de escrita."""
+    opcoes = list(options or [])
+    if not opcoes:
+        return fallback
+
+    if not isinstance(preferidos, (list, tuple, set)):
+        preferidos = [preferidos]
+
+    mapa_normalizado = {
+        normalizar_chave_visual(str(opcao)): opcao
+        for opcao in opcoes
+    }
+    for preferido in preferidos:
+        chave_preferida = normalizar_chave_visual(str(preferido or ""))
+        if chave_preferida and chave_preferida in mapa_normalizado:
+            return mapa_normalizado[chave_preferida]
+
+    if fallback in opcoes:
+        return fallback
+    return opcoes[0]
+
+
+def formatar_data_atualizacao_dashboard(path_ref: str | Path | None) -> str:
+    """Formata a última atualização de um arquivo no padrão dd/mm."""
+    if not path_ref:
+        return "--/--"
+    try:
+        path_obj = Path(path_ref)
+        if not path_obj.exists():
+            return "--/--"
+        return datetime.fromtimestamp(path_obj.stat().st_mtime).strftime("%d/%m")
+    except Exception:
+        return "--/--"
+
+
+def montar_segmento_data_atualizacao_html(
+    path_ref: str | Path | None,
+    rotulo: str = "Dados atualizados até"
+) -> str:
+    data_formatada = formatar_data_atualizacao_dashboard(path_ref)
+    return f"""
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:13px; color:#333333; font-weight:600;">{escape(str(rotulo))}:</span>
+            <span style="font-size:14px; color:#790E09; font-weight:700;
+                    background: rgba(121, 14, 9, 0.09); padding: 6px 15px; border-radius: 20px;">
+                {escape(data_formatada)}
+            </span>
+        </div>
+    """
 
 PRIMARY_BASE_USECOLS = [
     'REGIONAL', 'DSC_REGIONAL_CMV',
@@ -12937,12 +13049,12 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     """
 
     for col in colunas:
-        classe = ""
+        classes = []
         if col == col_meta:
-            classe = "col-meta"
+            classes.append("col-meta")
         elif col in {col_mom, col_var}:
-            classe = "col-var"
-        html += f'<th class="{classe}">{escape(str(col))}</th>'
+            classes.append("col-var")
+        html += f'<th class="{" ".join(classes)}">{escape(str(col))}</th>'
     html += "</tr></thead><tbody>"
 
     idx_linha_canal = 0
@@ -14714,104 +14826,103 @@ def render_bloco_cotacoes_funil_movel() -> None:
     base_funil_cotacoes = globals().get("df_perf_base", pd.DataFrame())
     if (base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True)) and "preparar_base_performance" in globals():
         try:
-            base_funil_cotacoes = preparar_base_performance(df)
+            df_origem_principal = globals().get("df", pd.DataFrame())
+            if df_origem_principal is not None and not getattr(df_origem_principal, "empty", True):
+                base_funil_cotacoes = preparar_base_performance(df_origem_principal)
         except Exception:
             base_funil_cotacoes = pd.DataFrame()
 
     if (
-        base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True)
-        or df_cotacoes_base_movel is None or getattr(df_cotacoes_base_movel, "empty", True)
+        base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True) or
+        df_cotacoes_base_movel is None or getattr(df_cotacoes_base_movel, "empty", True)
     ):
         return
 
     st.markdown(
-        build_visual_title_html("FUNIL CONTA - PEDIDOS X COTAÇÃO X ATIVAÇÃO", "grid", "subsection-title", extra_style="margin-top:18px;"),
+        build_visual_title_html("FUNIL CONTA - PEDIDOS X COTAÇÃO X ATIVAÇÃO", "target", "subsection-title", extra_style="margin-top:18px;"),
         unsafe_allow_html=True
     )
 
-    canais_funil_lista: list[str] = []
+    canais_funil_base = []
     if "CANAL_PLAN" in base_funil_cotacoes.columns:
-        canais_funil_lista.extend(
+        canais_funil_base.extend(
             [
-                canal for canal in
-                base_funil_cotacoes["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
-                if canal
+                _mapear_canal_funil_cotacoes(valor)
+                for valor in base_funil_cotacoes["CANAL_PLAN"].dropna().tolist()
             ]
         )
     if "CANAL_PLAN" in df_cotacoes_base_movel.columns:
-        canais_funil_lista.extend(
+        canais_funil_base.extend(
             [
-                canal for canal in
-                df_cotacoes_base_movel["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
-                if canal
+                _mapear_canal_funil_cotacoes(valor)
+                for valor in df_cotacoes_base_movel["CANAL_PLAN"].dropna().tolist()
             ]
         )
-    canais_funil_disp = _ordenar_canais_funil_cotacoes(list(set(canais_funil_lista)))
-    opcoes_canal_funil = ["Todos"] + canais_funil_disp if canais_funil_disp else ["Todos"]
+    canais_funil_opcoes = ["Todos"] + _ordenar_canais_funil_cotacoes(
+        [canal for canal in canais_funil_base if str(canal).strip()]
+    )
 
-    meses_funil_cotacoes_lista: list[str] = []
+    meses_funil_union = []
     if "dat_tratada" in base_funil_cotacoes.columns:
-        meses_funil_cotacoes_lista.extend(
+        meses_funil_union.extend(
             base_funil_cotacoes["dat_tratada"].dropna().astype(str).str.strip().str.lower().tolist()
         )
-    col_mes_funil_cot = "mes_ano" if "mes_ano" in df_cotacoes_base_movel.columns else (
-        "dat_tratada" if "dat_tratada" in df_cotacoes_base_movel.columns else None
-    )
-    if col_mes_funil_cot:
-        meses_funil_cotacoes_lista.extend(
-            df_cotacoes_base_movel[col_mes_funil_cot].dropna().astype(str).str.strip().str.lower().tolist()
+    col_mes_cot = "mes_ano" if "mes_ano" in df_cotacoes_base_movel.columns else "dat_tratada"
+    if col_mes_cot in df_cotacoes_base_movel.columns:
+        meses_funil_union.extend(
+            df_cotacoes_base_movel[col_mes_cot].dropna().astype(str).str.strip().str.lower().tolist()
         )
-    meses_funil_cotacoes_disp = sorted(
-        list({
-            mes for mes in meses_funil_cotacoes_lista
+    meses_funil_opcoes = sorted(
+        [
+            mes for mes in set(meses_funil_union)
             if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
-        }),
+        ],
         key=mes_ano_para_data
     )
-    if not meses_funil_cotacoes_disp:
-        meses_funil_cotacoes_disp = [get_mes_atual_formatado().strip().lower()]
-    mes_funil_cotacoes_default = (
-        get_mes_atual_formatado().strip().lower()
-        if get_mes_atual_formatado().strip().lower() in meses_funil_cotacoes_disp
-        else meses_funil_cotacoes_disp[-1]
-    )
+    if not meses_funil_opcoes:
+        st.info("Sem dados disponíveis para montar a tabela do funil CONTA.")
+        return
 
-    col_funil_filtro, col_funil_mes, col_funil_spacer = st.columns([0.85, 0.85, 2.10], gap="medium")
-    with col_funil_filtro:
+    mes_funil_default = get_mes_atual_formatado().strip().lower()
+    if mes_funil_default not in meses_funil_opcoes:
+        mes_funil_default = meses_funil_opcoes[-1]
+
+    col_funil_c1, col_funil_c2 = st.columns([1.05, 0.95], gap="medium")
+    with col_funil_c1:
         render_filter_label("Canal")
-        canal_funil_cotacoes = st.selectbox(
-            "Selecione o canal do funil de cotações",
-            options=opcoes_canal_funil,
+        canal_funil_sel = st.selectbox(
+            "Selecione o canal do funil conta",
+            options=canais_funil_opcoes,
             index=0,
-            key="funil_movel_cotacoes_funil_canal",
+            key="funil_conta_cotacoes_canal",
             label_visibility="collapsed"
         )
-    with col_funil_mes:
+    with col_funil_c2:
         render_filter_label("Mês Atual")
-        mes_funil_cotacoes_sel = st.selectbox(
-            "Selecione o mês atual do funil de cotações",
-            options=meses_funil_cotacoes_disp,
-            index=meses_funil_cotacoes_disp.index(mes_funil_cotacoes_default),
-            key="funil_movel_cotacoes_funil_mes",
+        mes_funil_sel = st.selectbox(
+            "Selecione o mês do funil conta",
+            options=meses_funil_opcoes,
+            index=meses_funil_opcoes.index(mes_funil_default) if mes_funil_default in meses_funil_opcoes else len(meses_funil_opcoes) - 1,
+            key="funil_conta_cotacoes_mes",
+            format_func=lambda valor: str(valor).upper(),
             label_visibility="collapsed"
         )
-    with col_funil_spacer:
-        st.empty()
 
-    tabela_funil_fmt, tabela_funil_num = montar_tabela_funil_cotacoes(
+    tabela_funil_conta_fmt, tabela_funil_conta_num = montar_tabela_funil_cotacoes(
         df_base_principal=base_funil_cotacoes,
         df_cotacoes_base=df_cotacoes_base_movel,
-        canal_ref=canal_funil_cotacoes,
-        mes_ref=mes_funil_cotacoes_sel
+        canal_ref=canal_funil_sel,
+        mes_ref=mes_funil_sel
     )
-    if tabela_funil_fmt.empty:
-        st.info("Sem dados disponíveis para montar a tabela do funil de COTAÇÕES.")
+
+    if tabela_funil_conta_fmt.empty:
+        st.info("Sem dados disponíveis para montar a tabela do funil CONTA.")
     else:
         st.markdown(
             criar_tabela_html_funil_cotacoes(
-                df_formatado=tabela_funil_fmt,
-                df_numerico=tabela_funil_num,
-                table_id="tabela-funil-movel-cotacoes-funil-integrado"
+                df_formatado=tabela_funil_conta_fmt,
+                df_numerico=tabela_funil_conta_num,
+                table_id="tabela-funil-conta-cotacoes-ativacao"
             ),
             unsafe_allow_html=True
         )
@@ -14964,11 +15075,10 @@ labels_abas_dashboard = [
     "PEDIDOS",
     "LIGAÇÕES",
     "FUNIL MÓVEL",
-    "FUNIL FIXA",
     "DESATIVAÇÕES"
 ]
 try:
-    tab0, tab1, tab3, tab4, tab5, tab6, tab2 = st.tabs(
+    tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
         labels_abas_dashboard,
         default="INÍCIO",
         key="dashboard_tab_ativa",
@@ -14976,13 +15086,13 @@ try:
     )
 except TypeError:
     try:
-        tab0, tab1, tab3, tab4, tab5, tab6, tab2 = st.tabs(
+        tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
             labels_abas_dashboard,
             key="dashboard_tab_ativa",
             on_change="rerun"
         )
     except TypeError:
-        tab0, tab1, tab3, tab4, tab5, tab6, tab2 = st.tabs(labels_abas_dashboard)
+        tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(labels_abas_dashboard)
 
 def _tab_deve_renderizar(tab) -> bool:
     estado_aberto = getattr(tab, "open", None)
@@ -14994,7 +15104,6 @@ tab_desativacoes_ativa = _tab_deve_renderizar(tab2)
 tab_pedidos_ativa = _tab_deve_renderizar(tab3)
 tab_ligacoes_ativa = _tab_deve_renderizar(tab4)
 tab_funil_movel_ativa = _tab_deve_renderizar(tab5)
-tab_funil_fixa_ativa = _tab_deve_renderizar(tab6)
 
 components.html(
     """
@@ -15104,6 +15213,247 @@ components.html(
     </script>
     """,
     height=0,
+)
+
+st.markdown(
+    """
+    <style>
+    .stPlotlyChart,
+    div[data-testid="stPlotlyChart"] {
+        overflow: hidden !important;
+        overflow-y: hidden !important;
+        max-height: none !important;
+    }
+
+    div[data-testid="stPlotlyChart"] > div,
+    div[data-testid="stPlotlyChart"] .js-plotly-plot,
+    div[data-testid="stPlotlyChart"] .plot-container,
+    div[data-testid="stPlotlyChart"] .svg-container {
+        overflow: hidden !important;
+        max-width: 100% !important;
+    }
+
+    div[data-testid="stPlotlyChart"]::-webkit-scrollbar,
+    div[data-testid="stPlotlyChart"] *::-webkit-scrollbar {
+        width: 0 !important;
+        height: 0 !important;
+        display: none !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    """
+    <style>
+    body #tabela-analitico-resultado-canais-conta.tabela-container-resultado-canais,
+    body #tabela-analitico-resultado-canais-fixa.tabela-container-resultado-canais,
+    body .tabela-container-resultado-canais,
+    body .tabela-analitico-migracoes-pme-container,
+    body .tabela-funil-movel-cotacoes-valor-mensal-container,
+    body #tabela-funil-conta-cotacoes-ativacao.tabela-container-funil-cotacoes {
+        border: 1px solid rgba(121, 14, 9, 0.18) !important;
+        border-radius: 4px !important;
+        box-shadow: none !important;
+        background: #FFFFFF !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta.tabela-container-resultado-canais::before,
+    body #tabela-analitico-resultado-canais-fixa.tabela-container-resultado-canais::before,
+    body .tabela-container-resultado-canais::before,
+    body #tabela-funil-conta-cotacoes-ativacao.tabela-container-funil-cotacoes::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais,
+    body .tabela-container-resultado-canais .tabela-resultado-canais,
+    body table.tabela-analitico-migracoes-pme,
+    body table.tabela-funil-movel-cotacoes-valor-mensal,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes {
+        background: #FFFFFF !important;
+        box-shadow: none !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th,
+    body .tabela-container-resultado-canais .tabela-resultado-canais th,
+    body table.tabela-analitico-migracoes-pme th,
+    body table.tabela-funil-movel-cotacoes-valor-mensal th,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th {
+        background: #790E09 !important;
+        text-shadow: none !important;
+        box-shadow: none !important;
+        border-bottom: 1px solid rgba(61, 7, 4, 0.72) !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-meta,
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-var,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-meta,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-var,
+    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-meta,
+    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-var,
+    body table.tabela-analitico-migracoes-pme th.col-tend,
+    body table.tabela-analitico-migracoes-pme th.col-mom,
+    body table.tabela-funil-movel-cotacoes-valor-mensal th.col-total-mes,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th.col-var,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th.col-tend {
+        background: #8E241D !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-meta,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-meta,
+    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-meta {
+        background: linear-gradient(180deg, #A23B36 0%, #790E09 100%) !important;
+        color: #FFFFFF !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-var,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-var,
+    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-var {
+        background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+        color: #FFFFFF !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais td,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais td,
+    body .tabela-container-resultado-canais .tabela-resultado-canais td,
+    body table.tabela-analitico-migracoes-pme td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td {
+        border-bottom: 1px solid #E6E6E6 !important;
+        border-right: 1px solid #EFEFEF !important;
+        background: #FFFFFF !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    body table.tabela-analitico-migracoes-pme th,
+    body table.tabela-funil-movel-cotacoes-valor-mensal th,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th,
+    body table.tabela-analitico-migracoes-pme td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td {
+        padding: 6px 5px !important;
+    }
+
+    body table.tabela-analitico-migracoes-pme td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td {
+        font-size: clamp(10.5px, 0.72vw, 11.2px) !important;
+        font-weight: 600 !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais tbody tr:nth-child(even) td,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais tbody tr:nth-child(even) td,
+    body .tabela-container-resultado-canais .tabela-resultado-canais tbody tr:nth-child(even) td,
+    body table.tabela-analitico-migracoes-pme tbody tr:nth-child(even) td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(even) td,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr:nth-child(even) td {
+        background: #FAFAFA !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais tbody tr:hover td,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais tbody tr:hover td,
+    body .tabela-container-resultado-canais .tabela-resultado-canais tbody tr:hover td,
+    body table.tabela-analitico-migracoes-pme tbody tr:hover td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:hover td,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr:hover td {
+        background: #FFF8F7 !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais td.col-canal,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais td.col-canal,
+    body .tabela-container-resultado-canais .tabela-resultado-canais td.col-canal,
+    body table.tabela-analitico-migracoes-pme td.col-regional,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td.col-canal,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td.col-etapa {
+        box-shadow: none !important;
+        color: #2F3747 !important;
+        font-weight: 700 !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .canal-label-resultado::before,
+    body #tabela-analitico-resultado-canais-fixa .canal-label-resultado::before,
+    body .tabela-container-resultado-canais .canal-label-resultado::before {
+        display: none !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .var-pill-resultado,
+    body #tabela-analitico-resultado-canais-fixa .var-pill-resultado,
+    body .tabela-container-resultado-canais .var-pill-resultado,
+    body table.tabela-analitico-migracoes-pme .mom-chip-migracoes,
+    body #tabela-funil-conta-cotacoes-ativacao .mom-chip-funil {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        min-width: auto !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    body table.tabela-analitico-migracoes-pme td.col-valor::before,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td.col-valor::before {
+        display: none !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais td.col-meta,
+    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais td.col-meta,
+    body .tabela-container-resultado-canais .tabela-resultado-canais td.col-meta,
+    body table.tabela-analitico-migracoes-pme td.col-tend,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td.col-total-mes,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td.col-tend {
+        background: #F5F5F5 !important;
+        color: #2F3747 !important;
+        font-weight: 700 !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .linha-total-resultado,
+    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado,
+    body .tabela-container-resultado-canais .linha-total-resultado,
+    body table.tabela-analitico-migracoes-pme tr.linha-total,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total,
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tr.linha-conversao-funil {
+        border-top: 1px solid #D9D9D9 !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .linha-total-resultado td,
+    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado td,
+    body .tabela-container-resultado-canais .linha-total-resultado td,
+    body table.tabela-analitico-migracoes-pme tr.linha-total td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total td {
+        background: linear-gradient(180deg, #790E09 0%, #4E0805 100%) !important;
+        color: #FFFFFF !important;
+        text-shadow: none !important;
+        border-top: 1px solid rgba(255,255,255,0.18) !important;
+        border-bottom: 1px solid rgba(61,7,4,0.88) !important;
+        font-weight: 800 !important;
+    }
+
+    body #tabela-analitico-resultado-canais-conta .linha-total-resultado .valor-numero,
+    body #tabela-analitico-resultado-canais-conta .linha-total-resultado .var-pill-resultado,
+    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado .valor-numero,
+    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado .var-pill-resultado,
+    body .tabela-container-resultado-canais .linha-total-resultado .valor-numero,
+    body .tabela-container-resultado-canais .linha-total-resultado .var-pill-resultado {
+        background: rgba(255,255,255,0.16) !important;
+        color: #FFFFFF !important;
+        box-shadow: none !important;
+        border: 1px solid rgba(255,255,255,0.22) !important;
+        text-shadow: none !important;
+    }
+
+    body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr.linha-conversao-funil td {
+        background: #FAFAFA !important;
+        color: #2F3747 !important;
+        font-weight: 700 !important;
+        border-top: 1px solid #E6E6E6 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 with tab1:
@@ -18908,6 +19258,8 @@ with tab3:
                     width='stretch',
                     config={'displayModeBar': False, 'displaylogo': False}
                 )
+
+            render_visual_funil_fixa_ecommerce()
         
             container_evolucao_pedidos = st.container()
             st.markdown(build_visual_title_html("PEDIDOS POR REGIONAL", "grid"), unsafe_allow_html=True)
@@ -19747,7 +20099,7 @@ with tab3:
                 **MOM:** {formatar_percentual_pedidos(variacao_mom_geral_pedidos)} | 
                 **TEND vs ORÇ:** {formatar_percentual_pedidos(alcance_meta_geral_pedidos)}
                 """)
-            
+
                 with container_evolucao_pedidos:
                     st.markdown(build_visual_title_html("EVOLUÇÃO MENSAL DE PEDIDOS", "trend"), unsafe_allow_html=True)
 
@@ -21888,33 +22240,34 @@ with tab4:
 
 with tab5:
     if tab_funil_movel_ativa or tab_inicio_ativa:
-        st.markdown(
-            build_visual_title_html(
-                "FUNIL MÓVEL",
-                "grid",
-                subtitle="VISÃO ANALÍTICA DOS FUNIS E BLOCOS DE SUPORTE"
-            ),
-            unsafe_allow_html=True
-        )
+        if tab_funil_movel_ativa:
+            st.markdown(
+                build_visual_title_html(
+                    "FUNIL MÓVEL",
+                    "grid",
+                    subtitle="VISÃO ANALÍTICA DOS FUNIS E BLOCOS DE SUPORTE"
+                ),
+                unsafe_allow_html=True
+            )
 
-        def load_obs_resultado() -> str:
-            obs_path = OBS_RESULTADO_FILE_PATH
-            if obs_path.exists():
-                try:
-                    return obs_path.read_text(encoding="utf-8")
-                except Exception:
-                    return ""
-            return ""
+            def load_obs_resultado() -> str:
+                obs_path = OBS_RESULTADO_FILE_PATH
+                if obs_path.exists():
+                    try:
+                        return obs_path.read_text(encoding="utf-8")
+                    except Exception:
+                        return ""
+                return ""
 
-        def save_obs_resultado(texto: str):
-            obs_path = OBS_RESULTADO_FILE_PATH
-            obs_path.parent.mkdir(parents=True, exist_ok=True)
-            obs_path.write_text(texto, encoding="utf-8")
+            def save_obs_resultado(texto: str):
+                obs_path = OBS_RESULTADO_FILE_PATH
+                obs_path.parent.mkdir(parents=True, exist_ok=True)
+                obs_path.write_text(texto, encoding="utf-8")
 
-        if "obs_resultado_canais" not in st.session_state:
-            st.session_state["obs_resultado_canais"] = load_obs_resultado()
-        if "obs_resultado_editor" not in st.session_state:
-            st.session_state["obs_resultado_editor"] = st.session_state["obs_resultado_canais"]
+            if "obs_resultado_canais" not in st.session_state:
+                st.session_state["obs_resultado_canais"] = load_obs_resultado()
+            if "obs_resultado_editor" not in st.session_state:
+                st.session_state["obs_resultado_editor"] = st.session_state["obs_resultado_canais"]
 
         render_blocos_home_only_no_funil_movel = False
 
@@ -21931,74 +22284,75 @@ with tab5:
             st.session_state[key] = valor
             return valor
 
-        st.markdown(
-            """
-            <style>
-            div[data-testid="stPopover"] > button {
-                border-radius: 999px !important;
-                border: 1px solid rgba(121, 14, 9, 0.18) !important;
-                background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%) !important;
-                color: #790E09 !important;
-                font-family: 'Manrope', 'Segoe UI', sans-serif !important;
-                font-weight: 800 !important;
-                letter-spacing: 0.03em !important;
-                padding: 0.32rem 0.96rem !important;
-                min-height: 2rem !important;
-                box-shadow:
-                    0 0.45rem 1rem rgba(121, 14, 9, 0.10),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
-            }
-            div[data-testid="stPopover"] > button:hover {
-                border-color: rgba(255, 40, 0, 0.24) !important;
-                box-shadow: 0 0 0 0.16rem rgba(255, 40, 0, 0.08), 0 0.65rem 1.25rem rgba(121, 14, 9, 0.14) !important;
-                transform: translateY(-1px);
-            }
-            div[data-testid="stPopover"] > button p {
-                font-size: 0.8rem !important;
-                color: #790E09 !important;
-            }
-            div.st-key-obs_save_btn_top button,
-            div.st-key-obs_clear_btn_top button {
-                border-radius: 10px !important;
-                min-height: 2rem !important;
-                padding: 0.28rem 0.72rem !important;
-                font-weight: 700 !important;
-            }
-            div.st-key-obs_save_btn_top button p,
-            div.st-key-obs_clear_btn_top button p {
-                font-size: 0.8rem !important;
-                white-space: nowrap !important;
-                line-height: 1.05 !important;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
+        if tab_funil_movel_ativa:
+            st.markdown(
+                """
+                <style>
+                div[data-testid="stPopover"] > button {
+                    border-radius: 999px !important;
+                    border: 1px solid rgba(121, 14, 9, 0.18) !important;
+                    background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%) !important;
+                    color: #790E09 !important;
+                    font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+                    font-weight: 800 !important;
+                    letter-spacing: 0.03em !important;
+                    padding: 0.32rem 0.96rem !important;
+                    min-height: 2rem !important;
+                    box-shadow:
+                        0 0.45rem 1rem rgba(121, 14, 9, 0.10),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+                }
+                div[data-testid="stPopover"] > button:hover {
+                    border-color: rgba(255, 40, 0, 0.24) !important;
+                    box-shadow: 0 0 0 0.16rem rgba(255, 40, 0, 0.08), 0 0.65rem 1.25rem rgba(121, 14, 9, 0.14) !important;
+                    transform: translateY(-1px);
+                }
+                div[data-testid="stPopover"] > button p {
+                    font-size: 0.8rem !important;
+                    color: #790E09 !important;
+                }
+                div.st-key-obs_save_btn_top button,
+                div.st-key-obs_clear_btn_top button {
+                    border-radius: 10px !important;
+                    min-height: 2rem !important;
+                    padding: 0.28rem 0.72rem !important;
+                    font-weight: 700 !important;
+                }
+                div.st-key-obs_save_btn_top button p,
+                div.st-key-obs_clear_btn_top button p {
+                    font-size: 0.8rem !important;
+                    white-space: nowrap !important;
+                    line-height: 1.05 !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
 
-        _, col_top_right_obs = st.columns([7.4, 1.4], gap="small")
-        with col_top_right_obs:
-            with st.popover("🗒️ Notas", width='content'):
-                st.caption("Observações por canal")
-                st.text_area(
-                    "Observações por canal",
-                    key="obs_resultado_editor",
-                    height=240,
-                    label_visibility="collapsed",
-                    help="Anote pontos qualitativos sobre o resultado dos canais."
-                )
-                col_obs_btn1, col_obs_btn2 = st.columns(2, gap="small")
-                with col_obs_btn1:
-                    if st.button("Salvar", key="obs_save_btn_top", type="primary", width='stretch'):
-                        texto_salvar = str(st.session_state.get("obs_resultado_editor", ""))
-                        st.session_state["obs_resultado_canais"] = texto_salvar
-                        save_obs_resultado(texto_salvar)
-                        st.success("Observações salvas.")
-                with col_obs_btn2:
-                    if st.button("Limpar", key="obs_clear_btn_top", type="secondary", width='stretch'):
-                        st.session_state["obs_resultado_editor"] = ""
-                        st.session_state["obs_resultado_canais"] = ""
-                        save_obs_resultado("")
-                        st.success("Observações removidas.")
+            _, col_top_right_obs = st.columns([7.4, 1.4], gap="small")
+            with col_top_right_obs:
+                with st.popover("🗒️ Notas", width='content'):
+                    st.caption("Observações por canal")
+                    st.text_area(
+                        "Observações por canal",
+                        key="obs_resultado_editor",
+                        height=240,
+                        label_visibility="collapsed",
+                        help="Anote pontos qualitativos sobre o resultado dos canais."
+                    )
+                    col_obs_btn1, col_obs_btn2 = st.columns(2, gap="small")
+                    with col_obs_btn1:
+                        if st.button("Salvar", key="obs_save_btn_top", type="primary", width='stretch'):
+                            texto_salvar = str(st.session_state.get("obs_resultado_editor", ""))
+                            st.session_state["obs_resultado_canais"] = texto_salvar
+                            save_obs_resultado(texto_salvar)
+                            st.success("Observações salvas.")
+                    with col_obs_btn2:
+                        if st.button("Limpar", key="obs_clear_btn_top", type="secondary", width='stretch'):
+                            st.session_state["obs_resultado_editor"] = ""
+                            st.session_state["obs_resultado_canais"] = ""
+                            save_obs_resultado("")
+                            st.success("Observações removidas.")
 
 
         def normalizar_texto_chave(valor):
@@ -23116,50 +23470,63 @@ with tab5:
 
             mes_resultado_m1 = get_mes_anterior(mes_resultado)
             mes_resultado_m2 = get_mes_anterior(mes_resultado_m1)
-            base_resultado = base_analitica.copy()
+            base_resultado = base_analitica
             if str(regional_resultado).strip() != "Todas":
                 regional_resultado_norm3 = str(regional_resultado).strip().upper()[:3]
                 base_resultado = base_resultado[
                     base_resultado['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_resultado_norm3)
-                ].copy()
+                ]
 
             if base_resultado.empty:
                 if render_blocos_home_only_no_funil_movel:
                     st.warning("Sem dados para os filtros selecionados em RESULTADO DOS CANAIS.")
             else:
-                resultados_html: dict[str, str] = {}
-                for produto_resultado, table_id_resultado in [
-                    ('CONTA', 'tabela-analitico-resultado-canais-conta'),
-                    ('FIXA', 'tabela-analitico-resultado-canais-fixa')
-                ]:
-                    tabela_resultado_canais = construir_tabela_resultado_canais(
-                        df_base=base_resultado,
-                        mes_ref=mes_resultado,
-                        produto_ref=produto_resultado
-                    )
-                    tabela_resultado_canais_fmt = formatar_tabela_resultado_canais(
-                        df_tabela=tabela_resultado_canais,
-                        mes_ref=mes_resultado,
-                        mes_m1=mes_resultado_m1,
-                        mes_m2=mes_resultado_m2,
-                        produto_ref=produto_resultado,
-                        incluir_total=True
-                    )
-                    tabela_resultado_canais_num = montar_tabela_resultado_canais_exibicao_numerica(
-                        df_tabela=tabela_resultado_canais,
-                        mes_ref=mes_resultado,
-                        mes_m1=mes_resultado_m1,
-                        mes_m2=mes_resultado_m2,
-                        produto_ref=produto_resultado,
-                        incluir_total=True
-                    )
-                    html_resultado_canais = criar_tabela_html_resultado_canais(
-                        df_formatado=tabela_resultado_canais_fmt,
-                        df_numerico=tabela_resultado_canais_num,
-                        table_id=table_id_resultado
-                    )
-                    resultados_html[produto_resultado] = html_resultado_canais
-                    home_inicio_ctx[f"resultado_{produto_resultado.lower()}"] = html_resultado_canais
+                def _montar_ctx_resultado_canais_home():
+                    resultados_html_local: dict[str, str] = {}
+                    for produto_resultado, table_id_resultado in [
+                        ('CONTA', 'tabela-analitico-resultado-canais-conta'),
+                        ('FIXA', 'tabela-analitico-resultado-canais-fixa')
+                    ]:
+                        tabela_resultado_canais = construir_tabela_resultado_canais(
+                            df_base=base_resultado,
+                            mes_ref=mes_resultado,
+                            produto_ref=produto_resultado
+                        )
+                        tabela_resultado_canais_fmt = formatar_tabela_resultado_canais(
+                            df_tabela=tabela_resultado_canais,
+                            mes_ref=mes_resultado,
+                            mes_m1=mes_resultado_m1,
+                            mes_m2=mes_resultado_m2,
+                            produto_ref=produto_resultado,
+                            incluir_total=True
+                        )
+                        tabela_resultado_canais_num = montar_tabela_resultado_canais_exibicao_numerica(
+                            df_tabela=tabela_resultado_canais,
+                            mes_ref=mes_resultado,
+                            mes_m1=mes_resultado_m1,
+                            mes_m2=mes_resultado_m2,
+                            produto_ref=produto_resultado,
+                            incluir_total=True
+                        )
+                        resultados_html_local[produto_resultado] = criar_tabela_html_resultado_canais(
+                            df_formatado=tabela_resultado_canais_fmt,
+                            df_numerico=tabela_resultado_canais_num,
+                            table_id=table_id_resultado
+                        )
+                    return resultados_html_local
+
+                resultados_html = obter_cache_session_dashboard(
+                    "home_resultado_canais_html_v2",
+                    (
+                        "resultado_canais",
+                        file_mtime,
+                        str(mes_resultado).strip().lower(),
+                        str(regional_resultado).strip().upper(),
+                    ),
+                    _montar_ctx_resultado_canais_home
+                )
+                home_inicio_ctx["resultado_conta"] = resultados_html.get("CONTA", "")
+                home_inicio_ctx["resultado_fixa"] = resultados_html.get("FIXA", "")
 
                 if render_blocos_home_only_no_funil_movel:
                     col_res_t1, col_res_t2 = st.columns(2, gap="medium")
@@ -23587,6 +23954,8 @@ with tab5:
                             label_visibility="collapsed"
                         )
                 else:
+                    canal_sem_default = obter_opcao_preferida_dashboard(canais_disp_sem, "E-Commerce")
+                    produto_sem_default = obter_opcao_preferida_dashboard(produtos_disp_sem, "FIXA")
                     mes_sem_sel = obter_valor_filtro_estado(
                         "analitico_evolucao_semanal_mes",
                         meses_disp_sem,
@@ -23595,12 +23964,12 @@ with tab5:
                     canal_sem_sel = obter_valor_filtro_estado(
                         "analitico_evolucao_semanal_canal",
                         canais_disp_sem,
-                        canais_disp_sem[0]
+                        canal_sem_default
                     )
                     produto_sem_sel = obter_valor_filtro_estado(
                         "analitico_evolucao_semanal_produto",
                         produtos_disp_sem,
-                        produtos_disp_sem[0]
+                        produto_sem_default
                     )
                     regional_sem_sel = obter_valor_filtro_estado(
                         "analitico_evolucao_semanal_regional",
@@ -25249,7 +25618,7 @@ with tab5:
                 unsafe_allow_html=True
             )
 
-        df_reg_base = base_analitica.copy() if tab_inicio_ativa else pd.DataFrame()
+        df_reg_base = base_analitica if tab_inicio_ativa else pd.DataFrame()
         if df_reg_base.empty:
             if render_blocos_home_only_no_funil_movel:
                 st.warning("Não há dados disponíveis para montar a visão regional.")
@@ -25272,8 +25641,6 @@ with tab5:
 
             ligacoes_resumo_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
             df_lig_resumo = load_ligacoes_resumo(ligacoes_resumo_mtime)
-            df_reg_base['COD_PLATAFORMA'] = df_reg_base['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
-            df_reg_base['DSC_IND_NORM'] = df_reg_base['DSC_INDICADOR'].apply(normalizar_texto_chave)
 
             meses_disp_reg = sorted(
                 df_reg_base['dat_tratada'].dropna().unique().tolist(),
@@ -25303,8 +25670,9 @@ with tab5:
                         label_visibility="collapsed"
                     )
             else:
+                canal_reg_default = obter_opcao_preferida_dashboard(canal_disp_reg, ["E-Commerce", "Todos"])
                 mes_reg_sel = obter_valor_filtro_estado("reg_viz_mes", meses_disp_reg, mes_reg_default)
-                canal_reg_sel = obter_valor_filtro_estado("reg_viz_canal", canal_disp_reg, canal_disp_reg[0])
+                canal_reg_sel = obter_valor_filtro_estado("reg_viz_canal", canal_disp_reg, canal_reg_default)
 
             aliases_ped = {'PEDIDOS'}
             aliases_lig = {'LIGACOES'}
@@ -25329,9 +25697,7 @@ with tab5:
                     ).fillna(0).sum()
                 )
 
-            df_tend_base = base_analitica.copy()
-            df_tend_base['COD_PLATAFORMA'] = df_tend_base['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
-            df_tend_base['DSC_IND_NORM'] = df_tend_base['DSC_INDICADOR'].apply(normalizar_texto_chave)
+            df_tend_base = df_reg_base
 
             def obter_meta_ligacoes_produto(mes_ref: str, regional_ref: str, produto_ref_local: str) -> float:
                 """Busca ORÇ de ligações por mês/regional/produto usando a base oficial de metas de ligações."""
@@ -25910,18 +26276,30 @@ with tab5:
                 </div>
                 """
 
-            blocos_resumo_regional = [
-                ('CONTA'),
-                ('FIXA')
-            ]
-            qtd_renderizadas = 0
-            html_regional_produtos: dict[str, str] = {}
-            for produto_ref in blocos_resumo_regional:
-                html_tabela_reg = montar_html_resumo_regional_produto(produto_ref)
-                if html_tabela_reg:
-                    html_regional_produtos[produto_ref] = html_tabela_reg
-                    home_inicio_ctx[f"regional_{produto_ref.lower()}"] = html_tabela_reg
-                    qtd_renderizadas += 1
+            blocos_resumo_regional = ['CONTA', 'FIXA']
+
+            def _montar_ctx_regional_home():
+                html_regional_produtos_local: dict[str, str] = {}
+                for produto_ref in blocos_resumo_regional:
+                    html_tabela_reg = montar_html_resumo_regional_produto(produto_ref)
+                    if html_tabela_reg:
+                        html_regional_produtos_local[produto_ref] = html_tabela_reg
+                return html_regional_produtos_local
+
+            html_regional_produtos = obter_cache_session_dashboard(
+                "home_regional_resumo_html_v2",
+                (
+                    "regional_resumo",
+                    file_mtime,
+                    ligacoes_resumo_mtime,
+                    str(mes_reg_sel).strip().lower(),
+                    str(canal_reg_sel).strip().upper(),
+                ),
+                _montar_ctx_regional_home
+            )
+            qtd_renderizadas = len(html_regional_produtos)
+            home_inicio_ctx["regional_conta"] = html_regional_produtos.get("CONTA", "")
+            home_inicio_ctx["regional_fixa"] = html_regional_produtos.get("FIXA", "")
 
             if render_blocos_home_only_no_funil_movel:
                 col_reg_conta, col_reg_fixa = st.columns(2, gap="medium")
@@ -25992,6 +26370,7 @@ with tab5:
                         label_visibility="collapsed"
                     )
             else:
+                canal_analitico_default = obter_opcao_preferida_dashboard(canais_analitico, ["E-Commerce", "Todos"])
                 mes_analitico = obter_valor_filtro_estado(
                     "analitico_mes_ref",
                     meses_analitico,
@@ -26005,17 +26384,45 @@ with tab5:
                 canal_analitico = obter_valor_filtro_estado(
                     "analitico_canal_ref",
                     canais_analitico,
-                    canais_analitico[0]
+                    canal_analitico_default
                 )
 
-            html_conta, _ctx_conta = criar_tabela_html_necessidade_diaria_produto(
-                df_base=base_analitica,
-                mes_ref=mes_analitico,
-                regional_ref=regional_analitico,
-                canal_ref=canal_analitico,
-                produto_ref='CONTA',
-                table_id="tabela-analitico-necessidade-conta"
+            def _montar_ctx_necessidade_home():
+                html_conta_local, _ctx_conta_local = criar_tabela_html_necessidade_diaria_produto(
+                    df_base=base_analitica,
+                    mes_ref=mes_analitico,
+                    regional_ref=regional_analitico,
+                    canal_ref=canal_analitico,
+                    produto_ref='CONTA',
+                    table_id="tabela-analitico-necessidade-conta"
+                )
+                html_fixa_local, _ctx_fixa_local = criar_tabela_html_necessidade_diaria_produto(
+                    df_base=base_analitica,
+                    mes_ref=mes_analitico,
+                    regional_ref=regional_analitico,
+                    canal_ref=canal_analitico,
+                    produto_ref='FIXA',
+                    table_id="tabela-analitico-necessidade-fixa"
+                )
+                return {
+                    "conta": html_conta_local,
+                    "fixa": html_fixa_local,
+                    "info": f"Mês: {str(mes_analitico).upper()} | Regional: {regional_analitico} | Canal: {canal_analitico}"
+                }
+
+            necessidade_ctx = obter_cache_session_dashboard(
+                "home_necessidade_diaria_html_v2",
+                (
+                    "necessidade_diaria",
+                    file_mtime,
+                    str(mes_analitico).strip().lower(),
+                    str(regional_analitico).strip().upper(),
+                    str(canal_analitico).strip().upper(),
+                ),
+                _montar_ctx_necessidade_home
             )
+
+            html_conta = str(necessidade_ctx.get("conta", "") or "")
             home_inicio_ctx["necessidade_conta"] = html_conta
 
             if not html_conta:
@@ -26027,18 +26434,9 @@ with tab5:
                     unsafe_allow_html=True
                 )
 
-            html_fixa, _ctx_fixa = criar_tabela_html_necessidade_diaria_produto(
-                df_base=base_analitica,
-                mes_ref=mes_analitico,
-                regional_ref=regional_analitico,
-                canal_ref=canal_analitico,
-                produto_ref='FIXA',
-                table_id="tabela-analitico-necessidade-fixa"
-            )
+            html_fixa = str(necessidade_ctx.get("fixa", "") or "")
             home_inicio_ctx["necessidade_fixa"] = html_fixa
-            home_inicio_ctx["necessidade_info"] = (
-                f"Mês: {str(mes_analitico).upper()} | Regional: {regional_analitico} | Canal: {canal_analitico}"
-            )
+            home_inicio_ctx["necessidade_info"] = str(necessidade_ctx.get("info", "") or "")
 
             if not html_fixa:
                 if render_blocos_home_only_no_funil_movel:
@@ -26049,8 +26447,8 @@ with tab5:
                     unsafe_allow_html=True
                 )
 
-with tab6:
-    if tab_funil_fixa_ativa:
+if False:
+    if False:
         st.markdown(
             build_visual_title_html(
                 "FUNIL FIXA",
@@ -26285,178 +26683,6 @@ with tab6:
                                 unsafe_allow_html=True
                             )
 
-                    base_funil_cotacoes = globals().get("df_perf_base", pd.DataFrame())
-                    if (
-                        base_funil_cotacoes is None
-                        or getattr(base_funil_cotacoes, "empty", True)
-                    ) and "preparar_base_performance" in globals():
-                        try:
-                            base_funil_cotacoes = preparar_base_performance(df)
-                        except Exception:
-                            base_funil_cotacoes = pd.DataFrame()
-
-                    if base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True):
-                        base_funil_cotacoes = globals().get("df", pd.DataFrame())
-
-                    st.markdown(
-                        build_visual_title_html(
-                            "FUNIL FIXA - PEDIDOS X VENDA BRUTA X INSTALADOS",
-                            "grid"
-                        ),
-                        unsafe_allow_html=True
-                    )
-
-                    def _normalizar_mes_funil_fixa_ui(valor) -> str | None:
-                        if pd.isna(valor):
-                            return None
-                        meses_pt = {
-                            1: "jan", 2: "fev", 3: "mar", 4: "abr",
-                            5: "mai", 6: "jun", 7: "jul", 8: "ago",
-                            9: "set", 10: "out", 11: "nov", 12: "dez"
-                        }
-                        texto = str(valor).strip().lower()
-                        if not texto:
-                            return None
-                        if re.match(r"^[a-z]{3}/\d{2}$", texto, flags=re.IGNORECASE):
-                            return texto
-                        dt = pd.to_datetime(valor, errors="coerce", dayfirst=True)
-                        if pd.isna(dt):
-                            dt = pd.to_datetime(texto, errors="coerce")
-                        if pd.notna(dt):
-                            mes_num = int(dt.month)
-                            ano_num = int(dt.year)
-                            return f"{meses_pt.get(mes_num, '')}/{str(ano_num)[-2:]}" if mes_num in meses_pt else None
-                        return None
-
-                    def _obter_coluna_existente(df_base: pd.DataFrame, candidatas: list[str]) -> str | None:
-                        for col in candidatas:
-                            if col in df_base.columns:
-                                return col
-                        return None
-
-                    base_funil_fixa_filtros = pd.DataFrame()
-                    if base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True):
-                        base_funil_fixa_filtros = base_funil_cotacoes.copy()
-
-                        col_canal_funil = _obter_coluna_existente(
-                            base_funil_fixa_filtros,
-                            ["CANAL_PLAN", "CANAL", "DS_CANAL", "CANAL_VENDA"]
-                        )
-                        if col_canal_funil is not None:
-                            base_funil_fixa_filtros["CANAL_PLAN"] = (
-                                base_funil_fixa_filtros[col_canal_funil]
-                                .astype(str).str.strip()
-                                .replace({"nan": None, "None": None, "": None})
-                                .apply(lambda x: _mapear_canal_funil_cotacoes(x) if pd.notna(x) else None)
-                            )
-                        elif "CANAL_PLAN" not in base_funil_fixa_filtros.columns:
-                            base_funil_fixa_filtros["CANAL_PLAN"] = None
-
-                        col_mes_funil = _obter_coluna_existente(
-                            base_funil_fixa_filtros,
-                            [
-                                "dat_tratada", "mes_ano", "MES_ANO", "DATA", "DT_PEDIDO", "DATA_PEDIDO",
-                                "DT_VENDA", "DATA_VENDA", "DT_INSTALACAO", "DATA_INSTALACAO",
-                                "DAT_MOVIMENTO2", "DAT_MOVIMENTO", "DAT_MOVIMENTO_2", "PERIODO"
-                            ]
-                        )
-                        if col_mes_funil is not None:
-                            base_funil_fixa_filtros["dat_tratada"] = (
-                                base_funil_fixa_filtros[col_mes_funil].apply(_normalizar_mes_funil_fixa_ui)
-                            )
-                        elif "dat_tratada" not in base_funil_fixa_filtros.columns:
-                            base_funil_fixa_filtros["dat_tratada"] = None
-
-                    canais_funil_fixa_disp = []
-                    if (
-                        base_funil_fixa_filtros is not None
-                        and not getattr(base_funil_fixa_filtros, "empty", True)
-                        and "CANAL_PLAN" in base_funil_fixa_filtros.columns
-                    ):
-                        canais_funil_fixa_disp = sorted(
-                            [
-                                canal for canal in
-                                base_funil_fixa_filtros["CANAL_PLAN"].dropna().astype(str).str.strip().unique().tolist()
-                                if canal
-                            ]
-                        )
-                        canais_funil_fixa_disp = _ordenar_canais_funil_cotacoes(canais_funil_fixa_disp)
-
-                    opcoes_canal_funil_fixa = ["Todos"] + canais_funil_fixa_disp if canais_funil_fixa_disp else ["Todos"]
-
-                    meses_funil_fixa_disp = []
-                    if (
-                        base_funil_fixa_filtros is not None
-                        and not getattr(base_funil_fixa_filtros, "empty", True)
-                        and "dat_tratada" in base_funil_fixa_filtros.columns
-                    ):
-                        meses_funil_fixa_disp = sorted(
-                            [
-                                mes for mes in
-                                base_funil_fixa_filtros["dat_tratada"].dropna().astype(str).str.strip().str.lower().unique().tolist()
-                                if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
-                            ],
-                            key=mes_ano_para_data
-                        )
-
-                    if not meses_funil_fixa_disp:
-                        meses_funil_fixa_disp = [get_mes_atual_formatado().strip().lower()]
-
-                    mes_atual_funil_fixa = get_mes_atual_formatado().strip().lower()
-                    mes_funil_fixa_default = (
-                        mes_atual_funil_fixa
-                        if mes_atual_funil_fixa in meses_funil_fixa_disp
-                        else meses_funil_fixa_disp[-1]
-                    )
-
-                    col_funil_fixa_canal, col_funil_fixa_mes, col_funil_fixa_spacer = st.columns(
-                        [0.95, 0.85, 2.20], gap="medium"
-                    )
-                    with col_funil_fixa_canal:
-                        render_filter_label("Canal")
-                        canal_funil_fixa_sel = st.selectbox(
-                            "Selecione o canal do funil fixa",
-                            options=opcoes_canal_funil_fixa,
-                            index=0,
-                            key="funil_fixa_legado_canal",
-                            label_visibility="collapsed"
-                        )
-                    with col_funil_fixa_mes:
-                        render_filter_label("Mês Atual")
-                        mes_funil_fixa_sel = st.selectbox(
-                            "Selecione o mês atual do funil fixa",
-                            options=meses_funil_fixa_disp,
-                            index=meses_funil_fixa_disp.index(mes_funil_fixa_default),
-                            key="funil_fixa_legado_mes",
-                            label_visibility="collapsed"
-                        )
-                    with col_funil_fixa_spacer:
-                        st.empty()
-
-                    tabela_funil_fixa_fmt, tabela_funil_fixa_num = montar_tabela_funil_fixa(
-                        df_base_principal=base_funil_cotacoes,
-                        canal_ref=canal_funil_fixa_sel,
-                        mes_ref=mes_funil_fixa_sel
-                    )
-                    if tabela_funil_fixa_fmt.empty:
-                        st.info(
-                            "Sem dados disponíveis para montar a tabela do funil FIXA com os filtros selecionados."
-                        )
-                        if base_funil_cotacoes is not None and not getattr(base_funil_cotacoes, "empty", True):
-                            st.caption(
-                                "Colunas disponíveis na base utilizada: "
-                                + ", ".join(map(str, base_funil_cotacoes.columns.tolist()))
-                            )
-                    else:
-                        st.markdown(
-                            criar_tabela_html_funil_cotacoes(
-                                df_formatado=tabela_funil_fixa_fmt,
-                                df_numerico=tabela_funil_fixa_num,
-                                table_id="tabela-cotacoes-funil-fixa"
-                            ),
-                            unsafe_allow_html=True
-                        )
-
 with tab5:
     if tab_funil_movel_ativa:
         render_bloco_cotacoes_funil_movel()
@@ -26600,14 +26826,14 @@ with tab0:
                         build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
                         unsafe_allow_html=True
                     )
-                    st.markdown(str(html_resultado_conta_home), unsafe_allow_html=True)
+                    renderizar_html_otimizado(html_resultado_conta_home)
             with col_home_res_2:
                 if html_resultado_fixa_home:
                     st.markdown(
                         build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:8px;"),
                         unsafe_allow_html=True
                     )
-                    st.markdown(str(html_resultado_fixa_home), unsafe_allow_html=True)
+                    renderizar_html_otimizado(html_resultado_fixa_home)
         else:
             st.info("Os dados de RESULTADO DOS CANAIS não estão disponíveis para a capa.")
 
@@ -26621,6 +26847,14 @@ with tab0:
         regionais_sem_home = list(globals().get("regionais_disp_sem", []) or [])
         if meses_sem_home and canais_sem_home and produtos_sem_home and regionais_sem_home:
             mes_sem_home_default = st.session_state.get("analitico_evolucao_semanal_mes", meses_sem_home[-1])
+            canal_home_default = st.session_state.get(
+                "analitico_evolucao_semanal_canal",
+                obter_opcao_preferida_dashboard(canais_sem_home, "E-Commerce")
+            )
+            produto_home_default = st.session_state.get(
+                "analitico_evolucao_semanal_produto",
+                obter_opcao_preferida_dashboard(produtos_sem_home, "FIXA")
+            )
             col_home_sem_f1, col_home_sem_f2, col_home_sem_f3, col_home_sem_f4 = st.columns([1, 1, 1, 1])
             with col_home_sem_f1:
                 render_home_synced_selectbox(
@@ -26638,7 +26872,7 @@ with tab0:
                     canais_sem_home,
                     "analitico_evolucao_semanal_canal",
                     "home_evolucao_semanal_canal_widget",
-                    default_value=st.session_state.get("analitico_evolucao_semanal_canal", canais_sem_home[0])
+                    default_value=canal_home_default
                 )
             with col_home_sem_f3:
                 render_home_synced_selectbox(
@@ -26647,7 +26881,7 @@ with tab0:
                     produtos_sem_home,
                     "analitico_evolucao_semanal_produto",
                     "home_evolucao_semanal_produto_widget",
-                    default_value=st.session_state.get("analitico_evolucao_semanal_produto", produtos_sem_home[0])
+                    default_value=produto_home_default
                 )
             with col_home_sem_f4:
                 render_home_synced_selectbox(
@@ -26708,6 +26942,14 @@ with tab0:
             unsafe_allow_html=True
         )
         if meses_sem_home and canais_sem_home and produtos_sem_home and regionais_sem_home:
+            canal_home_default = st.session_state.get(
+                "analitico_evolucao_semanal_canal",
+                obter_opcao_preferida_dashboard(canais_sem_home, "E-Commerce")
+            )
+            produto_home_default = st.session_state.get(
+                "analitico_evolucao_semanal_produto",
+                obter_opcao_preferida_dashboard(produtos_sem_home, "FIXA")
+            )
             col_home_res_sem_f1, col_home_res_sem_f2, col_home_res_sem_f3, col_home_res_sem_f4 = st.columns([1, 1, 1, 1])
             with col_home_res_sem_f1:
                 render_home_synced_selectbox(
@@ -26725,7 +26967,7 @@ with tab0:
                     canais_sem_home,
                     "analitico_evolucao_semanal_canal",
                     "home_resumo_semanal_canal_widget",
-                    default_value=st.session_state.get("analitico_evolucao_semanal_canal", canais_sem_home[0])
+                    default_value=canal_home_default
                 )
             with col_home_res_sem_f3:
                 render_home_synced_selectbox(
@@ -26734,7 +26976,7 @@ with tab0:
                     produtos_sem_home,
                     "analitico_evolucao_semanal_produto",
                     "home_resumo_semanal_produto_widget",
-                    default_value=st.session_state.get("analitico_evolucao_semanal_produto", produtos_sem_home[0])
+                    default_value=produto_home_default
                 )
             with col_home_res_sem_f4:
                 render_home_synced_selectbox(
@@ -26752,13 +26994,13 @@ with tab0:
                 build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
                 unsafe_allow_html=True
             )
-            st.markdown(str(html_resumo_conta_home), unsafe_allow_html=True)
+            renderizar_html_otimizado(html_resumo_conta_home)
         if html_resumo_fixa_home:
             st.markdown(
                 build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:8px;"),
                 unsafe_allow_html=True
             )
-            st.markdown(str(html_resumo_fixa_home), unsafe_allow_html=True)
+            renderizar_html_otimizado(html_resumo_fixa_home)
         if not html_resumo_conta_home and not html_resumo_fixa_home:
             st.info("Os dados de RESUMO SEMANAL não estão disponíveis para a capa.")
 
@@ -26769,6 +27011,10 @@ with tab0:
         meses_reg_home = list(globals().get("meses_disp_reg", []) or [])
         canais_reg_home = list(globals().get("canal_disp_reg", []) or [])
         if meses_reg_home and canais_reg_home:
+            canal_reg_home_default = st.session_state.get(
+                "reg_viz_canal",
+                obter_opcao_preferida_dashboard(canais_reg_home, ["E-Commerce", "Todos"])
+            )
             col_home_reg_f1, col_home_reg_f2 = st.columns([1, 1], gap="small")
             with col_home_reg_f1:
                 render_home_synced_selectbox(
@@ -26786,7 +27032,7 @@ with tab0:
                     canais_reg_home,
                     "reg_viz_canal",
                     "home_reg_viz_canal_widget",
-                    default_value=st.session_state.get("reg_viz_canal", canais_reg_home[0])
+                    default_value=canal_reg_home_default
                 )
         html_regional_conta_home = home_inicio_ctx.get("regional_conta", "")
         html_regional_fixa_home = home_inicio_ctx.get("regional_fixa", "")
@@ -26798,132 +27044,16 @@ with tab0:
                         build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
                         unsafe_allow_html=True
                     )
-                    st.markdown(str(html_regional_conta_home), unsafe_allow_html=True)
+                    renderizar_html_otimizado(html_regional_conta_home)
             with col_home_reg_2:
                 if html_regional_fixa_home:
                     st.markdown(
                         build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:8px;"),
                         unsafe_allow_html=True
                     )
-                    st.markdown(str(html_regional_fixa_home), unsafe_allow_html=True)
+                    renderizar_html_otimizado(html_regional_fixa_home)
         else:
             st.info("Os dados de PERFORMANCE POR REGIONAL não estão disponíveis para a capa.")
-
-        st.markdown(
-            build_visual_title_html("FUNIL CONTA E FIXA - FILTRO ÚNICO", "grid", "subsection-title", extra_style="margin-top:14px;"),
-            unsafe_allow_html=True
-        )
-        base_funil_home, df_cotacoes_home = obter_bases_funil_home()
-        canais_funil_home: list[str] = []
-        if base_funil_home is not None and not getattr(base_funil_home, "empty", True) and "CANAL_PLAN" in base_funil_home.columns:
-            canais_funil_home.extend([
-                canal for canal in
-                base_funil_home["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
-                if canal
-            ])
-        if df_cotacoes_home is not None and not getattr(df_cotacoes_home, "empty", True) and "CANAL_PLAN" in df_cotacoes_home.columns:
-            canais_funil_home.extend([
-                canal for canal in
-                df_cotacoes_home["CANAL_PLAN"].dropna().astype(str).map(_mapear_canal_funil_cotacoes).tolist()
-                if canal
-            ])
-        canais_funil_home = _ordenar_canais_funil_cotacoes(list(set(canais_funil_home)))
-        opcoes_canal_funil_home = ["Todos"] + canais_funil_home if canais_funil_home else ["Todos"]
-        meses_funil_home: list[str] = []
-        if base_funil_home is not None and not getattr(base_funil_home, "empty", True) and "dat_tratada" in base_funil_home.columns:
-            meses_funil_home.extend(base_funil_home["dat_tratada"].dropna().astype(str).str.strip().str.lower().tolist())
-        if df_cotacoes_home is not None and not getattr(df_cotacoes_home, "empty", True):
-            col_mes_funil_home = "mes_ano" if "mes_ano" in df_cotacoes_home.columns else ("dat_tratada" if "dat_tratada" in df_cotacoes_home.columns else None)
-            if col_mes_funil_home:
-                meses_funil_home.extend(df_cotacoes_home[col_mes_funil_home].dropna().astype(str).str.strip().str.lower().tolist())
-        meses_funil_home = sorted(
-            list({
-                mes for mes in meses_funil_home
-                if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
-            }),
-            key=mes_ano_para_data
-        )
-        if not meses_funil_home:
-            meses_funil_home = [get_mes_atual_formatado().strip().lower()]
-        mes_funil_home_default = (
-            get_mes_atual_formatado().strip().lower()
-            if get_mes_atual_formatado().strip().lower() in meses_funil_home
-            else meses_funil_home[-1]
-        )
-
-        col_home_funil_1, col_home_funil_2, col_home_funil_3 = st.columns([0.95, 0.95, 2.10], gap="medium")
-        with col_home_funil_1:
-            render_filter_label("CANAL")
-            canal_funil_home_sel = st.selectbox(
-                "Canal do funil na capa",
-                options=opcoes_canal_funil_home,
-                index=0,
-                key="home_funil_canal",
-                label_visibility="collapsed"
-            )
-        with col_home_funil_2:
-            render_filter_label("SELECIONE O MÊS")
-            mes_funil_home_sel = st.selectbox(
-                "Mês do funil na capa",
-                options=meses_funil_home,
-                index=meses_funil_home.index(mes_funil_home_default),
-                key="home_funil_mes",
-                label_visibility="collapsed"
-            )
-        with col_home_funil_3:
-            mes_funil_home_m1 = get_mes_anterior(mes_funil_home_sel)
-            st.markdown(
-                f"""
-                <div class="analitico-corte-info">
-                    Filtro sincronizado para os dois funis. Mês Atual: {escape(str(mes_funil_home_sel).upper())} |
-                    MoM: {escape(str(mes_funil_home_sel).upper())} vs {escape(str(mes_funil_home_m1).upper())}.
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        tabela_funil_home_fmt, tabela_funil_home_num = montar_tabela_funil_cotacoes(
-            df_base_principal=base_funil_home,
-            df_cotacoes_base=df_cotacoes_home,
-            canal_ref=canal_funil_home_sel,
-            mes_ref=mes_funil_home_sel
-        )
-        if tabela_funil_home_fmt.empty:
-            st.info("Sem dados disponíveis para o FUNIL CONTA na capa.")
-        else:
-            st.markdown(
-                build_visual_title_html("FUNIL CONTA - PEDIDOS X COTAÇÃO X ATIVAÇÃO", "grid", "subsection-title", extra_style="margin-top:8px;"),
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                criar_tabela_html_funil_cotacoes(
-                    df_formatado=tabela_funil_home_fmt,
-                    df_numerico=tabela_funil_home_num,
-                    table_id="tabela-home-funil-conta"
-                ),
-                unsafe_allow_html=True
-            )
-
-        tabela_funil_fixa_home_fmt, tabela_funil_fixa_home_num = montar_tabela_funil_fixa(
-            df_base_principal=base_funil_home,
-            canal_ref=canal_funil_home_sel,
-            mes_ref=mes_funil_home_sel
-        )
-        if tabela_funil_fixa_home_fmt.empty:
-            st.info("Sem dados disponíveis para o FUNIL FIXA na capa.")
-        else:
-            st.markdown(
-                build_visual_title_html("FUNIL FIXA - PEDIDOS X VENDA BRUTA X INSTALADOS", "grid", "subsection-title", extra_style="margin-top:8px;"),
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                criar_tabela_html_funil_cotacoes(
-                    df_formatado=tabela_funil_fixa_home_fmt,
-                    df_numerico=tabela_funil_fixa_home_num,
-                    table_id="tabela-home-funil-fixa"
-                ),
-                unsafe_allow_html=True
-            )
 
         st.markdown(
             build_visual_title_html("NECESSIDADE DIÁRIA POR CANAL/PRODUTO", "target", "subsection-title", extra_style="margin-top:14px;"),
@@ -26931,6 +27061,10 @@ with tab0:
         )
         canais_analitico_home = list(globals().get("canais_analitico", []) or [])
         if meses_analitico_home and regionais_analitico_home and canais_analitico_home:
+            canal_need_home_default = st.session_state.get(
+                "analitico_canal_ref",
+                obter_opcao_preferida_dashboard(canais_analitico_home, ["E-Commerce", "Todos"])
+            )
             col_home_need_f1, col_home_need_f2, col_home_need_f3 = st.columns([1.0, 1.0, 1.2])
             with col_home_need_f1:
                 render_home_synced_selectbox(
@@ -26957,14 +27091,14 @@ with tab0:
                     canais_analitico_home,
                     "analitico_canal_ref",
                     "home_necessidade_canal_widget",
-                    default_value=st.session_state.get("analitico_canal_ref", canais_analitico_home[0])
+                    default_value=canal_need_home_default
                 )
         html_need_conta_home = home_inicio_ctx.get("necessidade_conta", "")
         html_need_fixa_home = home_inicio_ctx.get("necessidade_fixa", "")
         if html_need_conta_home:
-            st.markdown(str(html_need_conta_home), unsafe_allow_html=True)
+            renderizar_html_otimizado(html_need_conta_home)
         if html_need_fixa_home:
-            st.markdown(str(html_need_fixa_home), unsafe_allow_html=True)
+            renderizar_html_otimizado(html_need_fixa_home)
         if not html_need_conta_home and not html_need_fixa_home:
             st.info("Os dados de NECESSIDADE DIÁRIA não estão disponíveis para a capa.")
 
