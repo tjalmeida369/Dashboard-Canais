@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 from plotly.subplots import make_subplots
 import streamlit.components.v1 as components
 from datetime import datetime, date, timedelta
@@ -114,8 +115,11 @@ def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
 
 CACHE_MAX_ENTRIES_LARGE = 4
 CACHE_MAX_ENTRIES_MEDIUM = 8
-CACHE_MAX_ENTRIES_VIEW = 24
-CACHE_SESSION_VARIATIONS = 3
+CACHE_MAX_ENTRIES_VIEW = 10
+CACHE_MAX_ENTRIES_FILTERS = 4
+CACHE_SESSION_VARIATIONS = 2
+SESSION_CACHE_MAX_TEXT_CHARS = 550_000
+SESSION_CACHE_MAX_CONTAINER_ITEMS = 12
 COTACOES_CACHE_VERSION = "2026-04-02-cotacoes-otimizadas-v7"
 ALLOWED_CANAIS_VENDA_COTACOES = {
     normalizar_chave_visual("CORPPME"),
@@ -149,6 +153,44 @@ def _normalizar_chave_cache_session(cache_key):
         return repr(cache_key)
 
 
+def _valor_cacheavel_session(valor, profundidade: int = 0) -> bool:
+    """Permite no cache em sessão apenas payloads leves, priorizando HTML já pronto."""
+    if valor is None or isinstance(valor, (bool, int, float, np.number)):
+        return True
+
+    if isinstance(valor, (str, bytes)):
+        return len(valor) <= SESSION_CACHE_MAX_TEXT_CHARS
+
+    if isinstance(valor, (pd.DataFrame, pd.Series, np.ndarray)):
+        return False
+
+    if hasattr(valor, "to_plotly_json"):
+        return False
+
+    if profundidade >= 2:
+        return False
+
+    if isinstance(valor, dict):
+        if len(valor) > SESSION_CACHE_MAX_CONTAINER_ITEMS:
+            return False
+        total_texto = 0
+        for item in valor.values():
+            if isinstance(item, (str, bytes)):
+                total_texto += len(item)
+                if total_texto > SESSION_CACHE_MAX_TEXT_CHARS:
+                    return False
+            if not _valor_cacheavel_session(item, profundidade + 1):
+                return False
+        return True
+
+    if isinstance(valor, (list, tuple)):
+        if len(valor) > SESSION_CACHE_MAX_CONTAINER_ITEMS:
+            return False
+        return all(_valor_cacheavel_session(item, profundidade + 1) for item in valor)
+
+    return False
+
+
 def obter_cache_session_dashboard(
     cache_id: str,
     cache_key,
@@ -176,6 +218,10 @@ def obter_cache_session_dashboard(
         return valor
 
     valor = calcular_fn()
+    if not _valor_cacheavel_session(valor):
+        st.session_state["_dashboard_session_result_cache"] = cache_raiz
+        return valor
+
     bucket[chave_normalizada] = valor
     while len(bucket) > max(1, int(max_variacoes or 1)):
         bucket.popitem(last=False)
@@ -535,13 +581,7 @@ def obter_bases_funil_home() -> tuple[pd.DataFrame, pd.DataFrame]:
         try:
             df_origem = globals().get("df", pd.DataFrame())
             if df_origem is not None and not getattr(df_origem, "empty", True):
-                file_mtime_ref = globals().get("file_mtime", None)
-                cache_key = ("base_performance_home", file_mtime_ref)
-                base_funil_home = obter_cache_session_dashboard(
-                    "home_funil_base_performance_v1",
-                    cache_key,
-                    lambda: preparar_base_performance(df_origem)
-                )
+                base_funil_home = preparar_base_performance(df_origem)
         except Exception:
             base_funil_home = pd.DataFrame()
 
@@ -554,15 +594,10 @@ def obter_bases_funil_home() -> tuple[pd.DataFrame, pd.DataFrame]:
                 cotacoes_path = cotacoes_path if Path(cotacoes_path).exists() else None
                 if cotacoes_path is not None:
                     cotacoes_mtime = Path(cotacoes_path).stat().st_mtime
-                    cache_key = (str(cotacoes_path), cotacoes_mtime, COTACOES_CACHE_VERSION)
-                    df_cotacoes_home = obter_cache_session_dashboard(
-                        "home_funil_cotacoes_base_v1",
-                        cache_key,
-                        lambda: load_cotacoes_data(
-                            str(cotacoes_path),
-                            cotacoes_mtime,
-                            COTACOES_CACHE_VERSION
-                        )
+                    df_cotacoes_home = load_cotacoes_data(
+                        str(cotacoes_path),
+                        cotacoes_mtime,
+                        COTACOES_CACHE_VERSION
                     )
         except Exception:
             df_cotacoes_home = pd.DataFrame()
@@ -9827,6 +9862,227 @@ def criar_grafico_barras_resumo_evolucao_semanal(
         comparacoes=comparacoes
     )
 
+def montar_ctx_plotly_evolucao_semanal(
+    df_sem_base: pd.DataFrame,
+    mes_sem_sel: str,
+    canal_sem_sel: str,
+    produto_sem_sel: str,
+    regional_sem_sel: str
+) -> dict[str, str]:
+    if df_sem_base is None or df_sem_base.empty:
+        return {}
+    dt_mes_sem = pd.Timestamp(mes_ano_para_data(mes_sem_sel)).normalize()
+    if dt_mes_sem.year != 2026:
+        return {}
+
+    mes_sem_m1 = get_mes_anterior(mes_sem_sel)
+    dt_mes_sem_m1 = pd.Timestamp(mes_ano_para_data(mes_sem_m1)).normalize()
+    regional_sem_norm3 = str(regional_sem_sel).strip().upper()[:3]
+    usar_tendencia_grafico = str(mes_sem_sel).strip().lower() == get_mes_atual_formatado().strip().lower()
+
+    df_sem = df_sem_base[df_sem_base['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_sem_sel)].copy()
+    if canal_sem_sel != "Todos":
+        df_sem = df_sem[df_sem['CANAL_PLAN'] == canal_sem_sel].copy()
+    if regional_sem_sel != "Todas":
+        df_sem = df_sem[df_sem['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)].copy()
+    if df_sem.empty:
+        return {}
+
+    aliases_real = {'GROSS LIQUIDO'} if produto_sem_sel == 'CONTA' else {'INSTALACAO', 'INSTALADOS', 'INSTAL'}
+    aliases_real_norm = {normalizar_texto_chave(a) for a in aliases_real}
+    aliases_meta_norm = {normalizar_texto_chave('GROSS LIQUIDO')}
+    df_real_hist = df_sem[df_sem['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
+    df_mes_atual = df_sem[df_sem['dat_tratada'] == mes_sem_sel].copy()
+    df_mes_anterior = df_sem[df_sem['dat_tratada'] == mes_sem_m1].copy()
+    df_real_atual = df_mes_atual[df_mes_atual['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
+    df_real_m1 = df_mes_anterior[df_mes_anterior['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
+    df_meta_atual = df_mes_atual[df_mes_atual['DSC_IND_NORM'].isin(aliases_meta_norm)].copy()
+    meta_mes_total = float(pd.to_numeric(df_meta_atual.get('DESAFIO_QTD', 0), errors='coerce').fillna(0).sum())
+
+    def montar_calendario_mes(inicio_mes: pd.Timestamp) -> pd.DataFrame:
+        fim_mes = (pd.Timestamp(inicio_mes) + pd.offsets.MonthEnd(0)).normalize()
+        datas = pd.date_range(start=pd.Timestamp(inicio_mes).normalize(), end=fim_mes, freq='D')
+        dia_abrev = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
+        dia_inicio_mes = int(pd.Timestamp(inicio_mes).weekday())
+        df_cal = pd.DataFrame({'DATA': datas})
+        df_cal['DIA_SEMANA'] = df_cal['DATA'].dt.weekday.astype(int)
+        df_cal['DIA_ABREV'] = df_cal['DIA_SEMANA'].map(dia_abrev)
+        df_cal['DIA_ORDEM_REF'] = ((df_cal['DIA_SEMANA'] - dia_inicio_mes) % 7).astype(int)
+        df_cal['SEMANA_IDX'] = ((df_cal['DATA'].dt.day - 1) // 7) + 1
+        df_cal['SEMANA_LABEL'] = df_cal['SEMANA_IDX'].apply(lambda n: f"S{int(n)}")
+        return df_cal.sort_values(['SEMANA_IDX', 'DIA_ORDEM_REF']).reset_index(drop=True)
+
+    def agregar_valor_diario(df_in: pd.DataFrame, cal_ref: pd.DataFrame, coluna_valor: str = 'QTDE') -> pd.DataFrame:
+        df_out = cal_ref.copy()
+        if df_in is None or df_in.empty:
+            df_out['VALOR_DIA'] = 0.0
+            return df_out
+        df_tmp = df_in.copy()
+        df_tmp['DATA'] = pd.to_datetime(df_tmp['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
+        df_tmp = df_tmp[df_tmp['DATA'].notna()].copy()
+        if df_tmp.empty:
+            df_out['VALOR_DIA'] = 0.0
+            return df_out
+        dt_min = pd.to_datetime(df_out['DATA']).min()
+        dt_max = pd.to_datetime(df_out['DATA']).max()
+        df_tmp = df_tmp[(df_tmp['DATA'] >= dt_min) & (df_tmp['DATA'] <= dt_max)].copy()
+        if df_tmp.empty:
+            df_out['VALOR_DIA'] = 0.0
+            return df_out
+        agg = df_tmp.groupby('DATA', as_index=False, observed=True)[coluna_valor].sum().rename(columns={coluna_valor: 'VALOR_DIA'})
+        df_out = df_out.merge(agg, on='DATA', how='left')
+        df_out['VALOR_DIA'] = pd.to_numeric(df_out['VALOR_DIA'], errors='coerce').fillna(0.0)
+        return df_out
+
+    cal_atual = montar_calendario_mes(dt_mes_sem)
+    cal_m1 = montar_calendario_mes(dt_mes_sem_m1)
+    serie_atual = agregar_valor_diario(df_real_atual, cal_atual, 'QTDE')
+    serie_m1_base = agregar_valor_diario(df_real_m1, cal_m1, 'QTDE')
+    prev_lookup = serie_m1_base.set_index(['SEMANA_IDX', 'DIA_SEMANA'])['VALOR_DIA'] if not serie_m1_base.empty else pd.Series(dtype='float64')
+    prev_wd_media = serie_m1_base.groupby('DIA_SEMANA', observed=True)['VALOR_DIA'].mean() if not serie_m1_base.empty else pd.Series(dtype='float64')
+    ctx_peso_proj = _montar_contexto_pesos_projecao_semana_dia(df_real_hist, mes_sem_sel, valor_col='QTDE')
+    serie_atual['VALOR_FINAL'] = pd.to_numeric(serie_atual.get('VALOR_DIA', 0), errors='coerce').fillna(0.0)
+
+    if usar_tendencia_grafico and not serie_atual.empty:
+        tend_mes_total = float(pd.to_numeric(df_real_atual.get('TEND_QTD', 0), errors='coerce').fillna(0).sum())
+        if tend_mes_total > 0:
+            df_datas_real = df_real_atual.copy()
+            df_datas_real['DATA'] = pd.to_datetime(df_datas_real.get('DAT_MOVIMENTO2'), errors='coerce').dt.normalize()
+            df_datas_real['QTDE'] = pd.to_numeric(df_datas_real.get('QTDE', 0), errors='coerce').fillna(0.0)
+            datas_validas = pd.to_datetime(df_datas_real.loc[df_datas_real['QTDE'] > 0, 'DATA'], errors='coerce').dropna()
+            if datas_validas.empty:
+                datas_validas = pd.to_datetime(df_datas_real.loc[df_datas_real['DATA'].notna(), 'DATA'], errors='coerce').dropna()
+            if datas_validas.empty:
+                data_corte = pd.Timestamp(dt_mes_sem).normalize() - pd.Timedelta(days=1)
+            else:
+                data_corte = pd.Timestamp(datas_validas.max()).normalize()
+                limite_real = pd.Timestamp.today().normalize() - pd.Timedelta(days=1)
+                if data_corte > limite_real:
+                    data_corte = limite_real
+            mask_realizado = pd.to_datetime(serie_atual['DATA'], errors='coerce') <= data_corte
+            real_total = float(pd.to_numeric(serie_atual.loc[mask_realizado, 'VALOR_FINAL'], errors='coerce').fillna(0).sum())
+            gap_tend = float(tend_mes_total) - real_total
+            if gap_tend > 0:
+                mask_restante = pd.to_datetime(serie_atual['DATA'], errors='coerce') > data_corte
+                if bool(mask_restante.any()):
+                    idx_restantes = list(serie_atual.index[mask_restante])
+                    pesos_tend = []
+                    for idx_row in idx_restantes:
+                        peso = _obter_peso_projecao_semana_dia(ctx_peso_proj, int(serie_atual.at[idx_row, 'SEMANA_IDX']), int(serie_atual.at[idx_row, 'DIA_SEMANA']))
+                        pesos_tend.append(max(float(peso), 0.0))
+                    soma_pesos_tend = float(np.sum(pesos_tend))
+                    if soma_pesos_tend <= 0:
+                        pesos_tend = [1.0] * len(idx_restantes)
+                        soma_pesos_tend = float(len(idx_restantes)) if idx_restantes else 1.0
+                    addicoes = [gap_tend * (p / soma_pesos_tend) for p in pesos_tend]
+                    if addicoes:
+                        addicoes[-1] = addicoes[-1] + (gap_tend - float(np.sum(addicoes)))
+                        for idx_row, add_val in zip(idx_restantes, addicoes):
+                            serie_atual.at[idx_row, 'VALOR_FINAL'] = float(serie_atual.at[idx_row, 'VALOR_FINAL']) + float(add_val)
+
+    serie_atual['REAL_M1_DIA'] = [
+        float((prev_wd_media.get(int(row.DIA_SEMANA), 0.0) if pd.isna(prev_lookup.get((int(row.SEMANA_IDX), int(row.DIA_SEMANA)), np.nan)) else prev_lookup.get((int(row.SEMANA_IDX), int(row.DIA_SEMANA)), 0.0)) or 0.0)
+        for row in serie_atual.itertuples(index=False)
+    ]
+    pesos_meta = [max(float(_obter_peso_projecao_semana_dia(ctx_peso_proj, int(row.SEMANA_IDX), int(row.DIA_SEMANA))), 0.0) for row in serie_atual.itertuples(index=False)]
+    soma_pesos = float(np.sum(pesos_meta))
+    if soma_pesos <= 0:
+        pesos_meta = [1.0] * len(serie_atual)
+        soma_pesos = float(len(serie_atual)) if len(serie_atual) > 0 else 1.0
+    meta_diaria = [meta_mes_total * (peso / soma_pesos) for peso in pesos_meta]
+    if meta_diaria:
+        meta_diaria[-1] = meta_diaria[-1] + (meta_mes_total - float(np.sum(meta_diaria)))
+    serie_atual['META_DIA'] = meta_diaria if meta_diaria else 0.0
+    if serie_atual.empty:
+        return {}
+
+    cores = {'REAL_ATUAL': '#FF2800', 'REAL_M1': '#790E09', 'META': '#5A6268'}
+    def _rotulos_trace(serie_valor: pd.Series) -> list[str]:
+        return [formatar_numero_brasileiro(v, 0) if pd.notna(v) and float(v) != 0 else '' for v in list(serie_valor)]
+
+    nome_trace_real = 'Atual/Tend.' if usar_tendencia_grafico else 'Atual'
+    hover_real_atual = "Realizado/Tendencia (Dia)" if usar_tendencia_grafico else "Realizado Atual (Dia)"
+    x_multicat = [serie_atual['SEMANA_LABEL'].tolist(), serie_atual['DIA_ABREV'].tolist()]
+    datas_hover = serie_atual['DATA'].dt.strftime('%d/%m/%Y').tolist()
+    fig_semanal = go.Figure()
+    fig_semanal.add_trace(
+        go.Scatter(
+            x=x_multicat,
+            y=serie_atual['VALOR_FINAL'],
+            mode='lines+markers+text',
+            name=nome_trace_real,
+            marker=dict(
+                size=9,
+                symbol='circle',
+                color=cores['REAL_ATUAL'],
+                line=dict(width=1.4, color='white')
+            ),
+            line=dict(width=3.0, color=cores['REAL_ATUAL'], shape='spline', smoothing=1.1),
+            text=_rotulos_trace(serie_atual['VALOR_FINAL']),
+            textposition='top left',
+            textfont=dict(size=11, color=cores['REAL_ATUAL']),
+            customdata=datas_hover,
+            hovertemplate=f"<b>%{{customdata}}</b><br><b>{hover_real_atual}:</b> %{{y:,.0f}}<extra></extra>",
+            cliponaxis=False
+        )
+    )
+    fig_semanal.add_trace(
+        go.Scatter(
+            x=x_multicat,
+            y=serie_atual['REAL_M1_DIA'],
+            mode='lines+markers+text',
+            name='M-1',
+            marker=dict(
+                size=9,
+                symbol='circle',
+                color=cores['REAL_M1'],
+                line=dict(width=1.4, color='white')
+            ),
+            line=dict(width=3.0, color=cores['REAL_M1'], shape='spline', smoothing=1.1),
+            text=_rotulos_trace(serie_atual['REAL_M1_DIA']),
+            textposition='top center',
+            textfont=dict(size=11, color=cores['REAL_M1']),
+            customdata=datas_hover,
+            hovertemplate="<b>%{customdata}</b><br><b>Realizado M-1 (Dia):</b> %{y:,.0f}<extra></extra>",
+            cliponaxis=False
+        )
+    )
+    fig_semanal.add_trace(
+        go.Scatter(
+            x=x_multicat,
+            y=serie_atual['META_DIA'],
+            mode='lines+markers+text',
+            name='Orçamento',
+            marker=dict(
+                size=10,
+                symbol='diamond',
+                color=cores['META'],
+                line=dict(width=1.4, color='white')
+            ),
+            line=dict(width=3.2, color=cores['META'], dash='dash', shape='spline', smoothing=1.0),
+            text=_rotulos_trace(serie_atual['META_DIA']),
+            textposition='top right',
+            textfont=dict(size=11, color=cores['META']),
+            customdata=datas_hover,
+            hovertemplate="<b>%{customdata}</b><br><b>Orç Diaria:</b> %{y:,.0f}<extra></extra>",
+            cliponaxis=False
+        )
+    )
+    fig_semanal.update_layout(title=dict(text=""), height=460, showlegend=True)
+    aplicar_estilo_visual_evolucao_semanal(fig_semanal, rotulo_mes_foco=str(mes_sem_sel).upper(), nome_serie_real=nome_trace_real, altura=460)
+    fig_totais_sem = criar_grafico_barras_resumo_evolucao_semanal(
+        categorias_totais=['M-1', 'M-0', 'ORÇ'],
+        valores_totais=[
+            float(pd.to_numeric(serie_atual['REAL_M1_DIA'], errors='coerce').fillna(0).sum()),
+            float(pd.to_numeric(serie_atual['VALOR_FINAL'], errors='coerce').fillna(0).sum()),
+            float(pd.to_numeric(serie_atual['META_DIA'], errors='coerce').fillna(0).sum())
+        ],
+        cores_totais=[cores['REAL_M1'], cores['REAL_ATUAL'], cores['META']],
+        altura=460,
+        comparacoes=[{'origem': 0, 'destino': 1}, {'origem': 2, 'destino': 1}]
+    )
+    return {"fig_principal_json": fig_semanal.to_json(), "fig_resumo_json": fig_totais_sem.to_json(), "mes": str(mes_sem_sel).upper()}
+
 def criar_grafico_barras_resumo_evolucao_mensal(
     df_linhas_base: pd.DataFrame,
     altura: int = 400,
@@ -11314,7 +11570,9 @@ def criar_tabela_html_necessidade_diaria_produto(
     regional_ref: str,
     canal_ref: str,
     produto_ref: str,
-    table_id: str
+    table_id: str,
+    base_preparada: bool = False,
+    incluir_ctx: bool = False
 ) -> tuple[str, dict]:
     ctx_default = {
         'mes_anterior': get_mes_anterior(mes_ref),
@@ -11322,27 +11580,39 @@ def criar_tabela_html_necessidade_diaria_produto(
         'data_corte': None
     }
     if df_base is None or df_base.empty:
-        return "", ctx_default
+        return "", (ctx_default if incluir_ctx else {})
 
-    df_work = df_base.copy()
-    for col in ['CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'REGIONAL', 'dat_tratada']:
-        if col in df_work.columns:
-            df_work[col] = df_work[col].astype(str).str.strip()
-    if 'COD_PLATAFORMA' not in df_work.columns or 'DSC_INDICADOR' not in df_work.columns:
-        return "", ctx_default
+    if base_preparada:
+        df_work = df_base
+        if 'COD_PLATAFORMA' not in df_work.columns or 'IND_NORM' not in df_work.columns:
+            return "", (ctx_default if incluir_ctx else {})
+    else:
+        colunas_necessarias = [
+            col for col in [
+                'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'REGIONAL', 'dat_tratada',
+                'QTDE', 'DESAFIO_QTD', 'TEND_QTD', 'DAT_MOVIMENTO2'
+            ]
+            if col in df_base.columns
+        ]
+        df_work = df_base[colunas_necessarias].copy()
+        for col in ['CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'REGIONAL', 'dat_tratada']:
+            if col in df_work.columns:
+                df_work[col] = df_work[col].astype(str).str.strip()
+        if 'COD_PLATAFORMA' not in df_work.columns or 'DSC_INDICADOR' not in df_work.columns:
+            return "", (ctx_default if incluir_ctx else {})
 
-    if 'DESAFIO_QTD' not in df_work.columns:
-        df_work['DESAFIO_QTD'] = 0
-    if 'TEND_QTD' not in df_work.columns:
-        df_work['TEND_QTD'] = df_work.get('QTDE', 0)
-    df_work['QTDE'] = normalizar_numerico_serie(df_work.get('QTDE', 0)).fillna(0.0)
-    df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work.get('DESAFIO_QTD', 0)).fillna(0.0)
-    df_work['TEND_QTD'] = normalizar_numerico_serie(df_work.get('TEND_QTD', 0)).fillna(0.0)
-    df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work.get('DAT_MOVIMENTO2'), errors='coerce')
-    df_work['DATA_DIA'] = pd.to_datetime(df_work['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
-    df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
-    df_work['IND_NORM'] = df_work['DSC_INDICADOR'].apply(_normalizar_texto_chave_analitico)
-    df_work['MES_NORM'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
+        if 'DESAFIO_QTD' not in df_work.columns:
+            df_work['DESAFIO_QTD'] = 0
+        if 'TEND_QTD' not in df_work.columns:
+            df_work['TEND_QTD'] = df_work.get('QTDE', 0)
+        df_work['QTDE'] = normalizar_numerico_serie(df_work.get('QTDE', 0)).fillna(0.0)
+        df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work.get('DESAFIO_QTD', 0)).fillna(0.0)
+        df_work['TEND_QTD'] = normalizar_numerico_serie(df_work.get('TEND_QTD', 0)).fillna(0.0)
+        df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work.get('DAT_MOVIMENTO2'), errors='coerce')
+        df_work['DATA_DIA'] = pd.to_datetime(df_work['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
+        df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+        df_work['IND_NORM'] = df_work['DSC_INDICADOR'].apply(_normalizar_texto_chave_analitico)
+        df_work['MES_NORM'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
 
     produto_norm = normalizar_rotulo_produto(produto_ref)
     df_work = df_work[df_work['COD_PLATAFORMA'] == produto_norm].copy()
@@ -11351,11 +11621,11 @@ def criar_tabela_html_necessidade_diaria_produto(
     if canal_ref and str(canal_ref).strip() != "Todos":
         df_work = df_work[df_work['CANAL_PLAN'] == canal_ref].copy()
     if df_work.empty:
-        return "", ctx_default
+        return "", (ctx_default if incluir_ctx else {})
 
     cal = _montar_calendario_semana_mes_analitico(mes_ref)
     if cal.empty:
-        return "", ctx_default
+        return "", (ctx_default if incluir_ctx else {})
 
     mes_ref_norm = str(mes_ref).strip().lower()
     mes_m1 = get_mes_anterior(mes_ref)
@@ -11694,11 +11964,11 @@ def criar_tabela_html_necessidade_diaria_produto(
         })
 
     if not tem_dados:
-        return "", {
+        return "", ({
             'mes_anterior': mes_m1,
             'dias_restantes': dias_restantes,
             'data_corte': data_corte
-        }
+        } if incluir_ctx else {})
 
     def fmt_num(v: float) -> str:
         return formatar_numero_brasileiro(v, 0)
@@ -12026,11 +12296,11 @@ def criar_tabela_html_necessidade_diaria_produto(
     </div>
     """
 
-    return html_out, {
+    return html_out, ({
         'mes_anterior': mes_m1,
         'dias_restantes': dias_restantes,
         'data_corte': data_corte
-    }
+    } if incluir_ctx else {})
 
 def _colunas_tabela_analitica(mes_ref: str, mes_anterior_ref: str) -> list[str]:
     ano_meta = "26"
@@ -14851,9 +15121,15 @@ def aplicar_filtros_globais_cached(
         tuple(indicadores),
         bool(incluir_periodo),
     )
-    cache = st.session_state.setdefault("_dashboard_filtros_globais_cache", {})
+    cache = st.session_state.setdefault("_dashboard_filtros_globais_cache", OrderedDict())
+    if not isinstance(cache, OrderedDict):
+        cache = OrderedDict(cache)
+
     if cache_key in cache:
-        return cache[cache_key].copy(deep=False)
+        resultado_cache = cache.pop(cache_key)
+        cache[cache_key] = resultado_cache
+        st.session_state["_dashboard_filtros_globais_cache"] = cache
+        return resultado_cache.copy(deep=False)
 
     resultado = aplicar_filtros_globais(
         _df_base,
@@ -14863,9 +15139,27 @@ def aplicar_filtros_globais_cached(
         list(indicadores),
         incluir_periodo=incluir_periodo
     )
-    if len(cache) >= CACHE_MAX_ENTRIES_VIEW:
-        cache.pop(next(iter(cache)), None)
-    cache[cache_key] = resultado
+
+    memoria_resultado = 0
+    try:
+        memoria_resultado = int(resultado.memory_usage(index=True, deep=False).sum())
+    except Exception:
+        memoria_resultado = 0
+
+    reter_em_cache = (
+        resultado.empty or (
+            len(resultado) <= 75_000 and
+            memoria_resultado <= 12 * 1024 * 1024 and
+            (len(_df_base) == 0 or len(resultado) < int(len(_df_base) * 0.70))
+        )
+    )
+
+    if reter_em_cache:
+        cache[cache_key] = resultado
+        while len(cache) > CACHE_MAX_ENTRIES_FILTERS:
+            cache.popitem(last=False)
+        st.session_state["_dashboard_filtros_globais_cache"] = cache
+
     return resultado.copy(deep=False)
 
 region_filter_key = tuple(str(item) for item in region_filter)
@@ -22191,6 +22485,38 @@ with tab5:
             return df_saida
 
         @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+        def preparar_base_necessidade_diaria(df_in: pd.DataFrame) -> pd.DataFrame:
+            """Materializa apenas os campos usados na tabela de necessidade diária."""
+            colunas_base = [
+                'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada',
+                'QTDE', 'DESAFIO_QTD', 'TEND_QTD', 'DAT_MOVIMENTO2',
+                'DSC_INDICADOR', 'DSC_IND_NORM'
+            ]
+            if df_in is None or df_in.empty:
+                return pd.DataFrame(columns=[c for c in colunas_base if c != 'DSC_INDICADOR'] + ['IND_NORM', 'MES_NORM', 'DATA_DIA'])
+
+            colunas_existentes = [col for col in colunas_base if col in df_in.columns]
+            df_work = df_in[colunas_existentes].copy()
+            if 'DAT_MOVIMENTO2' in df_work.columns and pd.api.types.is_datetime64_any_dtype(df_work['DAT_MOVIMENTO2']):
+                df_work['DATA_DIA'] = df_work['DAT_MOVIMENTO2'].dt.normalize()
+            else:
+                df_work['DAT_MOVIMENTO2'] = pd.to_datetime(df_work.get('DAT_MOVIMENTO2'), errors='coerce')
+                df_work['DATA_DIA'] = pd.to_datetime(df_work['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
+
+            if 'DSC_IND_NORM' in df_work.columns:
+                df_work['IND_NORM'] = df_work['DSC_IND_NORM'].astype(str).str.strip()
+                df_work.drop(columns=['DSC_IND_NORM'], inplace=True, errors='ignore')
+            else:
+                df_work['IND_NORM'] = df_work['DSC_INDICADOR'].astype(str).str.strip().apply(_normalizar_texto_chave_analitico)
+
+            df_work['MES_NORM'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
+            compactar_colunas_categoricas(
+                df_work,
+                ['CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM', 'IND_NORM']
+            )
+            return df_work
+
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
         def preparar_contexto_evolucao_semanal_analitico(df_base: pd.DataFrame):
             """Prepara a base e os metadados recorrentes usados na evolução semanal/resumo."""
             if df_base is None or df_base.empty:
@@ -23073,18 +23399,10 @@ with tab5:
             partes.append("</div>")
             return "".join(partes)
 
-        df_perf_base = obter_cache_session_dashboard(
-            "df_perf_base_principal_v1",
-            ("principal", file_mtime),
-            lambda: preparar_base_performance(df)
-        )
+        df_perf_base = preparar_base_performance(df)
         ligacoes_perf_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
         df_lig_raw = load_ligacoes_para_performance(ligacoes_perf_mtime)
-        df_lig_perf = obter_cache_session_dashboard(
-            "df_perf_base_ligacoes_v1",
-            ("ligacoes", ligacoes_perf_mtime),
-            lambda: preparar_base_performance(df_lig_raw)
-        )
+        df_lig_perf = preparar_base_performance(df_lig_raw)
 
         if not df_lig_perf.empty:
             base_ligacoes_origem = df_perf_base[
@@ -23157,11 +23475,7 @@ with tab5:
             )
             df_perf_base = pd.concat([df_perf_base[~mask_remove_lig], df_lig_perf], ignore_index=True)
 
-        base_analitica = obter_cache_session_dashboard(
-            "base_analitica_v1",
-            ("principal", file_mtime),
-            lambda: preparar_base_analitica(df)
-        )
+        base_analitica = preparar_base_analitica(df)
 
         meses_analitico = sorted(
             base_analitica['dat_tratada'].dropna().unique().tolist(),
@@ -23302,8 +23616,6 @@ with tab5:
                                 resultados_html.get(produto_resultado, ""),
                                 unsafe_allow_html=True
                             )
-                home_inicio_ctx["resultado_info"] = f"Mês: {str(mes_resultado).upper()} | Regional: {regional_resultado}"
-
             st.markdown(
                 build_visual_title_html(
                     "ATIVAÇÃO CONTA - MOTIVO DOS ATIVADOS",
@@ -23314,15 +23626,7 @@ with tab5:
                 unsafe_allow_html=True
             )
 
-            df_gross_motivo = (
-                obter_cache_session_dashboard(
-                    "base_gross_motivo_status_v1",
-                    ("principal", file_mtime),
-                    lambda: preparar_base_gross_motivo_status(df)
-                )
-                if tab_funil_movel_ativa
-                else pd.DataFrame()
-            )
+            df_gross_motivo = preparar_base_gross_motivo_status(df) if tab_funil_movel_ativa else pd.DataFrame()
             if df_gross_motivo.empty:
                 if tab_funil_movel_ativa:
                     st.info("Sem dados disponiveis para montar os graficos de ativacao por motivo.")
@@ -23654,11 +23958,7 @@ with tab5:
         elif base_analitica.empty:
             st.info("Nao ha dados para montar a evolucao semanal.")
         else:
-            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = obter_cache_session_dashboard(
-                "ctx_evolucao_semanal_analitico_v1",
-                ("principal", file_mtime),
-                lambda: preparar_contexto_evolucao_semanal_analitico(base_analitica)
-            )
+            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica)
 
             if not meses_disp_sem:
                 if render_blocos_home_only_no_funil_movel:
@@ -23744,311 +24044,44 @@ with tab5:
                 else:
                     mes_sem_m1 = get_mes_anterior(mes_sem_sel)
                     dt_mes_sem_m1 = pd.Timestamp(mes_ano_para_data(mes_sem_m1)).normalize()
-
-                    df_sem = df_sem_base[
-                        df_sem_base['COD_PLATAFORMA'] == normalizar_rotulo_produto(produto_sem_sel)
-                    ].copy()
-                    if canal_sem_sel != "Todos":
-                        df_sem = df_sem[df_sem['CANAL_PLAN'] == canal_sem_sel].copy()
-                    if regional_sem_sel != "Todas":
-                        df_sem = df_sem[
-                            df_sem['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
-                        ].copy()
-
-                    aliases_real = (
-                        {'GROSS LIQUIDO'}
-                        if produto_sem_sel == 'CONTA'
-                        else {'INSTALACAO', 'INSTALADOS', 'INSTAL'}
-                    )
-                    aliases_meta = {'GROSS LIQUIDO'}
-                    aliases_real_norm = {normalizar_texto_chave(a) for a in aliases_real}
-                    aliases_meta_norm = {normalizar_texto_chave(a) for a in aliases_meta}
-
-                    df_real_hist = df_sem[df_sem['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
-                    df_mes_atual = df_sem[df_sem['dat_tratada'] == mes_sem_sel].copy()
-                    df_mes_anterior = df_sem[df_sem['dat_tratada'] == mes_sem_m1].copy()
-                    df_real_atual = df_mes_atual[df_mes_atual['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
-                    df_real_m1 = df_mes_anterior[df_mes_anterior['DSC_IND_NORM'].isin(aliases_real_norm)].copy()
-                    df_meta_atual = df_mes_atual[df_mes_atual['DSC_IND_NORM'].isin(aliases_meta_norm)].copy()
-
-                    meta_mes_total = float(pd.to_numeric(df_meta_atual.get('DESAFIO_QTD', 0), errors='coerce').fillna(0).sum())
-
-                    def montar_calendario_mes(inicio_mes: pd.Timestamp) -> pd.DataFrame:
-                        fim_mes = (pd.Timestamp(inicio_mes) + pd.offsets.MonthEnd(0)).normalize()
-                        datas = pd.date_range(start=pd.Timestamp(inicio_mes).normalize(), end=fim_mes, freq='D')
-                        dia_abrev = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
-                        dia_inicio_mes = int(pd.Timestamp(inicio_mes).weekday())
-                        df_cal = pd.DataFrame({'DATA': datas})
-                        df_cal['DIA_SEMANA'] = df_cal['DATA'].dt.weekday.astype(int)
-                        df_cal['DIA_ABREV'] = df_cal['DIA_SEMANA'].map(dia_abrev)
-                        df_cal['DIA_ORDEM_REF'] = ((df_cal['DIA_SEMANA'] - dia_inicio_mes) % 7).astype(int)
-                        df_cal['SEMANA_IDX'] = ((df_cal['DATA'].dt.day - 1) // 7) + 1
-                        df_cal['SEMANA_LABEL'] = df_cal['SEMANA_IDX'].apply(lambda n: f"S{int(n)}")
-                        df_cal = df_cal.sort_values(['SEMANA_IDX', 'DIA_ORDEM_REF']).reset_index(drop=True)
-                        return df_cal
-
-                    def agregar_valor_diario(df_in: pd.DataFrame, cal_ref: pd.DataFrame, coluna_valor: str = 'QTDE') -> pd.DataFrame:
-                        df_out = cal_ref.copy()
-                        if df_in is None or df_in.empty:
-                            df_out['VALOR_DIA'] = 0.0
-                            return df_out
-
-                        df_tmp = df_in.copy()
-                        df_tmp['DATA'] = pd.to_datetime(df_tmp['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
-                        df_tmp = df_tmp[df_tmp['DATA'].notna()].copy()
-                        if df_tmp.empty:
-                            df_out['VALOR_DIA'] = 0.0
-                            return df_out
-
-                        dt_min = pd.to_datetime(df_out['DATA']).min()
-                        dt_max = pd.to_datetime(df_out['DATA']).max()
-                        df_tmp = df_tmp[(df_tmp['DATA'] >= dt_min) & (df_tmp['DATA'] <= dt_max)].copy()
-                        if df_tmp.empty:
-                            df_out['VALOR_DIA'] = 0.0
-                            return df_out
-
-                        agg = (
-                            df_tmp.groupby('DATA', as_index=False, observed=True)[coluna_valor]
-                            .sum()
-                            .rename(columns={coluna_valor: 'VALOR_DIA'})
+                    evolucao_ctx = obter_cache_session_dashboard(
+                        "home_evolucao_semanal_plotly_v2",
+                        (
+                            "evolucao_semanal",
+                            file_mtime,
+                            str(mes_sem_sel).strip().lower(),
+                            str(canal_sem_sel).strip().upper(),
+                            str(produto_sem_sel).strip().upper(),
+                            str(regional_sem_sel).strip().upper(),
+                        ),
+                        lambda: montar_ctx_plotly_evolucao_semanal(
+                            df_sem_base=df_sem_base,
+                            mes_sem_sel=mes_sem_sel,
+                            canal_sem_sel=canal_sem_sel,
+                            produto_sem_sel=produto_sem_sel,
+                            regional_sem_sel=regional_sem_sel
                         )
-                        df_out = df_out.merge(agg, on='DATA', how='left')
-                        df_out['VALOR_DIA'] = pd.to_numeric(df_out['VALOR_DIA'], errors='coerce').fillna(0.0)
-                        return df_out
-
-                    cal_atual = montar_calendario_mes(dt_mes_sem)
-                    cal_m1 = montar_calendario_mes(dt_mes_sem_m1)
-
-                    serie_atual = agregar_valor_diario(df_real_atual, cal_atual, 'QTDE')
-                    serie_m1_base = agregar_valor_diario(df_real_m1, cal_m1, 'QTDE')
-
-                    prev_lookup = (
-                        serie_m1_base.set_index(['SEMANA_IDX', 'DIA_SEMANA'])['VALOR_DIA']
-                        if not serie_m1_base.empty else pd.Series(dtype='float64')
-                    )
-                    prev_wd_media = (
-                        serie_m1_base.groupby('DIA_SEMANA', observed=True)['VALOR_DIA'].mean()
-                        if not serie_m1_base.empty else pd.Series(dtype='float64')
-                    )
-                    ctx_peso_proj = _montar_contexto_pesos_projecao_semana_dia(
-                        df_real_hist,
-                        mes_sem_sel,
-                        valor_col='QTDE'
                     )
 
-                    serie_atual['VALOR_FINAL'] = pd.to_numeric(
-                        serie_atual.get('VALOR_DIA', 0), errors='coerce'
-                    ).fillna(0.0)
+                    fig_semanal = None
+                    fig_totais_sem = None
+                    try:
+                        fig_principal_json = str(evolucao_ctx.get("fig_principal_json", "") or "")
+                        fig_resumo_json = str(evolucao_ctx.get("fig_resumo_json", "") or "")
+                        if fig_principal_json and fig_resumo_json:
+                            fig_semanal = pio.from_json(fig_principal_json)
+                            fig_totais_sem = pio.from_json(fig_resumo_json)
+                    except Exception:
+                        fig_semanal = None
+                        fig_totais_sem = None
 
-                    if usar_tendencia_grafico and not serie_atual.empty:
-                        tend_mes_total = float(
-                            pd.to_numeric(df_real_atual.get('TEND_QTD', 0), errors='coerce').fillna(0).sum()
-                        )
-                        if tend_mes_total > 0:
-                            df_datas_real = df_real_atual.copy()
-                            df_datas_real['DATA'] = pd.to_datetime(
-                                df_datas_real.get('DAT_MOVIMENTO2'), errors='coerce'
-                            ).dt.normalize()
-                            df_datas_real['QTDE'] = pd.to_numeric(
-                                df_datas_real.get('QTDE', 0), errors='coerce'
-                            ).fillna(0.0)
-
-                            datas_validas = pd.to_datetime(
-                                df_datas_real.loc[df_datas_real['QTDE'] > 0, 'DATA'],
-                                errors='coerce'
-                            ).dropna()
-                            if datas_validas.empty:
-                                datas_validas = pd.to_datetime(
-                                    df_datas_real.loc[df_datas_real['DATA'].notna(), 'DATA'],
-                                    errors='coerce'
-                                ).dropna()
-
-                            if datas_validas.empty:
-                                data_corte = pd.Timestamp(dt_mes_sem).normalize() - pd.Timedelta(days=1)
-                            else:
-                                data_corte = pd.Timestamp(datas_validas.max()).normalize()
-                                limite_real = pd.Timestamp.today().normalize() - pd.Timedelta(days=1)
-                                if data_corte > limite_real:
-                                    data_corte = limite_real
-
-                            mask_realizado = pd.to_datetime(serie_atual['DATA'], errors='coerce') <= data_corte
-                            real_total = float(pd.to_numeric(
-                                serie_atual.loc[mask_realizado, 'VALOR_FINAL'],
-                                errors='coerce'
-                            ).fillna(0).sum())
-                            gap_tend = float(tend_mes_total) - real_total
-
-                            if gap_tend > 0:
-                                mask_restante = pd.to_datetime(serie_atual['DATA'], errors='coerce') > data_corte
-                                if bool(mask_restante.any()):
-                                    idx_restantes = list(serie_atual.index[mask_restante])
-                                    pesos_tend = []
-                                    for idx_row in idx_restantes:
-                                        semana_idx = int(serie_atual.at[idx_row, 'SEMANA_IDX'])
-                                        dia_semana = int(serie_atual.at[idx_row, 'DIA_SEMANA'])
-                                        peso = _obter_peso_projecao_semana_dia(
-                                            ctx_peso_proj,
-                                            semana_idx,
-                                            dia_semana
-                                        )
-                                        pesos_tend.append(max(float(peso), 0.0))
-
-                                    soma_pesos_tend = float(np.sum(pesos_tend))
-                                    if soma_pesos_tend <= 0:
-                                        pesos_tend = [1.0] * len(idx_restantes)
-                                        soma_pesos_tend = float(len(idx_restantes)) if idx_restantes else 1.0
-
-                                    if idx_restantes and soma_pesos_tend > 0:
-                                        addicoes = [gap_tend * (p / soma_pesos_tend) for p in pesos_tend]
-                                        ajuste_final = gap_tend - float(np.sum(addicoes))
-                                        addicoes[-1] = addicoes[-1] + ajuste_final
-                                        for idx_row, add_val in zip(idx_restantes, addicoes):
-                                            serie_atual.at[idx_row, 'VALOR_FINAL'] = (
-                                                float(serie_atual.at[idx_row, 'VALOR_FINAL']) + float(add_val)
-                                            )
-
-                    real_m1_alinhado = []
-                    for row in serie_atual.itertuples(index=False):
-                        chave = (int(row.SEMANA_IDX), int(row.DIA_SEMANA))
-                        valor_ref = prev_lookup.get(chave, np.nan)
-                        if pd.isna(valor_ref):
-                            valor_ref = prev_wd_media.get(int(row.DIA_SEMANA), 0.0)
-                        real_m1_alinhado.append(float(valor_ref or 0.0))
-                    serie_atual['REAL_M1_DIA'] = real_m1_alinhado
-
-                    pesos_meta = []
-                    for row in serie_atual.itertuples(index=False):
-                        semana_idx = int(row.SEMANA_IDX)
-                        dia_semana = int(row.DIA_SEMANA)
-                        peso = _obter_peso_projecao_semana_dia(
-                            ctx_peso_proj,
-                            semana_idx,
-                            dia_semana
-                        )
-                        pesos_meta.append(max(float(peso), 0.0))
-
-                    soma_pesos = float(np.sum(pesos_meta))
-                    if soma_pesos <= 0:
-                        pesos_meta = [1.0] * len(serie_atual)
-                        soma_pesos = float(len(serie_atual)) if len(serie_atual) > 0 else 1.0
-
-                    meta_diaria = [meta_mes_total * (peso / soma_pesos) for peso in pesos_meta]
-                    if meta_diaria:
-                        ajuste_final = meta_mes_total - float(np.sum(meta_diaria))
-                        meta_diaria[-1] = meta_diaria[-1] + ajuste_final
-
-                    serie_atual['META_DIA'] = meta_diaria if meta_diaria else 0.0
-                    if serie_atual.empty:
-                        st.warning("Sem dados diarios para o mes selecionado.")
+                    if fig_semanal is None or fig_totais_sem is None:
+                        if render_blocos_home_only_no_funil_movel:
+                            st.warning("Sem dados diarios para o mes selecionado.")
                     else:
-                        nome_trace_real = (
-                            'Atual/Tend.' if usar_tendencia_grafico else 'Atual'
-                        )
-                        hover_real_atual = (
-                            "Realizado/Tendencia (Dia)" if usar_tendencia_grafico else "Realizado Atual (Dia)"
-                        )
-                        x_semana = serie_atual['SEMANA_LABEL'].tolist()
-                        x_dia = serie_atual['DIA_ABREV'].tolist()
-                        x_multicat = [x_semana, x_dia]
-                        datas_hover = serie_atual['DATA'].dt.strftime('%d/%m/%Y').tolist()
-
-                        cores_evolucao_semanal = {
-                            'REAL_ATUAL': '#FF2800',
-                            'REAL_M1': '#790E09',
-                            'META': '#5A6268'
-                        }
-
-                        def _rotulos_trace(serie_valor: pd.Series) -> list[str]:
-                            return [
-                                formatar_numero_brasileiro(v, 0) if pd.notna(v) and float(v) != 0 else ''
-                                for v in list(serie_valor)
-                            ]
-
-                        fig_semanal = go.Figure()
-                        fig_semanal.add_trace(go.Scatter(
-                            x=x_multicat,
-                            y=serie_atual['VALOR_FINAL'],
-                            mode='lines+markers+text',
-                            name=nome_trace_real,
-                            marker=dict(size=9, symbol='circle', color=cores_evolucao_semanal['REAL_ATUAL'], line=dict(width=1.4, color='white')),
-                            line=dict(width=3.0, color=cores_evolucao_semanal['REAL_ATUAL'], shape='spline', smoothing=1.1),
-                            text=_rotulos_trace(serie_atual['VALOR_FINAL']),
-                            textposition='top left',
-                            textfont=dict(size=11, color=cores_evolucao_semanal['REAL_ATUAL']),
-                            customdata=datas_hover,
-                            hovertemplate=f"<b>%{{customdata}}</b><br><b>{hover_real_atual}:</b> %{{y:,.0f}}<extra></extra>",
-                            cliponaxis=False
-                        ))
-                        fig_semanal.add_trace(go.Scatter(
-                            x=x_multicat,
-                            y=serie_atual['REAL_M1_DIA'],
-                            mode='lines+markers+text',
-                            name='M-1',
-                            marker=dict(size=9, symbol='circle', color=cores_evolucao_semanal['REAL_M1'], line=dict(width=1.4, color='white')),
-                            line=dict(width=3.0, color=cores_evolucao_semanal['REAL_M1'], shape='spline', smoothing=1.1),
-                            text=_rotulos_trace(serie_atual['REAL_M1_DIA']),
-                            textposition='top center',
-                            textfont=dict(size=11, color=cores_evolucao_semanal['REAL_M1']),
-                            customdata=datas_hover,
-                            hovertemplate="<b>%{customdata}</b><br><b>Realizado M-1 (Dia):</b> %{y:,.0f}<extra></extra>",
-                            cliponaxis=False
-                        ))
-                        fig_semanal.add_trace(go.Scatter(
-                            x=x_multicat,
-                            y=serie_atual['META_DIA'],
-                            mode='lines+markers+text',
-                            name='Orçamento',
-                            marker=dict(size=10, symbol='diamond', color=cores_evolucao_semanal['META'], line=dict(width=1.4, color='white')),
-                            line=dict(width=3.2, color=cores_evolucao_semanal['META'], dash='dash', shape='spline', smoothing=1.0),
-                            text=_rotulos_trace(serie_atual['META_DIA']),
-                            textposition='top right',
-                            textfont=dict(size=11, color=cores_evolucao_semanal['META']),
-                            customdata=datas_hover,
-                            hovertemplate="<b>%{customdata}</b><br><b>Orç Diaria:</b> %{y:,.0f}<extra></extra>",
-                            cliponaxis=False
-                        ))
-
-                        fig_semanal.update_layout(
-                            title=dict(text=""),
-                            height=460,
-                            showlegend=True
-                        )
-                        aplicar_estilo_visual_evolucao_semanal(
-                            fig_semanal,
-                            rotulo_mes_foco=str(mes_sem_sel).upper(),
-                            nome_serie_real=nome_trace_real,
-                            altura=460
-                        )
-
-                        total_real_mes = float(pd.to_numeric(serie_atual['VALOR_FINAL'], errors='coerce').fillna(0).sum())
-                        total_mes_anterior = float(pd.to_numeric(serie_atual['REAL_M1_DIA'], errors='coerce').fillna(0).sum())
-                        total_meta_mes = float(pd.to_numeric(serie_atual['META_DIA'], errors='coerce').fillna(0).sum())
-
-                        categorias_totais = ['M-1', 'M-0', 'ORÇ']
-                        valores_totais = [total_mes_anterior, total_real_mes, total_meta_mes]
-                        cores_totais = [
-                            cores_evolucao_semanal['REAL_M1'],
-                            cores_evolucao_semanal['REAL_ATUAL'],
-                            cores_evolucao_semanal['META']
-                        ]
-                        fig_totais_sem = criar_grafico_barras_resumo_evolucao_semanal(
-                            categorias_totais=categorias_totais,
-                            valores_totais=valores_totais,
-                            cores_totais=cores_totais,
-                            altura=460,
-                            comparacoes=[
-                                {'origem': 0, 'destino': 1},
-                                {'origem': 2, 'destino': 1}
-                            ]
-                        )
                         home_inicio_ctx["evolucao_semanal_fig"] = fig_semanal
                         home_inicio_ctx["evolucao_semanal_resumo_fig"] = fig_totais_sem
-                        home_inicio_ctx["evolucao_semanal_mes"] = str(mes_sem_sel).upper()
-                        home_inicio_ctx["evolucao_semanal_info"] = (
-                            f"Mês: {str(mes_sem_sel).upper()} | Canal: {canal_sem_sel} | "
-                            f"Produto: {produto_sem_sel} | Regional: {regional_sem_sel}"
-                        )
-
+                        home_inicio_ctx["evolucao_semanal_mes"] = str(evolucao_ctx.get("mes", "") or str(mes_sem_sel).upper())
                         if render_blocos_home_only_no_funil_movel:
                             col_evol_linha, col_evol_coluna = st.columns([2.2, 0.7], gap='medium')
                             with col_evol_linha:
@@ -24204,7 +24237,8 @@ with tab5:
                             df_mes_m1_ref: pd.DataFrame,
                             produto_ref: str,
                             titulo_tabela: str,
-                            titulo_ativacao: str
+                            titulo_ativacao: str,
+                            gerar_export: bool = False
                         ) -> tuple[str, pd.DataFrame]:
                             aliases_ped = {normalizar_texto_chave('PEDIDOS')}
                             aliases_lig = {normalizar_texto_chave('LIGACOES')}
@@ -24661,15 +24695,16 @@ with tab5:
                             lk_ativ = montar_lookup_projetado(df_ativ, df_ativ_m1, df_ativ_hist, canais_base, 'ATIV')
 
                             colunas_export = ['CANAL']
-                            for sem_exp in semanas_fixas:
+                            if gerar_export:
+                                for sem_exp in semanas_fixas:
+                                    colunas_export.extend([
+                                        f'S{sem_exp}_DOM', f'S{sem_exp}_SEG', f'S{sem_exp}_TER', f'S{sem_exp}_QUA',
+                                        f'S{sem_exp}_QUI', f'S{sem_exp}_SEX', f'S{sem_exp}_SAB', f'S{sem_exp}_TOT'
+                                    ])
                                 colunas_export.extend([
-                                    f'S{sem_exp}_DOM', f'S{sem_exp}_SEG', f'S{sem_exp}_TER', f'S{sem_exp}_QUA',
-                                    f'S{sem_exp}_QUI', f'S{sem_exp}_SEX', f'S{sem_exp}_SAB', f'S{sem_exp}_TOT'
+                                    'S2XS1', 'S3XS2', 'S4XS3', 'TEND.', 'ORÇ', 'TENDxORÇ', 'M-1', 'TENDxM-1', 'Méd. Abs', 'Méd. D.U'
                                 ])
-                            colunas_export.extend([
-                                'S2XS1', 'S3XS2', 'S4XS3', 'TEND.', 'ORÇ', 'TENDxORÇ', 'M-1', 'TENDxM-1', 'Méd. Abs', 'Méd. D.U'
-                            ])
-                            rows_export: list[dict] = []
+                            rows_export: list[dict] | None = [] if gerar_export else None
 
                             def linha_html_metrica(
                                 canal_ref: str,
@@ -24678,8 +24713,9 @@ with tab5:
                             ) -> tuple[str, dict]:
                                 vals_sem = {s: 0.0 for s in semanas_fixas}
                                 cols_sem = ""
-                                row_exp = {col: '' for col in colunas_export}
-                                row_exp['CANAL'] = canal_ref
+                                row_exp = ({col: '' for col in colunas_export} if gerar_export else None)
+                                if row_exp is not None:
+                                    row_exp['CANAL'] = canal_ref
                                 for sem in semanas_fixas:
                                     dias_sem = dias_por_semana.get(int(sem), ordem_dias)
                                     vals_dia = []
@@ -24694,10 +24730,12 @@ with tab5:
                                         if idx_dia == 0:
                                             cls_dia += " week-start"
                                         cols_sem += f'<td class="{cls_dia}">{formatar_numero_brasileiro(val_dia, 0)}</td>'
-                                        row_exp[f"S{sem}_{dia_ref.upper()}"] = formatar_numero_brasileiro(val_dia, 0)
+                                        if row_exp is not None:
+                                            row_exp[f"S{sem}_{dia_ref.upper()}"] = formatar_numero_brasileiro(val_dia, 0)
                                     vals_sem[sem] = float(sum(vals_dia))
                                     cols_sem += f'<td class="col-total-sem w{sem}">{formatar_numero_brasileiro(vals_sem[sem], 0)}</td>'
-                                    row_exp[f"S{sem}_TOT"] = formatar_numero_brasileiro(vals_sem[sem], 0)
+                                    if row_exp is not None:
+                                        row_exp[f"S{sem}_TOT"] = formatar_numero_brasileiro(vals_sem[sem], 0)
 
                                 v_s2s1 = calc_var_sem(vals_sem[1], vals_sem[2])
                                 v_s3s2 = calc_var_sem(vals_sem[2], vals_sem[3])
@@ -24708,16 +24746,17 @@ with tab5:
                                 med_abs = (float(tend_mes) / float(dias_cal_mes_ref)) if dias_cal_mes_ref > 0 else 0.0
                                 med_du = (float(tend_mes) / float(dias_uteis_mes_ref)) if dias_uteis_mes_ref > 0 else 0.0
 
-                                row_exp['S2XS1'] = fmt_pct_sem(v_s2s1)
-                                row_exp['S3XS2'] = fmt_pct_sem(v_s3s2)
-                                row_exp['S4XS3'] = fmt_pct_sem(v_s4s3)
-                                row_exp['TEND.'] = formatar_numero_brasileiro(tend_mes, 0)
-                                row_exp['ORÇ'] = formatar_numero_brasileiro(meta_mes, 0)
-                                row_exp['TENDxORÇ'] = fmt_pct_sem(var_tend_meta)
-                                row_exp['M-1'] = formatar_numero_brasileiro(m1_mes, 0)
-                                row_exp['TENDxM-1'] = fmt_pct_sem(var_tend_m1)
-                                row_exp['Méd. Abs'] = formatar_numero_brasileiro(med_abs, 1)
-                                row_exp['Méd. D.U'] = formatar_numero_brasileiro(med_du, 1)
+                                if row_exp is not None:
+                                    row_exp['S2XS1'] = fmt_pct_sem(v_s2s1)
+                                    row_exp['S3XS2'] = fmt_pct_sem(v_s3s2)
+                                    row_exp['S4XS3'] = fmt_pct_sem(v_s4s3)
+                                    row_exp['TEND.'] = formatar_numero_brasileiro(tend_mes, 0)
+                                    row_exp['ORÇ'] = formatar_numero_brasileiro(meta_mes, 0)
+                                    row_exp['TENDxORÇ'] = fmt_pct_sem(var_tend_meta)
+                                    row_exp['M-1'] = formatar_numero_brasileiro(m1_mes, 0)
+                                    row_exp['TENDxM-1'] = fmt_pct_sem(var_tend_m1)
+                                    row_exp['Méd. Abs'] = formatar_numero_brasileiro(med_abs, 1)
+                                    row_exp['Méd. D.U'] = formatar_numero_brasileiro(med_du, 1)
 
                                 html_row = (
                                     "<tr>"
@@ -24775,8 +24814,9 @@ with tab5:
                                 med_du_total = (float(tend_total) / float(dias_uteis_mes_ref)) if dias_uteis_mes_ref > 0 else 0.0
 
                                 cols_sem = ""
-                                row_exp = {col: '' for col in colunas_export}
-                                row_exp['CANAL'] = rotulo_total
+                                row_exp = ({col: '' for col in colunas_export} if gerar_export else None)
+                                if row_exp is not None:
+                                    row_exp['CANAL'] = rotulo_total
                                 for sem in semanas_fixas:
                                     dias_sem = dias_por_semana.get(int(sem), ordem_dias)
                                     for idx_dia, dia_ref in enumerate(dias_sem):
@@ -24789,20 +24829,23 @@ with tab5:
                                         if idx_dia == 0:
                                             cls_dia += " week-start"
                                         cols_sem += f'<td class="{cls_dia}">{formatar_numero_brasileiro(val_dia, 0)}</td>'
-                                        row_exp[f"S{sem}_{dia_ref.upper()}"] = formatar_numero_brasileiro(val_dia, 0)
+                                        if row_exp is not None:
+                                            row_exp[f"S{sem}_{dia_ref.upper()}"] = formatar_numero_brasileiro(val_dia, 0)
                                     cols_sem += f'<td class="col-total-sem w{sem}">{formatar_numero_brasileiro(vals_sem_total[sem], 0)}</td>'
-                                    row_exp[f"S{sem}_TOT"] = formatar_numero_brasileiro(vals_sem_total[sem], 0)
+                                    if row_exp is not None:
+                                        row_exp[f"S{sem}_TOT"] = formatar_numero_brasileiro(vals_sem_total[sem], 0)
 
-                                row_exp['S2XS1'] = fmt_pct_sem(v_s2s1)
-                                row_exp['S3XS2'] = fmt_pct_sem(v_s3s2)
-                                row_exp['S4XS3'] = fmt_pct_sem(v_s4s3)
-                                row_exp['TEND.'] = formatar_numero_brasileiro(tend_total, 0)
-                                row_exp['ORÇ'] = formatar_numero_brasileiro(meta_total, 0)
-                                row_exp['TENDxORÇ'] = fmt_pct_sem(var_tend_meta)
-                                row_exp['M-1'] = formatar_numero_brasileiro(m1_total, 0)
-                                row_exp['TENDxM-1'] = fmt_pct_sem(var_tend_m1)
-                                row_exp['Méd. Abs'] = formatar_numero_brasileiro(med_abs_total, 1)
-                                row_exp['Méd. D.U'] = formatar_numero_brasileiro(med_du_total, 1)
+                                if row_exp is not None:
+                                    row_exp['S2XS1'] = fmt_pct_sem(v_s2s1)
+                                    row_exp['S3XS2'] = fmt_pct_sem(v_s3s2)
+                                    row_exp['S4XS3'] = fmt_pct_sem(v_s4s3)
+                                    row_exp['TEND.'] = formatar_numero_brasileiro(tend_total, 0)
+                                    row_exp['ORÇ'] = formatar_numero_brasileiro(meta_total, 0)
+                                    row_exp['TENDxORÇ'] = fmt_pct_sem(var_tend_meta)
+                                    row_exp['M-1'] = formatar_numero_brasileiro(m1_total, 0)
+                                    row_exp['TENDxM-1'] = fmt_pct_sem(var_tend_m1)
+                                    row_exp['Méd. Abs'] = formatar_numero_brasileiro(med_abs_total, 1)
+                                    row_exp['Méd. D.U'] = formatar_numero_brasileiro(med_du_total, 1)
 
                                 html_row = (
                                     f'<tr class="{classe_linha}">'
@@ -24876,12 +24919,14 @@ with tab5:
                                 'linha-total-secao grupo-demanda'
                             )
                             corpo_html += html_sub_dem
-                            rows_export.append(row_sub_dem)
+                            if rows_export is not None and row_sub_dem is not None:
+                                rows_export.append(row_sub_dem)
                             for canal_dem in canais_demanda:
                                 tipo_dem = 'DEMANDA_PED' if canal_dem == 'E-Commerce' else 'DEMANDA_LIG'
                                 html_linha, row_linha = linha_html_metrica(canal_dem, lk_demanda, tipo_dem)
                                 corpo_html += html_linha
-                                rows_export.append(row_linha)
+                                if rows_export is not None and row_linha is not None:
+                                    rows_export.append(row_linha)
 
                             html_sub_vb, row_sub_vb = linha_html_total_secao(
                                 'VENDA BRUTA',
@@ -24891,11 +24936,13 @@ with tab5:
                                 'linha-total-secao grupo-vb'
                             )
                             corpo_html += html_sub_vb
-                            rows_export.append(row_sub_vb)
+                            if rows_export is not None and row_sub_vb is not None:
+                                rows_export.append(row_sub_vb)
                             for canal_ref in canais_vb_ativ:
                                 html_linha, row_linha = linha_html_metrica(canal_ref, lk_vb, 'VB')
                                 corpo_html += html_linha
-                                rows_export.append(row_linha)
+                                if rows_export is not None and row_linha is not None:
+                                    rows_export.append(row_linha)
 
                             html_sub_ativ, row_sub_ativ = linha_html_total_secao(
                                 titulo_ativacao,
@@ -24905,11 +24952,13 @@ with tab5:
                                 'linha-total-secao grupo-ativ'
                             )
                             corpo_html += html_sub_ativ
-                            rows_export.append(row_sub_ativ)
+                            if rows_export is not None and row_sub_ativ is not None:
+                                rows_export.append(row_sub_ativ)
                             for canal_ref in canais_vb_ativ:
                                 html_linha, row_linha = linha_html_metrica(canal_ref, lk_ativ, 'ATIV')
                                 corpo_html += html_linha
-                                rows_export.append(row_linha)
+                                if rows_export is not None and row_linha is not None:
+                                    rows_export.append(row_linha)
 
                             table_id = f"tabela-analitico-resumo-semanal-{produto_ref.lower()}"
                             css = f"""
@@ -25170,7 +25219,11 @@ with tab5:
                               </table>
                             </div>
                             """
-                            df_out_export = pd.DataFrame(rows_export, columns=colunas_export)
+                            df_out_export = (
+                                pd.DataFrame(rows_export, columns=colunas_export)
+                                if rows_export is not None
+                                else pd.DataFrame()
+                            )
                             return html_out, df_out_export
 
                         @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
@@ -25197,10 +25250,6 @@ with tab5:
                         df_resumo_sem['DESAFIO_QTD'] = pd.to_numeric(df_resumo_sem.get('DESAFIO_QTD', 0), errors='coerce').fillna(0.0)
                         df_resumo_sem['TEND_QTD'] = pd.to_numeric(df_resumo_sem.get('TEND_QTD', 0), errors='coerce').fillna(0.0)
                         df_resumo_sem['CANAL_RESUMO'] = df_resumo_sem['CANAL_PLAN'].apply(normalizar_canal_resumo_sem)
-                        if str(regional_sem_sel).strip() != 'Todas':
-                            df_resumo_sem = df_resumo_sem[
-                                df_resumo_sem['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
-                            ].copy()
                         df_resumo_sem = df_resumo_sem[df_resumo_sem['CANAL_RESUMO'].isin(canais_base)].copy()
                         df_resumo_sem['SEMANA_IDX'] = df_resumo_sem['DATA_DIA'].map(semana_map_atual)
                         df_resumo_sem = df_resumo_sem[df_resumo_sem['SEMANA_IDX'].notna()].copy()
@@ -25218,10 +25267,6 @@ with tab5:
                         df_resumo_sem_m1['DESAFIO_QTD'] = pd.to_numeric(df_resumo_sem_m1.get('DESAFIO_QTD', 0), errors='coerce').fillna(0.0)
                         df_resumo_sem_m1['TEND_QTD'] = pd.to_numeric(df_resumo_sem_m1.get('TEND_QTD', 0), errors='coerce').fillna(0.0)
                         df_resumo_sem_m1['CANAL_RESUMO'] = df_resumo_sem_m1['CANAL_PLAN'].apply(normalizar_canal_resumo_sem)
-                        if str(regional_sem_sel).strip() != 'Todas':
-                            df_resumo_sem_m1 = df_resumo_sem_m1[
-                                df_resumo_sem_m1['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
-                            ].copy()
                         df_resumo_sem_m1 = df_resumo_sem_m1[df_resumo_sem_m1['CANAL_RESUMO'].isin(canais_base)].copy()
                         df_resumo_sem_m1['SEMANA_IDX'] = df_resumo_sem_m1['DATA_DIA'].map(semana_map_m1)
                         df_resumo_sem_m1 = df_resumo_sem_m1[df_resumo_sem_m1['SEMANA_IDX'].notna()].copy()
@@ -25296,35 +25341,42 @@ with tab5:
                                 semana_map_m1,
                                 dia_map_m1
                             )
-                        if str(regional_sem_sel).strip() != 'Todas':
-                            df_lig_demanda_sem = df_lig_demanda_sem[
-                                df_lig_demanda_sem['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
-                            ].copy()
-                            df_lig_demanda_sem_m1 = df_lig_demanda_sem_m1[
-                                df_lig_demanda_sem_m1['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_sem_norm3)
-                            ].copy()
+                        def _montar_ctx_resumo_semanal_home():
+                            html_tabela_conta_local, _ = construir_tabela_resumo_semanal(
+                                df_mes_ref=df_resumo_sem,
+                                df_mes_m1_ref=df_resumo_sem_m1,
+                                produto_ref='CONTA',
+                                titulo_tabela='CONTA',
+                                titulo_ativacao='ATIVADOS',
+                                gerar_export=False
+                            )
+                            html_tabela_fixa_local, _ = construir_tabela_resumo_semanal(
+                                df_mes_ref=df_resumo_sem,
+                                df_mes_m1_ref=df_resumo_sem_m1,
+                                produto_ref='FIXA',
+                                titulo_tabela='FIXA',
+                                titulo_ativacao='INSTALADOS',
+                                gerar_export=False
+                            )
+                            return {
+                                "conta": html_tabela_conta_local,
+                                "fixa": html_tabela_fixa_local,
+                            }
 
-                        html_tabela_conta, df_export_conta = construir_tabela_resumo_semanal(
-                            df_mes_ref=df_resumo_sem,
-                            df_mes_m1_ref=df_resumo_sem_m1,
-                            produto_ref='CONTA',
-                            titulo_tabela='CONTA',
-                            titulo_ativacao='ATIVADOS'
+                        resumo_semanal_ctx = obter_cache_session_dashboard(
+                            "home_resumo_semanal_html_v3",
+                            (
+                                "resumo_semanal",
+                                file_mtime,
+                                lig_demanda_mtime,
+                                str(mes_sem_sel).strip().lower(),
+                            ),
+                            _montar_ctx_resumo_semanal_home
                         )
+                        html_tabela_conta = str(resumo_semanal_ctx.get("conta", "") or "")
+                        html_tabela_fixa = str(resumo_semanal_ctx.get("fixa", "") or "")
                         home_inicio_ctx["resumo_semanal_conta"] = html_tabela_conta
-
-                        html_tabela_fixa, df_export_fixa = construir_tabela_resumo_semanal(
-                            df_mes_ref=df_resumo_sem,
-                            df_mes_m1_ref=df_resumo_sem_m1,
-                            produto_ref='FIXA',
-                            titulo_tabela='FIXA',
-                            titulo_ativacao='INSTALADOS'
-                        )
                         home_inicio_ctx["resumo_semanal_fixa"] = html_tabela_fixa
-                        home_inicio_ctx["resumo_semanal_info"] = (
-                            f"Mês: {str(mes_sem_sel).upper()} | Canal: {canal_sem_sel} | "
-                            f"Produto: {produto_sem_sel} | Regional: {regional_sem_sel}"
-                        )
                         if render_blocos_home_only_no_funil_movel:
                             st.markdown(
                                 build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
@@ -25970,11 +26022,8 @@ with tab5:
             if qtd_renderizadas == 0:
                 if render_blocos_home_only_no_funil_movel:
                     st.warning("Sem dados para os filtros selecionados.")
-            else:
-                home_inicio_ctx["regional_info"] = f"Mês: {str(mes_reg_sel).upper()} | Canal: {canal_reg_sel}"
-
-
         if tab_inicio_ativa and tem_meses_analitico:
+            base_necessidade_diaria = preparar_base_necessidade_diaria(base_analitica)
             if render_blocos_home_only_no_funil_movel:
                 st.markdown(
                     build_visual_title_html(
@@ -26032,26 +26081,29 @@ with tab5:
                 )
 
             def _montar_ctx_necessidade_home():
-                html_conta_local, _ctx_conta_local = criar_tabela_html_necessidade_diaria_produto(
-                    df_base=base_analitica,
+                html_conta_local, _ = criar_tabela_html_necessidade_diaria_produto(
+                    df_base=base_necessidade_diaria,
                     mes_ref=mes_analitico,
                     regional_ref=regional_analitico,
                     canal_ref=canal_analitico,
                     produto_ref='CONTA',
-                    table_id="tabela-analitico-necessidade-conta"
+                    table_id="tabela-analitico-necessidade-conta",
+                    base_preparada=True,
+                    incluir_ctx=False
                 )
-                html_fixa_local, _ctx_fixa_local = criar_tabela_html_necessidade_diaria_produto(
-                    df_base=base_analitica,
+                html_fixa_local, _ = criar_tabela_html_necessidade_diaria_produto(
+                    df_base=base_necessidade_diaria,
                     mes_ref=mes_analitico,
                     regional_ref=regional_analitico,
                     canal_ref=canal_analitico,
                     produto_ref='FIXA',
-                    table_id="tabela-analitico-necessidade-fixa"
+                    table_id="tabela-analitico-necessidade-fixa",
+                    base_preparada=True,
+                    incluir_ctx=False
                 )
                 return {
                     "conta": html_conta_local,
-                    "fixa": html_fixa_local,
-                    "info": f"Mês: {str(mes_analitico).upper()} | Regional: {regional_analitico} | Canal: {canal_analitico}"
+                    "fixa": html_fixa_local
                 }
 
             necessidade_ctx = obter_cache_session_dashboard(
@@ -26080,7 +26132,6 @@ with tab5:
 
             html_fixa = str(necessidade_ctx.get("fixa", "") or "")
             home_inicio_ctx["necessidade_fixa"] = html_fixa
-            home_inicio_ctx["necessidade_info"] = str(necessidade_ctx.get("info", "") or "")
 
             if not html_fixa:
                 if render_blocos_home_only_no_funil_movel:
@@ -26585,51 +26636,55 @@ with tab0:
             build_visual_title_html("RESUMO SEMANAL", "grid", "subsection-title", extra_style="margin-top:14px;"),
             unsafe_allow_html=True
         )
-        if meses_sem_home and canais_sem_home and produtos_sem_home and regionais_sem_home:
-            canal_home_default = st.session_state.get(
-                "analitico_evolucao_semanal_canal",
-                obter_opcao_preferida_dashboard(canais_sem_home, "E-Commerce")
+        if meses_sem_home:
+            mes_resumo_home_default = st.session_state.get(
+                "analitico_evolucao_semanal_mes",
+                meses_sem_home[-1]
             )
-            produto_home_default = st.session_state.get(
-                "analitico_evolucao_semanal_produto",
-                obter_opcao_preferida_dashboard(produtos_sem_home, "FIXA")
-            )
-            col_home_res_sem_f1, col_home_res_sem_f2, col_home_res_sem_f3, col_home_res_sem_f4 = st.columns([1, 1, 1, 1])
+            col_home_res_sem_f1, col_home_res_sem_f2 = st.columns([1.15, 2.85], gap="medium")
             with col_home_res_sem_f1:
                 render_home_synced_selectbox(
-                    "SELECIONE O MÊS",
+                    "SELECIONE O MÊS PARA ANÁLISE",
                     "Mês do resumo semanal na capa",
                     meses_sem_home,
                     "analitico_evolucao_semanal_mes",
                     "home_resumo_semanal_mes_widget",
-                    default_value=st.session_state.get("analitico_evolucao_semanal_mes", meses_sem_home[-1])
+                    default_value=mes_resumo_home_default
                 )
+            mes_resumo_home_sel = st.session_state.get(
+                "analitico_evolucao_semanal_mes",
+                mes_resumo_home_default
+            )
+            mes_resumo_home_m1 = get_mes_anterior(mes_resumo_home_sel)
             with col_home_res_sem_f2:
-                render_home_synced_selectbox(
-                    "CANAL",
-                    "Canal do resumo semanal na capa",
-                    canais_sem_home,
-                    "analitico_evolucao_semanal_canal",
-                    "home_resumo_semanal_canal_widget",
-                    default_value=canal_home_default
-                )
-            with col_home_res_sem_f3:
-                render_home_synced_selectbox(
-                    "PRODUTO",
-                    "Produto do resumo semanal na capa",
-                    produtos_sem_home,
-                    "analitico_evolucao_semanal_produto",
-                    "home_resumo_semanal_produto_widget",
-                    default_value=produto_home_default
-                )
-            with col_home_res_sem_f4:
-                render_home_synced_selectbox(
-                    "REGIONAL",
-                    "Regional do resumo semanal na capa",
-                    regionais_sem_home,
-                    "analitico_evolucao_semanal_regional",
-                    "home_resumo_semanal_regional_widget",
-                    default_value=st.session_state.get("analitico_evolucao_semanal_regional", regionais_sem_home[0])
+                st.markdown(
+                    f"""
+                    <div class="info-box" style="margin: 21px 0 0 0; padding: 9px 14px; min-height: 38px; display: flex; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: nowrap; height: 100%;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 13px; color: #333333; font-weight: 600;">Mês Atual:</span>
+                                <span style="font-size: 14px; color: #FF2800; font-weight: 800; background: rgba(255, 40, 0, 0.1); padding: 6px 15px; border-radius: 20px;">
+                                    {mes_resumo_home_sel}
+                                </span>
+                            </div>
+                            <div style="width: 1px; height: 30px; background: #E9ECEF;"></div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 13px; color: #333333; font-weight: 600;">M-1:</span>
+                                <span style="font-size: 14px; color: #790E09; font-weight: 700; background: rgba(121, 14, 9, 0.1); padding: 6px 15px; border-radius: 20px;">
+                                    {mes_resumo_home_m1}
+                                </span>
+                            </div>
+                            <div style="width: 1px; height: 30px; background: #E9ECEF;"></div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 13px; color: #333333; font-weight: 600;">Comparativo:</span>
+                                <span style="font-size: 13px; color: #666666; font-weight: 600;">
+                                    MoM (Mês sobre Mês)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
                 )
         html_resumo_conta_home = home_inicio_ctx.get("resumo_semanal_conta", "")
         html_resumo_fixa_home = home_inicio_ctx.get("resumo_semanal_fixa", "")
