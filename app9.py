@@ -11856,15 +11856,11 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id}-container {{
         width: 100%;
         overflow-x: auto;
-        border: 1px solid rgba(121,14,9,0.74);
-        border-radius: 4px;
-        box-shadow:
-            0 16px 34px rgba(90,10,6,0.13),
-            0 3px 10px rgba(15,23,42,0.07),
-            inset 0 0 0 1px rgba(255,255,255,0.92);
+        border: 2px solid #790E09;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
         margin: 10px 0 6px 0;
-        background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-        font-family: 'Manrope', 'Segoe UI', sans-serif;
+        background: #FFFFFF;
     }}
     table.{table_id} {{
         border-collapse: collapse;
@@ -11874,8 +11870,6 @@ def criar_tabela_html_necessidade_diaria_produto(
         table-layout: fixed;
         font-size: clamp(8.8px, 0.70vw, 10.4px);
         line-height: 1.04;
-        font-family: 'Manrope', 'Segoe UI', sans-serif;
-        font-variant-numeric: tabular-nums;
     }}
     .{table_id} thead th {{
         background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
@@ -11883,37 +11877,28 @@ def criar_tabela_html_necessidade_diaria_produto(
         padding: 5px 3px;
         text-align: center;
         font-weight: 800;
-        letter-spacing: 0.20px;
-        border-right: 1px solid rgba(255,255,255,0.22);
-        border-bottom: 1px solid rgba(61,7,4,0.92);
+        letter-spacing: 0.15px;
+        border-right: 1px solid rgba(255,255,255,0.88);
         white-space: normal;
         line-height: 1.0;
         font-size: clamp(8.2px, 0.66vw, 10.2px);
-        text-transform: uppercase;
-        text-shadow: 0 1px 0 rgba(0,0,0,0.18);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
     }}
     .{table_id} thead th.th-semana {{
         background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
-        border-bottom: 1px solid rgba(255,255,255,0.22);
+        border-bottom: 2px solid rgba(255,255,255,0.22);
         font-size: clamp(8.6px, 0.70vw, 10.8px);
-        box-shadow: inset 0 -2px 0 rgba(255,40,0,0.24);
     }}
     .{table_id} thead th.th-dia-tot {{
         background: linear-gradient(135deg, #B23A31 0%, #8F1B14 100%) !important;
-        box-shadow: inset 0 -2px 0 rgba(255,255,255,0.16);
     }}
     .{table_id} thead th.th-total-mes {{
         background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%) !important;
-        box-shadow: inset 0 -2px 0 rgba(255,40,0,0.32);
     }}
     .{table_id} thead th.th-dia.th-dia-real {{
         background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
     }}
     .{table_id} thead th.th-dia.th-dia-tend {{
         background: linear-gradient(135deg, #B7443B 0%, #8F241D 100%) !important;
-        color: #FFFFFF !important;
-        box-shadow: inset 0 -2px 0 rgba(255,255,255,0.14);
     }}
     .{table_id} thead tr:nth-child(2) th {{
         font-size: clamp(7.8px, 0.60vw, 9.6px);
@@ -11921,31 +11906,30 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id} tbody td {{
         padding: 4px 3px;
         text-align: center;
-        border-bottom: 1px solid rgba(121,14,9,0.07);
-        border-right: 1px solid rgba(121,14,9,0.055);
+        border-bottom: 1px solid #FFFFFF;
+        border-right: 1px solid #FFFFFF;
         color: #2F3747;
-        font-weight: 550;
+        font-weight: 400;
         font-size: clamp(8.5px, 0.66vw, 10px);
         vertical-align: bottom;
         white-space: nowrap;
     }}
     .{table_id} tbody td.col-linha {{
         text-align: left;
-        padding-left: 8px;
-        font-weight: 800;
+        padding-left: 5px;
+        font-weight: 600;
         line-height: 1.05;
         position: sticky;
         left: 0;
         z-index: 5;
         background: transparent !important;
         white-space: nowrap;
-        box-shadow: inset 3px 0 0 rgba(255,40,0,0.26), 4px 0 10px rgba(90,10,6,0.025);
     }}
     .{table_id} tbody td.col-dia {{
         background: transparent !important;
     }}
     .{table_id} tbody td.col-dia.week-start {{
-        border-left: 1px solid rgba(121,14,9,0.20);
+        border-left: 1px solid #FFFFFF;
     }}
     .{table_id} tbody td.col-dia.dia-fds {{
         background: transparent !important;
@@ -11954,61 +11938,50 @@ def criar_tabela_html_necessidade_diaria_produto(
         background: transparent !important;
     }}
     .{table_id} tbody td.col-dia.dia-futuro {{
-        color: #64748B;
-        font-style: italic;
+        background: transparent !important;
     }}
     .{table_id} tbody td.col-total-sem {{
-        background: linear-gradient(180deg, #F3F5F7 0%, #E9EDF1 100%) !important;
+        background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
         color: #1F2937;
-        font-weight: 850;
-        box-shadow: inset 2px 0 0 rgba(100,116,139,0.24);
+        font-weight: 600;
     }}
     .{table_id} tbody td.col-total-mes {{
-        background: linear-gradient(180deg, #FFF0ED 0%, #F8D9D4 100%) !important;
-        color: #6B1F1A;
-        font-weight: 900;
-        box-shadow: inset 3px 0 0 rgba(255,40,0,0.28);
+        background: linear-gradient(180deg, rgba(47, 55, 71, 0.075) 0%, rgba(47, 55, 71, 0.03) 100%) !important;
+        color: #1F2937;
+        font-weight: 700;
     }}
     .{table_id} tbody td.col-pct {{
         color: #374151;
-        font-weight: 850;
-        background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
-        box-shadow: none;
+        font-weight: 600;
+        background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
     }}
     .{table_id} tbody td.col-pct.pct-positivo {{
         color: #1B5E20 !important;
-        background: linear-gradient(180deg, #F2FAF4 0%, #EAF6EE 100%) !important;
-        box-shadow: none;
     }}
     .{table_id} tbody td.col-pct.pct-negativo {{
         color: #B71C1C !important;
-        background: linear-gradient(180deg, #FFF3F1 0%, #FBE4E0 100%) !important;
-        box-shadow: none;
     }}
     .{table_id} tbody td.col-pct.pct-neutro {{
         color: #475569 !important;
-        background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
-        box-shadow: none;
     }}
     .{table_id} tbody tr.linha-grupo td {{
-        background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+        background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
         color: #FFFFFF !important;
         text-align: left !important;
-        font-weight: 900;
+        font-weight: 800;
         letter-spacing: 0.3px;
         padding: 6px 8px !important;
-        border-top: 1px solid rgba(255,255,255,0.18) !important;
-        border-bottom: 1px solid rgba(61,7,4,0.92) !important;
-        box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
+        border-top: 1px solid #FFFFFF !important;
+        border-bottom: 1px solid #FFFFFF !important;
     }}
     .{table_id} tbody tr.linha-projecao td {{
-        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-realizado td {{
-        background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
     }}
     .{table_id} tbody tr.linha-ating td {{
-        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-projecao td.col-linha,
     .{table_id} tbody tr.linha-projecao td.col-dia,
@@ -12021,29 +11994,21 @@ def criar_tabela_html_necessidade_diaria_produto(
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-util,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro,
     .{table_id} tbody tr.linha-ating td.col-linha {{
-        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     .{table_id} tbody tr.linha-realizado td.col-linha,
     .{table_id} tbody tr.linha-realizado td.col-dia,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-fds,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-util,
     .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro {{
-        background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
     }}
     .{table_id} tbody tr.linha-ating td.col-linha,
     .{table_id} tbody tr.linha-ating td.col-dia,
     .{table_id} tbody tr.linha-ating td.col-dia.dia-fds,
     .{table_id} tbody tr.linha-ating td.col-dia.dia-util,
     .{table_id} tbody tr.linha-ating td.col-dia.dia-futuro {{
-        background: linear-gradient(180deg, #FCFCFD 0%, #F7F8FA 100%) !important;
-    }}
-    .{table_id} tbody tr.linha-projecao td.col-dia.dia-futuro,
-    .{table_id} tbody tr.linha-realizado td.col-dia.dia-futuro,
-    .{table_id} tbody tr.linha-ating td.col-dia.dia-futuro {{
-        background: linear-gradient(180deg, #F6F8FA 0%, #EEF1F4 100%) !important;
-    }}
-    .{table_id} tbody tr:not(.linha-grupo):hover td {{
-        filter: brightness(0.985);
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
     }}
     @media (max-width: 1600px) {{
         table.{table_id} {{ min-width: 100%; }}
@@ -12706,7 +12671,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     if total_colunas == 1:
         larguras_colunas = [100.0]
     else:
-        largura_canal_pct = 24.0
+        largura_canal_pct = 22.0
         largura_num_pct = (100.0 - largura_canal_pct) / float(total_colunas - 1)
         larguras_colunas = [largura_canal_pct] + [largura_num_pct] * (total_colunas - 1)
     colgroup_html = "<colgroup>" + "".join(
@@ -12720,37 +12685,26 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     html = f"""
     <style>
         #{table_id}.tabela-container-resultado-canais {{
-            position: relative;
-            isolation: isolate;
             width: 100%;
             max-height: 500px;
             overflow-y: auto;
             overflow-x: auto;
-            border: 1px solid rgba(121,14,9,0.72);
-            border-radius: 4px;
-            box-shadow:
-                0 18px 38px rgba(90,10,6,0.14),
-                0 4px 12px rgba(15,23,42,0.07),
-                inset 0 0 0 1px rgba(255,255,255,0.92),
-                inset 0 0 0 5px rgba(121,14,9,0.025);
+            border: 2px solid #790E09;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(121, 14, 9, 0.14);
             font-family: 'Manrope', 'Segoe UI', sans-serif;
-            margin: 8px 0 16px 0;
-            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-        }}
-        #{table_id}.tabela-container-resultado-canais::before {{
-            content: none;
-            display: none;
+            margin: 10px 0 18px 0;
+            background: #FFFFFF;
         }}
         #{table_id} .tabela-resultado-canais {{
             width: 100%;
             min-width: 100%;
-            border-collapse: separate;
+            border-collapse: collapse;
             border-spacing: 0;
-            font-size: clamp(10.2px, 0.76vw, 11.6px);
-            line-height: 1.16;
+            font-size: 10px;
+            line-height: 1.14;
             table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
-            background: #FFFFFF;
         }}
         #{table_id} .tabela-resultado-canais thead {{
             position: sticky;
@@ -12758,287 +12712,162 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             z-index: 100;
         }}
         #{table_id} .tabela-resultado-canais th {{
-            background: linear-gradient(180deg, #790E09 0%, #4E0805 100%) !important;
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
             color: #FFFFFF !important;
-            font-weight: 800;
-            padding: 9px 6px;
+            font-weight: 700;
+            padding: 5px 5px;
             text-align: center;
             vertical-align: middle !important;
-            border-bottom: 1px solid rgba(61,7,4,0.90);
-            border-right: 1px solid rgba(255,255,255,0.20);
+            border-bottom: 3px solid #5A0A06;
+            border-right: 1px solid #FFFFFF;
             white-space: normal;
             overflow: visible;
             text-overflow: clip;
             overflow-wrap: break-word;
             word-break: normal;
             text-transform: uppercase;
-            letter-spacing: 0.36px;
-            line-height: 1.08;
-            font-size: clamp(9.2px, 0.68vw, 10.7px);
-            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
-        }}
-        #{table_id} .tabela-resultado-canais thead th:first-child {{
-            border-top-left-radius: 3px;
-        }}
-        #{table_id} .tabela-resultado-canais thead th:last-child {{
-            border-top-right-radius: 3px;
-        }}
-        #{table_id} .tabela-resultado-canais th:first-child {{
-            position: sticky;
-            left: 0;
-            z-index: 130;
-            background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%) !important;
-            text-align: left;
-            padding-left: 10px;
+            letter-spacing: 0.3px;
+            line-height: 1.2;
+            font-size: 9px;
         }}
         #{table_id} .tabela-resultado-canais th.col-var {{
             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais th.col-meta {{
-            background: linear-gradient(180deg, #A23B36 0%, #790E09 100%) !important;
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais td {{
-            padding: 8px 7px;
+            padding: 6px 5px 4px 5px;
             text-align: right;
-            vertical-align: middle !important;
-            border-bottom: 1px solid rgba(121,14,9,0.07);
-            border-right: 1px solid rgba(121,14,9,0.06);
-            font-weight: 600;
+            vertical-align: bottom !important;
+            border-bottom: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+            font-weight: 400;
             font-variant-numeric: tabular-nums;
-            color: #2F3747;
-            font-size: clamp(10px, 0.74vw, 11.4px);
+            color: #1F2937;
+            font-size: 10px;
             line-height: 1.16;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }}
-        #{table_id} .tabela-resultado-canais tbody td .valor-numero {{
-            font-weight: 650;
-            letter-spacing: -0.01em;
+        #{table_id} .tabela-resultado-canais tbody td,
+        #{table_id} .tabela-resultado-canais tbody td * {{
+            font-weight: 400 !important;
+        }}
+        #{table_id} .tabela-resultado-canais tbody tr td {{
+            vertical-align: bottom !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-canal {{
-            position: sticky;
-            left: 0;
-            z-index: 8;
             text-align: left;
             color: #2F3747;
-            padding-left: 10px;
+            background: transparent !important;
+            padding-left: 6px;
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: break-word;
             overflow: visible;
             text-overflow: clip;
-            box-shadow: 5px 0 12px rgba(90,10,6,0.035);
-        }}
-        #{table_id} .canal-label-resultado {{
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: #2F3747;
-            font-weight: 800;
-            letter-spacing: -0.01em;
-            line-height: 1.12;
-        }}
-        #{table_id} .canal-label-resultado::before {{
-            content: "";
-            flex: 0 0 auto;
-            width: 8px;
-            height: 18px;
-            border-left: 3px solid #FF2800;
-            border-top: 1px solid rgba(121,14,9,0.24);
-            border-bottom: 1px solid rgba(121,14,9,0.24);
-            border-radius: 1px;
-            background: linear-gradient(90deg, rgba(255,40,0,0.10) 0%, rgba(255,40,0,0.00) 100%);
-            box-shadow: inset 1px 0 0 rgba(255,255,255,0.80);
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par td {{
-            background: #FFFFFF !important;
+            background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-impar td {{
-            background: #FFF7F6 !important;
-        }}
-        #{table_id} .linha-canal-resultado.linha-zebra-par td.col-canal {{
-            background: #FFFFFF !important;
-        }}
-        #{table_id} .linha-canal-resultado.linha-zebra-impar td.col-canal {{
-            background: #FFF7F6 !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par:hover,
         #{table_id} .linha-canal-resultado.linha-zebra-impar:hover {{
-            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12);
         }}
         #{table_id} .linha-canal-resultado.linha-zebra-par:hover td,
         #{table_id} .linha-canal-resultado.linha-zebra-impar:hover td {{
-            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
-        }}
-        #{table_id} .linha-canal-resultado.linha-zebra-par:hover td:first-child,
-        #{table_id} .linha-canal-resultado.linha-zebra-impar:hover td:first-child {{
-            box-shadow: inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.04);
-        }}
-        #{table_id} .linha-canal-resultado td:first-child {{
-            border-left: 1px solid rgba(121,14,9,0.06);
-        }}
-        #{table_id} .linha-canal-resultado td:last-child {{
-            border-right: 1px solid rgba(121,14,9,0.06);
-        }}
-        #{table_id} .linha-canal-resultado:last-child td:first-child {{
-            border-bottom-left-radius: 3px;
-        }}
-        #{table_id} .linha-canal-resultado:last-child td:last-child {{
-            border-bottom-right-radius: 3px;
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-meta {{
-            background: linear-gradient(180deg, #FFF3F0 0%, #F8E4E1 100%) !important;
+            background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
             color: #6B1F1A;
-            font-weight: 800;
-            border-left: 1px solid rgba(121,14,9,0.07) !important;
-            border-right: 1px solid rgba(121,14,9,0.07) !important;
+            font-weight: 600;
+            border-left: 1px solid rgba(121, 14, 9, 0.08) !important;
+            border-right: 1px solid rgba(121, 14, 9, 0.08) !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-var {{
             position: relative;
-            padding: 6px 5px !important;
-            background: #FBF1EF !important;
-            border-left: 1px solid rgba(121,14,9,0.06) !important;
-            border-right: 1px solid rgba(121,14,9,0.06) !important;
-            text-align: center;
-        }}
-        #{table_id} .tabela-resultado-canais td.col-meta .valor-numero {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: flex-end;
-            min-width: 52px;
-            padding: 2px 6px;
-            border-radius: 3px;
-            background: rgba(255,255,255,0.58);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
-        }}
-        #{table_id} .var-pill-resultado {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 58px;
-            padding: 3px 7px;
-            border-radius: 3px;
-            font-size: clamp(9px, 0.66vw, 10px);
-            line-height: 1.0;
-            font-weight: 850;
-            letter-spacing: -0.01em;
-            border: 1px solid rgba(107,31,26,0.11);
-            background: rgba(255,255,255,0.86);
-            box-shadow: 0 1px 3px rgba(90,10,6,0.05), inset 0 1px 0 rgba(255,255,255,0.96);
+            padding-left: 13px !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
+            border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-positivo {{
             color: #1B5E20 !important;
-            background: #FBF1EF !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
             font-weight: 700;
         }}
-        #{table_id} .tabela-resultado-canais td.col-var.status-positivo .var-pill-resultado::before {{
-            content: "▲ ";
+        #{table_id} .tabela-resultado-canais td.col-var.status-positivo::before {{
+            content: "▲";
+            position: absolute;
+            left: 4px;
+            top: 50%;
+            transform: translateY(-50%);
             color: #2E7D32;
             font-size: 8px;
-            margin-right: 2px;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-negativo {{
             color: #B71C1C !important;
-            background: #FBF1EF !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
             font-weight: 700;
         }}
-        #{table_id} .tabela-resultado-canais td.col-var.status-negativo .var-pill-resultado::before {{
-            content: "▼ ";
+        #{table_id} .tabela-resultado-canais td.col-var.status-negativo::before {{
+            content: "▼";
+            position: absolute;
+            left: 4px;
+            top: 50%;
+            transform: translateY(-50%);
             color: #C62828;
             font-size: 8px;
-            margin-right: 2px;
         }}
         #{table_id} .tabela-resultado-canais td.col-var.status-neutro {{
             color: #666666 !important;
-            background: #FBF1EF !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
             font-weight: 500;
-        }}
-        #{table_id} .tabela-resultado-canais td.col-var.status-positivo .var-pill-resultado {{
-            border-color: rgba(27,94,32,0.18);
-            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(238,249,242,0.92) 100%);
-        }}
-        #{table_id} .tabela-resultado-canais td.col-var.status-negativo .var-pill-resultado {{
-            border-color: rgba(183,28,28,0.18);
-            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,238,236,0.92) 100%);
-        }}
-        #{table_id} .tabela-resultado-canais td.col-var.status-neutro .var-pill-resultado {{
-            border-color: rgba(100,116,139,0.18);
-            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.92) 100%);
         }}
         #{table_id} .linha-total-resultado {{
             position: sticky;
-            /* Alinha o sticky da linha total com a altura real do header para
-               evitar sobreposição visual na primeira linha de canal. */
-            top: 34px;
+            top: 28px;
             z-index: 95;
             border-bottom: 2px solid #790E09;
         }}
         #{table_id} .tabela-resultado-canais tbody tr.linha-canal-resultado td {{
             min-height: 24px;
             padding-top: 7px !important;
-            padding-bottom: 7px !important;
+            padding-bottom: 3px !important;
         }}
         #{table_id} .linha-total-resultado td {{
-            background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
             color: #FFFFFF !important;
-            font-weight: 900;
-            border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
-            border-top: 1px solid rgba(255,255,255,0.24) !important;
-            border-bottom: 1px solid rgba(61,7,4,0.92) !important;
-            padding: 9px 6px !important;
-            font-size: clamp(10.2px, 0.76vw, 11.8px);
-            vertical-align: middle !important;
-            text-transform: uppercase;
+            font-weight: 700;
+            border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+            padding: 6px 5px 4px 5px !important;
+            font-size: 10px;
+            vertical-align: bottom !important;
         }}
         #{table_id} .linha-total-resultado td.col-canal {{
-            background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
             z-index: 80;
-        }}
-        #{table_id} .linha-total-resultado td:first-child {{
-            box-shadow: inset 4px 0 0 rgba(255,40,0,0.52);
-        }}
-        #{table_id} .linha-total-resultado .valor-numero {{
-            display: inline-flex !important;
-            align-items: center;
-            justify-content: flex-end;
-            min-width: 58px !important;
-            padding: 2px 7px !important;
-            border-radius: 3px !important;
-            color: #FFFFFF !important;
-            background: rgba(255,255,255,0.18) !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.26);
-            font-weight: 900 !important;
-            letter-spacing: -0.01em;
-            text-shadow: 0 1px 1px rgba(0,0,0,0.28);
         }}
         #{table_id} .linha-total-resultado td.col-meta,
         #{table_id} .linha-total-resultado td.col-var.status-positivo,
         #{table_id} .linha-total-resultado td.col-var.status-negativo,
         #{table_id} .linha-total-resultado td.col-var.status-neutro {{
-            background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
             color: #FFFFFF !important;
         }}
         #{table_id} .linha-total-resultado td.col-var::before {{
             content: "" !important;
         }}
-        #{table_id} .linha-total-resultado .var-pill-resultado {{
-            color: #FFFFFF !important;
-            border-color: rgba(255,255,255,0.58);
-            background: rgba(255,255,255,0.24);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.22);
-            text-shadow: 0 1px 1px rgba(0,0,0,0.35);
-            min-width: 64px;
-        }}
         #{table_id} .linha-total-resultado td.col-var.status-positivo::before,
         #{table_id} .linha-total-resultado td.col-var.status-negativo::before,
         #{table_id} .linha-total-resultado td.col-var.status-neutro::before {{
-            content: "" !important;
-        }}
-        #{table_id} .linha-total-resultado td.col-var.status-positivo .var-pill-resultado::before,
-        #{table_id} .linha-total-resultado td.col-var.status-negativo .var-pill-resultado::before {{
             content: "" !important;
         }}
     </style>
@@ -13073,15 +12902,9 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         for col_idx, col in enumerate(colunas):
             valor_fmt = escape(str(row[col]))
             classes = []
-            valor_html = f'<span class="valor-numero">{valor_fmt}</span>'
 
             if col == col_canal:
                 classes.append("col-canal")
-                valor_html = (
-                    valor_fmt
-                    if is_total
-                    else f'<span class="canal-label-resultado">{valor_fmt}</span>'
-                )
             elif col == col_meta:
                 classes.append("col-meta")
             elif col in {col_mom, col_var}:
@@ -13096,14 +12919,9 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
                         classes.append("status-neutro")
                 except Exception:
                     classes.append("status-neutro")
-                valor_html = (
-                    f'<span class="valor-numero">{valor_fmt}</span>'
-                    if is_total
-                    else f'<span class="var-pill-resultado">{valor_fmt}</span>'
-                )
 
             classe_celula = " ".join(classes)
-            html += f'<td class="{classe_celula}">{valor_html}</td>'
+            html += f'<td class="{classe_celula}">{valor_fmt}</td>'
 
         html += "</tr>"
 
@@ -13900,15 +13718,10 @@ def criar_tabela_html_funil_fixa_ecommerce(
                 inset 0 0 0 1px rgba(255,255,255,0.92);
         }}
         #{table_id} .ff-table-box::before {{
-            content:"";
-            position:sticky;
-            top:0;
-            display:block;
-            height:3px;
-            z-index:7;
-            background:linear-gradient(90deg, #FF2800 0%, #790E09 44%, rgba(121,14,9,0.18) 100%);
+            content:none;
+            display:none;
         }}
-        #{table_id} table {{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; margin-top:-3px; font-variant-numeric:tabular-nums; background:#FFFFFF;}}
+        #{table_id} table {{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; margin-top:0; font-variant-numeric:tabular-nums; background:#FFFFFF;}}
         #{table_id} thead th {{
             position:sticky;
             top:0;
@@ -13925,12 +13738,10 @@ def criar_tabela_html_funil_fixa_ecommerce(
             overflow:hidden;
             text-overflow:ellipsis;
             font-weight:800;
-            text-shadow:0 1px 0 rgba(0,0,0,0.18);
-            box-shadow:inset 0 1px 0 rgba(255,255,255,0.14);
         }}
         #{table_id} thead th:first-child {{left:0; z-index:4; border-top-left-radius:5px; text-align:left; padding-left:12px; background:linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);}}
         #{table_id} thead th:last-child {{border-top-right-radius:5px; background:linear-gradient(180deg, #4F5861 0%, #343B43 100%);}}
-        #{table_id} thead th.ff-col-tend {{background:linear-gradient(135deg, #B7443B 0%, #8F241D 100%); color:#FFFFFF; box-shadow:inset 0 -3px 0 rgba(255,255,255,0.14);}}
+        #{table_id} thead th.ff-col-tend {{background:linear-gradient(135deg, #B7443B 0%, #8F241D 100%); color:#FFFFFF;}}
         #{table_id} tbody td {{
             padding:7px 5px;
             font-size:11.3px;
@@ -13944,7 +13755,7 @@ def criar_tabela_html_funil_fixa_ecommerce(
             text-overflow:ellipsis;
             font-weight:520;
         }}
-        #{table_id} tbody td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.075) 0%, rgba(183,68,59,0.030) 100%); color:#111827; box-shadow:inset 3px 0 0 rgba(183,68,59,0.24);}}
+        #{table_id} tbody td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.075) 0%, rgba(183,68,59,0.030) 100%); color:#111827;}}
         #{table_id} tbody tr.ff-row-parent td {{
             background:linear-gradient(180deg, #FFF6F4 0%, #FFFFFF 100%);
             font-weight:650;
@@ -13970,10 +13781,8 @@ def criar_tabela_html_funil_fixa_ecommerce(
             min-width:{largura_primeira_coluna}px;
             max-width:{largura_primeira_coluna}px;
             width:{largura_primeira_coluna}px;
-            box-shadow:inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.035);
         }}
         #{table_id} .ff-row-parent .ff-sticky {{z-index:3; color:#111827; background:linear-gradient(180deg, #FFF4F1 0%, #FFFDFC 100%);}}
-        #{table_id} .ff-row-child .ff-sticky {{box-shadow:inset 3px 0 0 rgba(121,14,9,0.28), 5px 0 12px rgba(90,10,6,0.025);}}
         #{table_id} .ff-row-label {{display:flex; align-items:center; gap:6px;}}
         #{table_id} .ff-label-text {{overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.01em;}}
         #{table_id} .ff-row-parent .ff-label-text {{text-transform:uppercase; font-size:11.2px; font-weight:650;}}
@@ -15247,9 +15056,6 @@ st.markdown(
 st.markdown(
     """
     <style>
-    body #tabela-analitico-resultado-canais-conta.tabela-container-resultado-canais,
-    body #tabela-analitico-resultado-canais-fixa.tabela-container-resultado-canais,
-    body .tabela-container-resultado-canais,
     body .tabela-analitico-migracoes-pme-container,
     body .tabela-funil-movel-cotacoes-valor-mensal-container,
     body #tabela-funil-conta-cotacoes-ativacao.tabela-container-funil-cotacoes {
@@ -15259,17 +15065,11 @@ st.markdown(
         background: #FFFFFF !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta.tabela-container-resultado-canais::before,
-    body #tabela-analitico-resultado-canais-fixa.tabela-container-resultado-canais::before,
-    body .tabela-container-resultado-canais::before,
     body #tabela-funil-conta-cotacoes-ativacao.tabela-container-funil-cotacoes::before {
         content: none !important;
         display: none !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais,
-    body .tabela-container-resultado-canais .tabela-resultado-canais,
     body table.tabela-analitico-migracoes-pme,
     body table.tabela-funil-movel-cotacoes-valor-mensal,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes {
@@ -15277,9 +15077,6 @@ st.markdown(
         box-shadow: none !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th,
-    body .tabela-container-resultado-canais .tabela-resultado-canais th,
     body table.tabela-analitico-migracoes-pme th,
     body table.tabela-funil-movel-cotacoes-valor-mensal th,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th {
@@ -15289,12 +15086,6 @@ st.markdown(
         border-bottom: 1px solid rgba(61, 7, 4, 0.72) !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-meta,
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-var,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-meta,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-var,
-    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-meta,
-    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-var,
     body table.tabela-analitico-migracoes-pme th.col-tend,
     body table.tabela-analitico-migracoes-pme th.col-mom,
     body table.tabela-funil-movel-cotacoes-valor-mensal th.col-total-mes,
@@ -15303,23 +15094,6 @@ st.markdown(
         background: #8E241D !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-meta,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-meta,
-    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-meta {
-        background: linear-gradient(180deg, #A23B36 0%, #790E09 100%) !important;
-        color: #FFFFFF !important;
-    }
-
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais th.col-var,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais th.col-var,
-    body .tabela-container-resultado-canais .tabela-resultado-canais th.col-var {
-        background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
-        color: #FFFFFF !important;
-    }
-
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais td,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais td,
-    body .tabela-container-resultado-canais .tabela-resultado-canais td,
     body table.tabela-analitico-migracoes-pme td,
     body table.tabela-funil-movel-cotacoes-valor-mensal td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td {
@@ -15346,27 +15120,18 @@ st.markdown(
         font-weight: 600 !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais tbody tr:nth-child(even) td,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais tbody tr:nth-child(even) td,
-    body .tabela-container-resultado-canais .tabela-resultado-canais tbody tr:nth-child(even) td,
     body table.tabela-analitico-migracoes-pme tbody tr:nth-child(even) td,
     body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(even) td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr:nth-child(even) td {
         background: #FAFAFA !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais tbody tr:hover td,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais tbody tr:hover td,
-    body .tabela-container-resultado-canais .tabela-resultado-canais tbody tr:hover td,
     body table.tabela-analitico-migracoes-pme tbody tr:hover td,
     body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:hover td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr:hover td {
         background: #FFF8F7 !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais td.col-canal,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais td.col-canal,
-    body .tabela-container-resultado-canais .tabela-resultado-canais td.col-canal,
     body table.tabela-analitico-migracoes-pme td.col-regional,
     body table.tabela-funil-movel-cotacoes-valor-mensal td.col-canal,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td.col-etapa {
@@ -15375,15 +15140,6 @@ st.markdown(
         font-weight: 700 !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .canal-label-resultado::before,
-    body #tabela-analitico-resultado-canais-fixa .canal-label-resultado::before,
-    body .tabela-container-resultado-canais .canal-label-resultado::before {
-        display: none !important;
-    }
-
-    body #tabela-analitico-resultado-canais-conta .var-pill-resultado,
-    body #tabela-analitico-resultado-canais-fixa .var-pill-resultado,
-    body .tabela-container-resultado-canais .var-pill-resultado,
     body table.tabela-analitico-migracoes-pme .mom-chip-migracoes,
     body #tabela-funil-conta-cotacoes-ativacao .mom-chip-funil {
         background: transparent !important;
@@ -15399,9 +15155,6 @@ st.markdown(
         display: none !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .tabela-resultado-canais td.col-meta,
-    body #tabela-analitico-resultado-canais-fixa .tabela-resultado-canais td.col-meta,
-    body .tabela-container-resultado-canais .tabela-resultado-canais td.col-meta,
     body table.tabela-analitico-migracoes-pme td.col-tend,
     body table.tabela-funil-movel-cotacoes-valor-mensal td.col-total-mes,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td.col-tend {
@@ -15410,18 +15163,12 @@ st.markdown(
         font-weight: 700 !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .linha-total-resultado,
-    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado,
-    body .tabela-container-resultado-canais .linha-total-resultado,
     body table.tabela-analitico-migracoes-pme tr.linha-total,
     body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tr.linha-conversao-funil {
         border-top: 1px solid #D9D9D9 !important;
     }
 
-    body #tabela-analitico-resultado-canais-conta .linha-total-resultado td,
-    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado td,
-    body .tabela-container-resultado-canais .linha-total-resultado td,
     body table.tabela-analitico-migracoes-pme tr.linha-total td,
     body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total td {
         background: linear-gradient(180deg, #790E09 0%, #4E0805 100%) !important;
@@ -15430,19 +15177,6 @@ st.markdown(
         border-top: 1px solid rgba(255,255,255,0.18) !important;
         border-bottom: 1px solid rgba(61,7,4,0.88) !important;
         font-weight: 800 !important;
-    }
-
-    body #tabela-analitico-resultado-canais-conta .linha-total-resultado .valor-numero,
-    body #tabela-analitico-resultado-canais-conta .linha-total-resultado .var-pill-resultado,
-    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado .valor-numero,
-    body #tabela-analitico-resultado-canais-fixa .linha-total-resultado .var-pill-resultado,
-    body .tabela-container-resultado-canais .linha-total-resultado .valor-numero,
-    body .tabela-container-resultado-canais .linha-total-resultado .var-pill-resultado {
-        background: rgba(255,255,255,0.16) !important;
-        color: #FFFFFF !important;
-        box-shadow: none !important;
-        border: 1px solid rgba(255,255,255,0.22) !important;
-        text-shadow: none !important;
     }
 
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr.linha-conversao-funil td {
@@ -25163,15 +24897,11 @@ with tab5:
                             .{table_id}-container {{
                                 width: 100%;
                                 overflow-x: auto;
-                                border: 1px solid rgba(121,14,9,0.74);
-                                border-radius: 4px;
-                                box-shadow:
-                                    0 16px 34px rgba(90,10,6,0.13),
-                                    0 3px 10px rgba(15,23,42,0.07),
-                                    inset 0 0 0 1px rgba(255,255,255,0.92);
+                                border: 2px solid #790E09;
+                                border-radius: 12px;
+                                box-shadow: 0 6px 18px rgba(121,14,9,0.16);
                                 margin: 8px 0 4px 0;
                                 background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
-                                font-family: 'Manrope', 'Segoe UI', sans-serif;
                             }}
                             table.{table_id} {{
                                 border-collapse: collapse;
@@ -25179,8 +24909,6 @@ with tab5:
                                 min-width: 1680px;
                                 table-layout: fixed;
                                 font-size: clamp(9px, 0.72vw, 11px);
-                                font-family: 'Manrope', 'Segoe UI', sans-serif;
-                                font-variant-numeric: tabular-nums;
                             }}
                             .{table_id} thead th {{
                                 background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
@@ -25189,19 +24917,14 @@ with tab5:
                                 text-align: center;
                                 font-weight: 800;
                                 letter-spacing: 0.15px;
-                                border-right: 1px solid rgba(255,255,255,0.24);
-                                border-bottom: 1px solid rgba(61,7,4,0.92);
+                                border-right: 1px solid rgba(255,255,255,0.90);
                                 white-space: normal;
                                 line-height: 1.0;
                                 font-size: clamp(8.2px, 0.66vw, 10.2px);
-                                text-transform: uppercase;
-                                text-shadow: 0 1px 0 rgba(0,0,0,0.18);
-                                box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
                             }}
                             .{table_id} thead th.th-semana {{
                                 font-size: clamp(8.6px, 0.70vw, 10.8px);
-                                border-bottom: 1px solid rgba(255,255,255,0.22);
-                                box-shadow: inset 0 -2px 0 rgba(255,40,0,0.24);
+                                border-bottom: 2px solid rgba(255,255,255,0.22);
                             }}
                             .{table_id} thead th.th-semana.w1,
                             .{table_id} thead th.th-semana.w2,
@@ -25211,22 +24934,19 @@ with tab5:
                                 background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
                             }}
                             .{table_id} thead th.th-dia.week-start {{
-                                border-left: 1px solid rgba(255,255,255,0.42);
+                                border-left: 1px solid rgba(255,255,255,0.90);
                             }}
                             .{table_id} thead th.th-dia-tot {{
                                 background: linear-gradient(135deg, #B23A31 0%, #8F1B14 100%) !important;
-                                border: 1px solid rgba(255,255,255,0.28) !important;
-                                box-shadow: inset 0 -2px 0 rgba(255,255,255,0.14);
+                                border: 1px solid rgba(255,255,255,0.90) !important;
                             }}
                             .{table_id} thead th.th-resumo {{
                                 background: linear-gradient(135deg, #6B7280 0%, #475569 100%) !important;
                                 border-left: 1px solid rgba(255,255,255,0.20);
-                                box-shadow: inset 0 -2px 0 rgba(255,255,255,0.12);
                             }}
                             .{table_id} thead th.th-kpi {{
                                 background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%) !important;
                                 border-left: 1px solid rgba(255,255,255,0.22);
-                                box-shadow: inset 0 -2px 0 rgba(255,40,0,0.28);
                             }}
                             .{table_id} thead tr:first-child th:first-child {{
                                 position: sticky;
@@ -25263,14 +24983,14 @@ with tab5:
                             .{table_id} tbody td {{
                                 padding: 4px 3px;
                                 text-align: center;
-                                border-bottom: 1px solid rgba(121,14,9,0.07);
-                                border-right: 1px solid rgba(121,14,9,0.055);
-                                font-weight: 520;
+                                border-bottom: 1px solid #FFFFFF;
+                                border-right: 1px solid #FFFFFF;
+                                font-weight: 400;
                                 color: #2F3747;
                                 font-size: clamp(8.6px, 0.68vw, 10.5px);
                             }}
                             .{table_id} tbody td.col-dia.week-start {{
-                                border-left: 1px solid rgba(121,14,9,0.18);
+                                border-left: 1px solid #FFFFFF;
                             }}
                             .{table_id} tbody td.col-dia.w1,
                             .{table_id} tbody td.col-dia.w3 {{
@@ -25289,13 +25009,12 @@ with tab5:
                             .{table_id} tbody td.col-canal {{
                                 text-align: left;
                                 padding-left: 5px;
-                                font-weight: 700;
+                                font-weight: 500;
                                 white-space: nowrap;
                                 line-height: 1.05;
                                 position: sticky;
                                 left: 0;
                                 z-index: 6;
-                                box-shadow: inset 3px 0 0 rgba(255,40,0,0.22), 4px 0 10px rgba(90,10,6,0.025);
                             }}
                             .{table_id} tbody td.col-canal.col-canal-grupo {{
                                 z-index: 7;
@@ -25305,48 +25024,42 @@ with tab5:
                             .{table_id} tbody tr:nth-child(even) td.col-canal {{ background: #FDF3F2 !important; }}
                             .{table_id} tbody tr.linha-grupo-resumo td.col-canal {{
                                 background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
-                                box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
                             }}
                             .{table_id} tbody tr.linha-total-secao td {{
-                                font-weight: 850;
-                                border-top: 1px solid rgba(255,255,255,0.18) !important;
-                                border-bottom: 1px solid rgba(61,7,4,0.92) !important;
+                                font-weight: 700;
+                                border-top: 1px solid #FFFFFF !important;
+                                border-bottom: 1px solid #FFFFFF !important;
                             }}
                             .{table_id} tbody tr.linha-total-secao td.col-canal {{
-                                font-weight: 900;
+                                font-weight: 800;
                             }}
                             .{table_id} tbody td.col-total-sem {{
-                                background: linear-gradient(180deg, #F3F5F7 0%, #E9EDF1 100%) !important;
-                                font-weight: 850;
+                                background: #F5E9E7 !important;
+                                font-weight: 500;
                                 color: #5A0A06;
-                                border: 1px solid rgba(121,14,9,0.08) !important;
+                                border: 1px solid #FFFFFF !important;
                             }}
                             .{table_id} tbody td.col-kpi {{
-                                background: linear-gradient(180deg, #FFF0ED 0%, #F8D9D4 100%) !important;
+                                background: #F8EEEC !important;
                                 color: #5A0A06;
-                                font-weight: 850;
                             }}
                             .{table_id} tbody td.col-var {{
-                                font-weight: 850;
-                                background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+                                font-weight: 500;
                             }}
                             .{table_id} tbody td.col-var-semanal {{
-                                border-left: 1px solid rgba(100,116,139,0.20);
+                                border-left: 1px solid #FFFFFF;
                             }}
                             .{table_id} tbody td.col-var-mensal {{
-                                border-left: 1px solid rgba(100,116,139,0.20);
+                                border-left: 1px solid #FFFFFF;
                             }}
                             .{table_id} tbody td.col-var.var-positivo {{
                                 color: #1B5E20 !important;
-                                background: linear-gradient(180deg, #F2FAF4 0%, #EAF6EE 100%) !important;
                             }}
                             .{table_id} tbody td.col-var.var-negativo {{
                                 color: #B71C1C !important;
-                                background: linear-gradient(180deg, #FFF3F1 0%, #FBE4E0 100%) !important;
                             }}
                             .{table_id} tbody td.col-var.var-neutro {{
                                 color: #475569 !important;
-                                background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
                             }}
                             .{table_id} tbody tr.linha-grupo-resumo td {{
                                 background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
@@ -25355,9 +25068,8 @@ with tab5:
                                 font-weight: 800;
                                 letter-spacing: 0.4px;
                                 padding: 6px 8px !important;
-                                border-top: 1px solid rgba(255,255,255,0.18) !important;
-                                border-bottom: 1px solid rgba(61,7,4,0.92) !important;
-                                box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
+                                border-top: 1px solid #FFFFFF !important;
+                                border-bottom: 1px solid #FFFFFF !important;
                             }}
                             .{table_id} tbody tr.linha-grupo-resumo.grupo-demanda td {{
                                 background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
@@ -26021,199 +25733,111 @@ with tab5:
                 .{tabela_id}-container {{
                     width: 100%;
                     overflow-x: auto;
-                    border: 1px solid rgba(121,14,9,0.74);
-                    border-radius: 4px;
-                    box-shadow:
-                        0 16px 34px rgba(90,10,6,0.13),
-                        0 3px 10px rgba(15,23,42,0.07),
-                        inset 0 0 0 1px rgba(255,255,255,0.92),
-                        inset 0 0 0 4px rgba(121,14,9,0.025);
-                    margin: 10px 0 6px 0;
+                    border: 2px solid #790E09;
+                    border-radius: 12px;
+                    box-shadow: 0 6px 18px rgba(121,14,9,0.16);
+                    margin: 12px 0 6px 0;
                     background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-                    font-family: 'Manrope', 'Segoe UI', sans-serif;
                 }}
                 table.{tabela_id} {{
-                    border-collapse: separate;
-                    border-spacing: 0;
+                    border-collapse: collapse;
                     width: 100%;
                     min-width: 100%;
                     table-layout: fixed;
-                    font-size: clamp(9.1px, 0.62vw, 9.9px);
+                    font-size: 9.5px;
                     line-height: 1.05;
-                    font-family: 'Manrope', 'Segoe UI', sans-serif;
-                    font-variant-numeric: tabular-nums;
-                    background: #FFFFFF;
                 }}
                 .{tabela_id} thead th {{
                     position: sticky;
                     top: 0;
-                    background: linear-gradient(180deg, #790E09 0%, #4E0805 100%);
+                    background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
                     color: #fff;
-                    padding: 5px 5px;
+                    padding: 4px 5px;
                     text-align: center;
-                    font-weight: 800;
-                    letter-spacing: 0.28px;
+                    font-weight: 700;
+                    letter-spacing: 0.2px;
                     white-space: nowrap;
-                    font-size: clamp(8.7px, 0.58vw, 9.5px);
-                    text-transform: uppercase;
-                    border-right: 1px solid rgba(255,255,255,0.20);
-                    border-bottom: 1px solid rgba(61,7,4,0.90);
-                    text-shadow: 0 1px 0 rgba(0,0,0,0.18);
-                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+                    font-size: 9px;
+                    border-right: 1px solid rgba(255,255,255,0.85);
+                    border-bottom: 1px solid rgba(255,255,255,0.25);
                 }}
                 .{tabela_id} thead tr:first-child th {{
-                    background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);
-                    font-size: clamp(8.9px, 0.60vw, 9.7px);
-                    padding-top: 6px;
-                    padding-bottom: 6px;
-                }}
-                .{tabela_id} thead tr:first-child th:first-child {{
-                    border-top-left-radius: 3px;
-                }}
-                .{tabela_id} thead tr:first-child th:last-child {{
-                    border-top-right-radius: 3px;
+                    background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
+                    font-size: 9.2px;
                 }}
                 .{tabela_id} thead th.th-sub {{
-                    background: linear-gradient(180deg, #8F1B14 0%, #6C0C08 100%);
+                    background: linear-gradient(135deg, #8F1B14 0%, #6C0C08 100%);
                 }}
                 .{tabela_id} thead th.th-sub.th-pct {{
-                    background: linear-gradient(180deg, #5A6268 0%, #3E444A 100%);
+                    background: linear-gradient(135deg, #6B7280 0%, #475569 100%);
                 }}
                 .{tabela_id} thead th.th-conv {{
-                    background: linear-gradient(180deg, #A23B36 0%, #790E09 100%);
+                    background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%);
                 }}
                 .{tabela_id} tbody td {{
-                    padding: 4px 5px;
+                    padding: 3px 5px;
                     text-align: right;
-                    border-bottom: 1px solid rgba(121,14,9,0.07);
-                    border-right: 1px solid rgba(121,14,9,0.06);
-                    font-weight: 600;
+                    border-bottom: 1px solid #F0E4E2;
+                    font-weight: 400;
                     color: #2F3747;
-                    font-size: clamp(9.1px, 0.62vw, 9.9px);
+                    font-size: 9.5px;
                     line-height: 1.05;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }}
-                .{tabela_id} tbody tr:nth-child(odd) td {{ background: #FFFFFF; }}
-                .{tabela_id} tbody tr:nth-child(even) td {{ background: #FFF7F6; }}
-                .{tabela_id} tbody tr:not(.linha-total):hover td {{
-                    background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
-                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
-                }}
+                .{tabela_id} tbody td * {{ font-weight: 400 !important; }}
+                .{tabela_id} tbody tr:nth-child(odd) td {{ background: #FFF9F8; }}
+                .{tabela_id} tbody tr:nth-child(even) td {{ background: #FDF3F2; }}
                 .{tabela_id} tbody tr:first-child td {{
-                    background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+                    background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
                     color: #fff;
-                    font-weight: 900;
-                    padding: 6px 5px !important;
-                    font-size: clamp(9.4px, 0.64vw, 10.2px);
-                    border-bottom: 1px solid rgba(61,7,4,0.92);
-                    border-right: 1px solid rgba(255,255,255,0.15);
-                    text-shadow: 0 1px 1px rgba(0,0,0,0.28);
+                    font-weight: 400;
+                    border-bottom: 2px solid #A23B36;
                 }}
                 .{tabela_id} tbody tr.linha-total td.col-pct {{
                     color: #FFFFFF !important;
-                    font-weight: 900;
-                    background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+                    font-weight: 600;
                 }}
                 .{tabela_id} tbody td.col-regional {{
-                    position: relative;
                     text-align: left;
-                    padding-left: 12px;
+                    padding-left: 6px;
                     white-space: normal;
                     overflow-wrap: anywhere;
                     word-break: break-word;
                     overflow: visible;
                     text-overflow: clip;
-                    font-weight: 800;
-                    letter-spacing: -0.01em;
-                }}
-                .{tabela_id} tbody tr:not(.linha-total) td.col-regional::before {{
-                    content: "";
-                    position: absolute;
-                    left: 4px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    width: 5px;
-                    height: 17px;
-                    border-left: 3px solid #FF2800;
-                    border-top: 1px solid rgba(121,14,9,0.22);
-                    border-bottom: 1px solid rgba(121,14,9,0.22);
-                    border-radius: 1px;
-                    background: linear-gradient(90deg, rgba(255,40,0,0.10) 0%, rgba(255,40,0,0.00) 100%);
-                }}
-                .{tabela_id} tbody tr.linha-total td.col-regional {{
-                    padding-left: 8px;
-                    box-shadow: inset 4px 0 0 rgba(255,40,0,0.58);
                 }}
                 .{tabela_id} tbody td:nth-child(3),
                 .{tabela_id} tbody td:nth-child(6),
                 .{tabela_id} tbody td:nth-child(9) {{
-                    background: linear-gradient(180deg, #FFF3F0 0%, #F8E4E1 100%) !important;
+                    background: #FFF3F0 !important;
                     color: #6B1F1A;
-                    font-weight: 800;
+                    font-weight: 400;
                 }}
                 .{tabela_id} tbody td.col-pct.pct-positivo {{
                     color: #1B5E20 !important;
-                    background: #FBF1EF !important;
-                    font-weight: 850;
+                    font-weight: 600;
                 }}
                 .{tabela_id} tbody td.col-pct.pct-negativo {{
                     color: #B71C1C !important;
-                    background: #FBF1EF !important;
-                    font-weight: 850;
+                    font-weight: 600;
                 }}
                 .{tabela_id} tbody td.col-pct.pct-neutro {{
                     color: #475569 !important;
-                    background: #FBF1EF !important;
-                    font-weight: 850;
-                }}
-                .{tabela_id} tbody td.col-pct {{
-                    padding-left: 3px !important;
-                    padding-right: 3px !important;
-                    letter-spacing: -0.02em;
+                    font-weight: 600;
                 }}
                 .{tabela_id} tbody tr.linha-total td:nth-child(3),
                 .{tabela_id} tbody tr.linha-total td:nth-child(6),
                 .{tabela_id} tbody tr.linha-total td:nth-child(9) {{
-                    background: linear-gradient(180deg, #5A0A06 0%, #330504 100%) !important;
+                    background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
                     color: #FFFFFF !important;
-                }}
-                .{tabela_id} tbody tr.linha-total td:first-child {{
-                    border-bottom-left-radius: 3px;
-                    box-shadow: inset 4px 0 0 rgba(255,40,0,0.52);
-                }}
-                .{tabela_id} tbody tr:last-child td:first-child {{
-                    border-bottom-left-radius: 3px;
-                }}
-                .{tabela_id} tbody tr:last-child td:last-child {{
-                    border-bottom-right-radius: 3px;
                 }}
                 </style>
                 """
-                largura_regional_pct = 9.0
-                largura_valor_pct = 7.95
-                largura_pct_orc_pct = 8.80
-                largura_conv_pct = (
-                    100.0
-                    - largura_regional_pct
-                    - (largura_valor_pct * 6)
-                    - (largura_pct_orc_pct * 3)
-                ) / 2.0
-                larguras_cols_pct = [
-                    largura_regional_pct,
-                    largura_valor_pct,
-                    largura_valor_pct,
-                    largura_pct_orc_pct,
-                    largura_valor_pct,
-                    largura_valor_pct,
-                    largura_pct_orc_pct,
-                    largura_valor_pct,
-                    largura_valor_pct,
-                    largura_pct_orc_pct,
-                    largura_conv_pct,
-                    largura_conv_pct,
-                ]
+                largura_regional_pct = 12.0
+                largura_demais_pct = (100.0 - largura_regional_pct) / 11.0
+                larguras_cols_pct = [largura_regional_pct] + [largura_demais_pct] * 11
                 colgroup_html = "<colgroup>" + "".join(
                     [f'<col style="width:{w:.4f}%;">' for w in larguras_cols_pct]
                 ) + "</colgroup>"
