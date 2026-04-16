@@ -328,6 +328,9 @@ def compactar_colunas_categoricas(
     if df is None or df.empty:
         return df
 
+    # Evita SettingWithCopyWarning quando a função recebe slices filtrados.
+    df = df.copy(deep=False)
+
     for coluna in colunas:
         if coluna not in df.columns:
             continue
@@ -340,7 +343,7 @@ def compactar_colunas_categoricas(
             total = int(len(serie))
             nunique = int(serie.nunique(dropna=False))
             if total > 0 and nunique <= max(64, int(total * 0.50)):
-                df[coluna] = serie.astype("category")
+                df.loc[:, coluna] = serie.astype("category")
         except Exception:
             continue
     return df
@@ -4909,7 +4912,7 @@ def _filtrar_regra_cotacoes_novas_linhas(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df.loc[mask_regra]
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
 def load_cotacoes_data(
     path: str,
     file_mtime: float | None = None,
@@ -5125,7 +5128,7 @@ def _agregar_cotacoes_dataframe(df_cot: pd.DataFrame) -> pd.DataFrame:
     compactar_colunas_categoricas(df_agg, ["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL"])
     return df_agg[colunas_saida]
 
-@st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
+@st.cache_data(ttl=1800, show_spinner=False, max_entries=2)
 def preparar_agregados_cotacoes(
     path: str,
     file_mtime: float | None = None,
@@ -5261,7 +5264,7 @@ def _formatar_mes_ano_backlog(data_valor) -> str | None:
     }
     return f"{meses_pt.get(data_ts.month, 'jan')}/{data_ts.strftime('%y')}"
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
 def load_backlog_consolidado_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega o backlog consolidado com os mesmos filtros do notebook de preparo."""
     _ = file_mtime
@@ -5428,7 +5431,7 @@ def load_backlog_consolidado_data(path: str, file_mtime: float | None = None) ->
     return df
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
 def load_pedidos_dashboard_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega a base otimizada de pedidos E-Commerce já consolidada por mês/regional/canal."""
     _ = file_mtime
@@ -7475,7 +7478,7 @@ def _cor_motivo_gross_sts(motivo: str, idx_fallback: int = 0) -> str:
     paleta_fallback = ["#5A0A06", "#8D1A12", "#B23A2F", "#C86E61", "#7C3F3A", "#A95C54"]
     return paleta_fallback[idx_fallback % len(paleta_fallback)]
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
 def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega a base de migracoes PME e padroniza os campos usados na tabela analitica."""
     _ = file_mtime
@@ -7535,7 +7538,12 @@ def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.Da
         }
     ).copy()
 
-    df["DAT_REFERENCIA"] = pd.to_datetime(df["DAT_REFERENCIA"], errors="coerce", dayfirst=True)
+    df["DAT_REFERENCIA"] = pd.to_datetime(
+        df["DAT_REFERENCIA"],
+        format="mixed",
+        errors="coerce",
+        dayfirst=True
+    )
     df["REGIONAL"] = (
         df["REGIONAL"]
         .astype("string")
@@ -7642,7 +7650,8 @@ def montar_tabela_migracoes_pme_regionais(
         columns="MES_ANO",
         values="QTDE",
         aggfunc="sum",
-        fill_value=0
+        fill_value=0,
+        observed=False
     ).reindex(columns=meses_ordem, fill_value=0)
 
     if tabela.empty:
@@ -7853,7 +7862,7 @@ def criar_grafico_migracoes_pme_mensal(
 
     return fig
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
 def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega e normaliza a base bruta de ligações uma única vez para reaproveitamento no app."""
     path_obj = Path(path)
@@ -13299,7 +13308,7 @@ def _normalizar_segmento_funil_fixa(valor) -> str:
     return str(valor).strip()
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
 def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     _ = file_mtime
     path_obj = Path(path)
@@ -13334,7 +13343,12 @@ def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.
 
     df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
     df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(999.0)
-    df['PERIODO_MES'] = pd.to_datetime(df['PERIODO_MES'], errors='coerce', dayfirst=True)
+    df['PERIODO_MES'] = pd.to_datetime(
+        df['PERIODO_MES'],
+        format='mixed',
+        errors='coerce',
+        dayfirst=True
+    )
     df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0.0)
     df = df[df['PERIODO_MES'].notna()].copy()
     df['MES_ANO'] = df['PERIODO_MES'].apply(_formatar_mes_ano_funil_fixa).astype(str).str.strip().str.lower()
@@ -13531,7 +13545,7 @@ def _aplicar_tend_funil_fixa(df_funil: pd.DataFrame, df_tend: pd.DataFrame) -> p
     return df_out
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM, persist="disk")
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
 def load_funil_fixa_ecommerce_data(
     path: str,
     file_mtime: float | None = None,
@@ -13599,7 +13613,12 @@ def load_funil_fixa_ecommerce_data(
     df['INDICADOR_ORDEM'] = normalizar_numerico_serie(df['INDICADOR_ORDEM']).fillna(999.0)
     df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(df['INDICADOR_ORDEM'])
 
-    df['PERIODO_MES'] = pd.to_datetime(df['PERIODO_MES'], errors='coerce', dayfirst=True)
+    df['PERIODO_MES'] = pd.to_datetime(
+        df['PERIODO_MES'],
+        format='mixed',
+        errors='coerce',
+        dayfirst=True
+    )
     if 'MES_ANO_ORDEM' in df.columns:
         df['MES_ANO_ORDEM'] = normalizar_numerico_serie(df['MES_ANO_ORDEM'])
     else:
