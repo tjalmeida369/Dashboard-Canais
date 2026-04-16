@@ -427,7 +427,7 @@ def resolver_arquivo_dashboard(nome_arquivo: str | Path, *fallbacks: str | Path)
             return candidato
     return candidatos[0] if candidatos else Path(nome_arquivo)
 
-LOGO_FILE_PATH = resolver_arquivo_dashboard("logo_claro_empresas.png")
+#LOGO_FILE_PATH = resolver_arquivo_dashboard("logo_claro_empresas.png")
 OBS_RESULTADO_FILE_PATH = resolver_arquivo_dashboard("obs_resultado_canais.txt")
 
 _EXPORT_WRAPPER_NAMES = {
@@ -602,21 +602,6 @@ _plotly_chart_com_exportacao._dashboard_export_original = _ORIGINAL_ST_PLOTLY_CH
 st.plotly_chart = _plotly_chart_com_exportacao
 st.markdown = _ORIGINAL_ST_MARKDOWN
 components.html = _ORIGINAL_COMPONENTS_HTML
-
-def render_header_logo():
-    """Render top-right logo if the local PNG file exists."""
-    logo_path = LOGO_FILE_PATH
-    if not logo_path.exists():
-        return
-
-    col_space, col_logo = st.columns([6, 2])
-    with col_logo:
-        st.markdown(
-            '<div style="display:flex;justify-content:flex-end;padding:4px 0 2px 0;">',
-            unsafe_allow_html=True
-        )
-        st.image(str(logo_path), width=230)
-        st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("""
     <style>
@@ -13949,10 +13934,20 @@ def _formatar_valor_real_funil_segmentado(indicador: str, valor: float) -> str:
     return formatar_numero_brasileiro(valor_num, 0)
 
 
-def _formatar_percentual_step_funil_segmentado(valor_atual: float, valor_anterior: float | None) -> str:
+def _formatar_percentual_step_funil_segmentado(
+    valor_atual: float,
+    valor_anterior: float | None,
+    valor_base_primeiro_step: float | None = None
+) -> str:
     atual = float(pd.to_numeric(pd.Series([valor_atual]), errors='coerce').fillna(0.0).iloc[0])
     if valor_anterior is None:
-        return ''
+        if valor_base_primeiro_step is None:
+            return ''
+        base_primeiro = float(pd.to_numeric(pd.Series([valor_base_primeiro_step]), errors='coerce').fillna(0.0).iloc[0])
+        if base_primeiro <= 0:
+            return 'n/d'
+        percentual_primeiro = (atual / base_primeiro) * 100.0
+        return f"{formatar_numero_brasileiro(percentual_primeiro, 1)}%"
 
     anterior = float(pd.to_numeric(pd.Series([valor_anterior]), errors='coerce').fillna(0.0).iloc[0])
     if anterior <= 0:
@@ -14027,6 +14022,13 @@ def criar_grafico_funil_segmentado_fixa(
         how='left'
     )
     base_plot['QTDE'] = normalizar_numerico_serie(base_plot['QTDE']).fillna(0.0)
+    base_plot['INDICADOR_NORM'] = base_plot['INDICADOR'].apply(normalizar_chave_visual)
+    total_investimento_mes = float(
+        pd.to_numeric(
+            base_plot.loc[base_plot['INDICADOR_NORM'].eq('investimento'), 'QTDE'],
+            errors='coerce'
+        ).fillna(0.0).sum()
+    )
 
     fig = make_subplots(
         rows=1,
@@ -14059,15 +14061,26 @@ def criar_grafico_funil_segmentado_fixa(
             indicador_ref = str(linha_seg.get('INDICADOR', '')).strip()
             valor_real = float(linha_seg.get('QTDE', 0.0))
             valor_rotulo = _formatar_valor_real_funil_segmentado(indicador_ref, valor_real)
-            percentual_step = _formatar_percentual_step_funil_segmentado(valor_real, valor_anterior_real)
+            indicador_norm = normalizar_chave_visual(indicador_ref)
+            eh_primeiro_step_investimento = valor_anterior_real is None and indicador_norm == 'investimento'
+            percentual_step = _formatar_percentual_step_funil_segmentado(
+                valor_real,
+                valor_anterior_real,
+                valor_base_primeiro_step=total_investimento_mes if eh_primeiro_step_investimento else None
+            )
 
             largura_plot = float(larguras_visuais[idx_seg]) if valor_real > 0 else 0.0
             valores.append(largura_plot)
             texto_label = valor_rotulo if not percentual_step else f"{valor_rotulo} | {percentual_step}"
-            texto_hover_step = (
-                f"<br><b>% vs etapa anterior ({etapa_anterior}):</b> {percentual_step}"
-                if percentual_step and etapa_anterior else ""
-            )
+            if percentual_step:
+                if eh_primeiro_step_investimento:
+                    texto_hover_step = f"<br><b>% do investimento total do mês:</b> {percentual_step}"
+                elif etapa_anterior:
+                    texto_hover_step = f"<br><b>% vs etapa anterior ({etapa_anterior}):</b> {percentual_step}"
+                else:
+                    texto_hover_step = ""
+            else:
+                texto_hover_step = ""
             textos.append(texto_label)
             customdata.append([
                 segmento_ref,
@@ -14860,8 +14873,6 @@ canal_filter_key = tuple(str(item) for item in canal_filter)
 data_filter_key = tuple(str(item) for item in data_filter)
 indicador_filter_key = tuple(str(item) for item in indicador_filter)
 
-render_header_logo()
-
 st.markdown("""
     <div class="main-title">
         CANAIS ESTRATÉGICOS
@@ -14920,15 +14931,23 @@ components.html(
     (function() {
       const KEY = "dashboard_tab_ativa";
       const doc = window.parent.document;
+      const DISPLAY_LABELS = {
+        PEDIDOS: "E-COMMERCE",
+        LIGACOES: "TELEVENDAS",
+        "FUNIL MOVEL": "EM CONSTRUÇÃO"
+      };
       const TAB_ICONS = {
         INICIO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg>`,
         ATIVADOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.4"></rect><path d="M11 18.5h2"></path></svg>`,
         DESATIVADOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l4.5 5 3.5-3 6 8"></path><path d="M14.5 18H18v-3.5"></path></svg>`,
         DESATIVACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l4.5 5 3.5-3 6 8"></path><path d="M14.5 18H18v-3.5"></path></svg>`,
         PEDIDOS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`,
+        "E COMMERCE": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`,
         LIGACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
+        TELEVENDAS: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.45 19.45 0 0 1 5.15 12.8 19.82 19.82 0 0 1 .92 4.18 2 2 0 0 1 2.91 2.2h2A2 2 0 0 1 6.9 3.92c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L5.91 10.11a16 16 0 0 0 6.18 6.18l1.46-1.16a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"></path></svg>`,
         ANALITICO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"></rect><rect x="14" y="3" width="7" height="7" rx="1.6"></rect><rect x="3" y="14" width="7" height="7" rx="1.6"></rect><rect x="14" y="14" width="7" height="7" rx="1.6"></rect></svg>`,
         "FUNIL MOVEL": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"></path><path d="M6.5 10h11"></path><path d="M9 15h6"></path><path d="M11 20h2"></path></svg>`,
+        "EM CONSTRUCAO": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"></path><path d="M6.5 10h11"></path><path d="M9 15h6"></path><path d="M11 20h2"></path></svg>`,
         COTACOES: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
         COTACAO: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V4.5A1.5 1.5 0 0 1 9.5 3h8A1.5 1.5 0 0 1 19 4.5v11A1.5 1.5 0 0 1 17.5 17H15"></path><path d="M6.5 7h8A1.5 1.5 0 0 1 16 8.5v11A1.5 1.5 0 0 1 14.5 21h-8A1.5 1.5 0 0 1 5 19.5v-11A1.5 1.5 0 0 1 6.5 7z"></path><path d="M8 11h5"></path><path d="M8 14.5h5"></path></svg>`,
         "FUNIL FIXA": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.7"></circle><circle cx="18" cy="20" r="1.7"></circle><path d="M3 4h2l2.2 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.78L20 7H6.2"></path></svg>`
@@ -14954,13 +14973,14 @@ components.html(
         tabs.forEach((tab) => {
           const rawLabel = (tab.dataset.tabLabel || tab.innerText || "").trim();
           const labelNormalized = normalizeTabLabel(rawLabel);
+          const displayLabel = DISPLAY_LABELS[labelNormalized] || rawLabel;
           const iconSvg = TAB_ICONS[labelNormalized];
           if (!iconSvg || !rawLabel) return;
 
           const existingBadge = tab.querySelector(".tab-icon-badge");
           const existingLabel = tab.querySelector(".tab-label-text");
           if (tab.dataset.tabDecorated === "1" && existingBadge && existingLabel) {
-            existingLabel.textContent = rawLabel;
+            existingLabel.textContent = displayLabel;
             tab.dataset.tabLabel = rawLabel;
             return;
           }
@@ -14972,7 +14992,7 @@ components.html(
 
           const label = doc.createElement("span");
           label.className = "tab-label-text";
-          label.textContent = rawLabel;
+          label.textContent = displayLabel;
 
           tab.textContent = "";
           tab.appendChild(badge);
