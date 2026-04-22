@@ -18,6 +18,12 @@ import gc
 import unicodedata
 from html import escape
 from textwrap import dedent
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="Workbook contains no default style, apply openpyxl's default"
+)
+
 base_template = go.layout.Template(
     layout=go.Layout(
         template="plotly_white",
@@ -343,7 +349,7 @@ def compactar_colunas_categoricas(
             total = int(len(serie))
             nunique = int(serie.nunique(dropna=False))
             if total > 0 and nunique <= max(64, int(total * 0.50)):
-                df.loc[:, coluna] = serie.astype("category")
+                df[coluna] = serie.astype("category")
         except Exception:
             continue
     return df
