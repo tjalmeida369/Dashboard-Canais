@@ -14,6 +14,7 @@ import locale
 import re
 import shutil
 import tempfile
+import gc
 import unicodedata
 from html import escape
 from textwrap import dedent
@@ -91,63 +92,6 @@ def normalizar_numerico_serie(serie):
     s = s.str.replace(r'[^0-9\.-]', '', regex=True)
     return pd.to_numeric(s, errors='coerce')
 
-def normalizar_texto_series(serie: pd.Series) -> pd.Series:
-    """Normaliza texto em lote usando operações vetorizadas do pandas."""
-    if not isinstance(serie, pd.Series):
-        serie = pd.Series(serie)
-
-    serie_texto = serie.astype("string").fillna("")
-    serie_texto = (
-        serie_texto
-        .str.normalize("NFKD")
-        .str.encode("ASCII", errors="ignore")
-        .str.decode("ASCII")
-        .str.strip()
-        .str.upper()
-        .str.replace(r"[^A-Z0-9]+", " ", regex=True)
-        .str.replace(r"\s+", " ", regex=True)
-        .str.strip()
-    )
-    return serie_texto.fillna("")
-
-def normalizar_plataforma_series(serie: pd.Series) -> pd.Series:
-    """Replica em lote a normalização simples de plataforma usada no comparativo."""
-    texto = normalizar_texto_series(serie)
-    valores = np.select(
-        [
-            texto.str.contains("FIXA", regex=False, na=False),
-            texto.str.contains("MOVEL|MOBILE", regex=True, na=False),
-            texto.str.contains("CONTA", regex=False, na=False),
-        ],
-        ["FIXA", "CONTA", "CONTA"],
-        default=texto.astype(object).to_numpy()
-    )
-    return pd.Series(valores, index=texto.index)
-
-def mapear_canal_canonico_series(serie: pd.Series) -> pd.Series:
-    """Mapeia os canais do comparativo em lote para reduzir applys por linha."""
-    texto = normalizar_texto_series(serie)
-    valores = np.select(
-        [
-            texto.str.contains("TELEVENDAS ATIVO", regex=False, na=False),
-            texto.str.contains("TELEVENDAS RECEPTIVO", regex=False, na=False),
-            texto.str.contains("S2S", regex=False, na=False) & texto.str.contains("DAC", regex=False, na=False),
-            texto.str.contains("E COMMERCE", regex=False, na=False),
-            texto.str.contains("HOSPITALITY", regex=False, na=False),
-            texto.str.contains("INSIDE SALES", regex=False, na=False),
-        ],
-        [
-            "Televendas Ativo",
-            "Televendas Receptivo",
-            "S2S+DAC",
-            "E-Commerce",
-            "Hospitality",
-            "Inside Sales",
-        ],
-        default=""
-    )
-    return pd.Series(valores, index=texto.index)
-
 def normalizar_chave_visual(texto: str) -> str:
     """Normaliza textos para buscar ícones sem depender de acentuação."""
     base = unicodedata.normalize("NFKD", str(texto or ""))
@@ -169,9 +113,10 @@ def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
             return coluna_real
     return None
 
-CACHE_MAX_ENTRIES_LARGE = 1
-CACHE_MAX_ENTRIES_MEDIUM = 6
-CACHE_MAX_ENTRIES_VIEW = 3
+CACHE_MAX_ENTRIES_LARGE = 4
+CACHE_MAX_ENTRIES_MEDIUM = 8
+CACHE_MAX_ENTRIES_VIEW = 10
+CACHE_MAX_ENTRIES_FILTERS = 4
 CACHE_SESSION_VARIATIONS = 2
 SESSION_CACHE_MAX_TEXT_CHARS = 550_000
 SESSION_CACHE_MAX_CONTAINER_ITEMS = 12
@@ -531,2422 +476,31 @@ def resolver_arquivo_dashboard(nome_arquivo: str | Path, *fallbacks: str | Path)
             return candidato
     return candidatos[0] if candidatos else Path(nome_arquivo)
 
+
+DASHBOARD_PREPROCESSED_SUBDIR = Path("dados_preprocessados")
+
+
+def resolver_arquivo_preprocessado(nome_arquivo: str | Path, *fallbacks: str | Path) -> Path:
+    """Resolve arquivos preprocessados priorizando a subpasta dados_preprocessados."""
+    candidatos: list[Path] = []
+    nome_path = Path(nome_arquivo)
+    candidatos.append(DASHBOARD_PREPROCESSED_SUBDIR / nome_path)
+    candidatos.append(nome_path)
+
+    for fallback in fallbacks:
+        fallback_path = Path(fallback)
+        if fallback_path.is_absolute():
+            candidatos.append(fallback_path)
+        else:
+            candidatos.append(DASHBOARD_PREPROCESSED_SUBDIR / fallback_path)
+            candidatos.append(fallback_path)
+
+    if not candidatos:
+        return Path(nome_arquivo)
+    return resolver_arquivo_dashboard(candidatos[0], *candidatos[1:])
+
 #LOGO_FILE_PATH = resolver_arquivo_dashboard("logo_claro_empresas.png")
 OBS_RESULTADO_FILE_PATH = resolver_arquivo_dashboard("obs_resultado_canais.txt")
-ANALITICO_MIGRACOES_FILE_PATH = resolver_arquivo_dashboard("ANALITICO_MIGRACOES_fev26.xlsx")
-FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
-    "base_funil_ecomm_fixa.xlsx",
-    DASHBOARD_LEGACY_MOBILITY_DIR / "base_funil_ecomm_fixa.xlsx"
-)
-TEND_FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
-    "tend_funil_ecom.xlsx",
-    DASHBOARD_LEGACY_MOBILITY_DIR / "tend_funil_ecom.xlsx"
-)
-
-def _carregar_blocos_graficos_backup_app10() -> None:
-    """Compatibilidade legada: o bootstrap via app10.py foi internalizado no app9.py."""
-    return None
-
-def criar_tabela_html_migracoes_regionais(
-    df_formatado: pd.DataFrame,
-    df_numerico: pd.DataFrame,
-    table_id: str
-) -> str:
-    """Cria tabela regional x mes para migracoes, com destaque de tendencia e MoM."""
-    if df_formatado is None or df_formatado.empty:
-        return ""
-
-    colunas = list(df_formatado.columns)
-    col_regional = colunas[0] if colunas else "REGIONAL"
-    col_mom = "MoM" if "MoM" in colunas else ""
-    colunas_valor = [col for col in colunas if col not in {col_regional, col_mom}]
-    largura_regional_pct = 10.2
-    largura_mom_pct = 8.3 if col_mom else 0.0
-    largura_mes_pct = (100.0 - largura_regional_pct - largura_mom_pct) / max(len(colunas_valor), 1)
-    larguras: list[float] = []
-    for coluna in colunas:
-        if coluna == col_regional:
-            larguras.append(largura_regional_pct)
-        elif coluna == col_mom:
-            larguras.append(largura_mom_pct)
-        else:
-            larguras.append(largura_mes_pct)
-    colgroup_html = "<colgroup>" + "".join(
-        [f'<col style="width:{largura:.4f}%;">' for largura in larguras]
-    ) + "</colgroup>"
-
-    mask_linhas_valor = (
-        df_numerico.iloc[:, 0].astype(str).str.strip().str.upper().ne("TOTAL")
-        if df_numerico is not None and not df_numerico.empty and df_numerico.shape[1] > 0
-        else pd.Series(dtype=bool)
-    )
-    maximos_coluna: dict[int, float] = {}
-    for idx_col, coluna in enumerate(colunas):
-        if coluna in {col_regional, col_mom} or df_numerico is None or df_numerico.empty or idx_col >= df_numerico.shape[1]:
-            continue
-        serie_valores = pd.to_numeric(df_numerico.iloc[:, idx_col], errors="coerce").fillna(0.0)
-        serie_base = (
-            serie_valores[mask_linhas_valor]
-            if len(mask_linhas_valor) == len(serie_valores) and bool(mask_linhas_valor.any())
-            else serie_valores
-        )
-        maximos_coluna[idx_col] = float(serie_base.max()) if not serie_base.empty else 0.0
-
-    def _largura_data_bar(idx_linha: int, idx_col: int) -> float:
-        try:
-            valor = float(pd.to_numeric(pd.Series([df_numerico.iloc[idx_linha, idx_col]]), errors="coerce").fillna(0.0).iloc[0])
-        except Exception:
-            valor = 0.0
-        max_coluna = float(maximos_coluna.get(idx_col, 0.0) or 0.0)
-        if valor <= 0 or max_coluna <= 0:
-            return 0.0
-        return max(6.0, min(100.0, (valor / max_coluna) * 100.0))
-
-    def _classe_mom(valor) -> str:
-        try:
-            valor_float = float(valor)
-        except Exception:
-            valor_float = 0.0
-        if valor_float > 0.05:
-            return "mom-pos"
-        if valor_float < -0.05:
-            return "mom-neg"
-        return "mom-neut"
-
-    html = f"""
-    <style>
-        .{table_id}-container {{
-            width: 100%;
-            overflow-x: auto;
-            border: 1px solid rgba(121,14,9,0.78);
-            border-radius: 5px;
-            box-shadow:
-                0 18px 38px rgba(90,10,6,0.13),
-                0 4px 12px rgba(15,23,42,0.06),
-                inset 0 0 0 1px rgba(255,255,255,0.90);
-            margin: 8px 0 14px 0;
-            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
-            font-family: 'Manrope', 'Segoe UI', sans-serif;
-        }}
-        table.{table_id} {{
-            border-collapse: separate;
-            border-spacing: 0;
-            width: 100%;
-            min-width: 820px;
-            table-layout: fixed;
-            font-size: clamp(11.2px, 0.80vw, 12.4px);
-            line-height: 1.14;
-            font-family: 'Manrope', 'Segoe UI', sans-serif;
-            font-variant-numeric: tabular-nums;
-            background: #FFFFFF;
-        }}
-        .{table_id} thead th {{
-            position: sticky;
-            top: 0;
-            z-index: 40;
-            background: linear-gradient(180deg, #790E09 0%, #4E0805 100%);
-            color: #fff;
-            padding: 7px 6px;
-            text-align: center;
-            font-weight: 800;
-            letter-spacing: 0.26px;
-            white-space: nowrap;
-            font-size: clamp(10.0px, 0.70vw, 11.0px);
-            border-right: 1px solid rgba(255,255,255,0.20);
-            border-bottom: 1px solid rgba(61,7,4,0.92);
-            text-transform: uppercase;
-            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
-        }}
-        .{table_id} thead th.col-regional {{
-            position: sticky;
-            left: 0;
-            z-index: 50;
-            background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);
-            text-align: left;
-            padding-left: 10px;
-        }}
-        .{table_id} thead th.col-tend {{
-            background: linear-gradient(180deg, #6B7280 0%, #4B5563 100%);
-            box-shadow:
-                inset 0 1px 0 rgba(255,255,255,0.18),
-                inset 0 -3px 0 rgba(255,255,255,0.14);
-        }}
-        .{table_id} thead th.col-mom {{
-            background: linear-gradient(180deg, #4F5861 0%, #343B43 100%);
-        }}
-        .{table_id} tbody td {{
-            position: relative;
-            padding: 8px 6px;
-            text-align: right;
-            border-bottom: 1px solid rgba(121,14,9,0.07);
-            border-right: 1px solid rgba(121,14,9,0.055);
-            color: #2F3747;
-            font-size: clamp(11.3px, 0.80vw, 12.5px);
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }}
-        .{table_id} tbody tr:nth-child(odd) td {{
-            background: #FFFFFF;
-        }}
-        .{table_id} tbody tr:nth-child(even) td {{
-            background: #FFF7F6;
-        }}
-        .{table_id} tbody tr:hover td {{
-            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
-        }}
-        .{table_id} tbody td.col-regional {{
-            position: sticky;
-            left: 0;
-            z-index: 20;
-            text-align: left;
-            padding-left: 10px;
-            color: #5A0A06;
-            font-weight: 800;
-            box-shadow: inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.035);
-        }}
-        .{table_id} tbody td.col-valor {{
-            overflow: hidden;
-        }}
-        .{table_id} tbody td.col-valor::before {{
-            content: "";
-            position: absolute;
-            left: 5px;
-            top: 5px;
-            bottom: 5px;
-            width: var(--bar, 0%);
-            max-width: calc(100% - 10px);
-            border-radius: 2px;
-            background: linear-gradient(90deg, rgba(121,14,9,0.115) 0%, rgba(255,40,0,0.035) 100%);
-            pointer-events: none;
-        }}
-        .{table_id} .valor-migracoes {{
-            position: relative;
-            z-index: 2;
-            letter-spacing: -0.015em;
-        }}
-        .{table_id} tbody td.col-tend {{
-            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
-            color: #2F3747;
-            font-weight: 900;
-            box-shadow: inset 3px 0 0 rgba(100,116,139,0.34);
-        }}
-        .{table_id} tbody td.col-tend::before {{
-            background: linear-gradient(90deg, rgba(100,116,139,0.13) 0%, rgba(100,116,139,0.035) 100%);
-        }}
-        .{table_id} tbody td.col-mom {{
-            background: linear-gradient(180deg, #F5F7F9 0%, #EEF2F5 100%) !important;
-            font-weight: 700;
-            text-align: center;
-            border-left: 1px solid rgba(90,98,104,0.08) !important;
-        }}
-        .{table_id} .mom-chip-migracoes {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 66px;
-            padding: 2px 6px;
-            border-radius: 2px;
-            border: 1px solid rgba(100,116,139,0.16);
-            background: rgba(255,255,255,0.70);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.86);
-            letter-spacing: -0.02em;
-        }}
-        .{table_id} tbody td.mom-pos {{
-            color: #0F8A4B;
-            box-shadow: inset 3px 0 0 rgba(15,138,75,0.62);
-        }}
-        .{table_id} tbody td.mom-neg {{
-            color: #B42318;
-            box-shadow: inset 3px 0 0 rgba(180,35,24,0.62);
-        }}
-        .{table_id} tbody td.mom-neut {{
-            color: #6B7280;
-            box-shadow: inset 3px 0 0 rgba(100,116,139,0.38);
-        }}
-        .{table_id} tbody tr.linha-total td {{
-            background: linear-gradient(180deg, #5A0A06 0%, #3D0704 100%) !important;
-            color: #FFFFFF !important;
-            font-weight: 800;
-            border-bottom: 1px solid #A23B36;
-            border-right: 1px solid rgba(255,255,255,0.13);
-            text-shadow: 0 1px 0 rgba(0,0,0,0.22);
-        }}
-        .{table_id} tbody tr.linha-total td.col-valor::before {{
-            display: none;
-        }}
-        .{table_id} tbody tr.linha-total td.col-regional {{
-            z-index: 30;
-            box-shadow: inset 3px 0 0 #FF2800;
-        }}
-        .{table_id} tbody tr.linha-total .mom-chip-migracoes {{
-            background: rgba(255,255,255,0.12);
-            border-color: rgba(255,255,255,0.22);
-        }}
-        .{table_id}-container::-webkit-scrollbar {{
-            width: 8px;
-            height: 8px;
-        }}
-        .{table_id}-container::-webkit-scrollbar-track {{
-            background: #F5F5F5;
-            border-radius: 10px;
-        }}
-        .{table_id}-container::-webkit-scrollbar-thumb {{
-            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
-            border-radius: 10px;
-        }}
-    </style>
-    <div class="{table_id}-container">
-      <table class="{table_id}">
-        {colgroup_html}
-        <thead>
-          <tr>
-    """
-    for idx_col, coluna in enumerate(colunas):
-        classes = []
-        coluna_txt = str(coluna).strip()
-        if idx_col == 0:
-            classes.append("col-regional")
-        elif coluna_txt.upper().startswith("TEND."):
-            classes.append("col-tend")
-        elif coluna == col_mom:
-            classes.append("col-mom")
-        html += f'<th class="{" ".join(classes)}">{escape(coluna_txt)}</th>'
-    html += "</tr></thead><tbody>"
-
-    for idx_linha, row in df_formatado.iterrows():
-        regional_ref = str(df_numerico.iloc[idx_linha, 0]) if idx_linha < len(df_numerico) else str(row.iloc[0])
-        is_total = regional_ref.strip().upper() == "TOTAL"
-        classe_linha = ' class="linha-total"' if is_total else ""
-        html += f"<tr{classe_linha}>"
-        for idx_col, coluna in enumerate(colunas):
-            valor = escape(str(row[coluna]))
-            classes = []
-            style_attr = ""
-            valor_html = valor
-            coluna_txt = str(coluna).strip()
-            if idx_col == 0:
-                classes.append("col-regional")
-            elif coluna_txt.upper().startswith("TEND."):
-                classes.extend(["col-valor", "col-tend"])
-                if not is_total:
-                    style_attr = f' style="--bar:{_largura_data_bar(idx_linha, idx_col):.2f}%;"'
-                valor_html = f'<span class="valor-migracoes">{valor}</span>'
-            elif coluna == col_mom:
-                classes.extend(["col-mom", _classe_mom(df_numerico.iloc[idx_linha][coluna])])
-                valor_html = f'<span class="mom-chip-migracoes">{valor}</span>'
-            else:
-                classes.append("col-valor")
-                if not is_total:
-                    style_attr = f' style="--bar:{_largura_data_bar(idx_linha, idx_col):.2f}%;"'
-                valor_html = f'<span class="valor-migracoes">{valor}</span>'
-            html += f'<td class="{" ".join(classes)}"{style_attr}>{valor_html}</td>'
-        html += "</tr>"
-
-    html += "</tbody></table></div>"
-    return html
-
-@st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
-def preparar_base_gross_motivo_status(df_base: pd.DataFrame) -> pd.DataFrame:
-    """Prepara a base de Gross Liquido Conta por motivo para os graficos do Analitico."""
-    colunas_saida = ["dat_tratada", "CANAL_PLAN", "REGIONAL", "MOTIVO_STS", "QTDE"]
-    colunas_base = [
-        "dat_tratada", "CANAL_PLAN", "REGIONAL",
-        "COD_PLATAFORMA", "DSC_INDICADOR", "DSC_MOTIVO_STS", "QTDE"
-    ]
-    if df_base is None or df_base.empty or not set(colunas_base).issubset(set(df_base.columns)):
-        return pd.DataFrame(columns=colunas_saida)
-
-    df_work = df_base.loc[:, colunas_base].copy()
-    for coluna in ["dat_tratada", "CANAL_PLAN", "REGIONAL", "COD_PLATAFORMA", "DSC_INDICADOR", "DSC_MOTIVO_STS"]:
-        df_work[coluna] = df_work[coluna].astype(str).str.strip()
-
-    df_work["dat_tratada"] = df_work["dat_tratada"].str.lower()
-    df_work = df_work.loc[df_work["dat_tratada"].str.match(r"^[a-z]{3}/\d{2}$", na=False)].reset_index(drop=True)
-    if df_work.empty:
-        return pd.DataFrame(columns=colunas_saida)
-
-    df_work["COD_PLATAFORMA"] = df_work["COD_PLATAFORMA"].apply(normalizar_rotulo_produto)
-    indicador_norm = normalizar_texto_series(df_work["DSC_INDICADOR"])
-    mask_gross_conta = (
-        df_work["COD_PLATAFORMA"].eq("CONTA") &
-        indicador_norm.str.contains("GROSS", na=False) &
-        indicador_norm.str.contains("LIQ", na=False)
-    )
-    df_work = df_work.loc[mask_gross_conta].reset_index(drop=True)
-    if df_work.empty:
-        return pd.DataFrame(columns=colunas_saida)
-
-    df_work["QTDE"] = normalizar_numerico_serie(df_work["QTDE"]).fillna(0.0)
-    df_work["CANAL_PLAN"] = df_work["CANAL_PLAN"].replace({"": "Canal nao informado", "nan": "Canal nao informado"})
-    df_work["REGIONAL"] = df_work["REGIONAL"].replace({"": "N/I", "nan": "N/I"})
-    df_work["MOTIVO_STS"] = (
-        df_work["DSC_MOTIVO_STS"]
-        .replace({"": "Nao informado", "nan": "Nao informado", "None": "Nao informado", "NULL": "Nao informado"})
-        .astype(str)
-        .str.strip()
-    )
-    df_work = df_work.loc[df_work["QTDE"].ne(0)].reset_index(drop=True)
-    if df_work.empty:
-        return pd.DataFrame(columns=colunas_saida)
-
-    df_saida = df_work.loc[:, colunas_saida]
-    compactar_colunas_categoricas(df_saida, ["dat_tratada", "CANAL_PLAN", "REGIONAL", "MOTIVO_STS"])
-    return df_saida
-
-def _classificar_motivo_gross_sts(motivo: str) -> tuple[int, str]:
-    """Define ordem visual estável para os motivos de gross líquido móvel."""
-    motivo_txt = str(motivo or "").strip()
-    motivo_norm = normalizar_chave_visual(motivo_txt)
-    if not motivo_norm:
-        return (98, "nao informado")
-    if "novo" in motivo_norm:
-        return (1, motivo_norm)
-    if "renov" in motivo_norm:
-        return (2, motivo_norm)
-    if "migra" in motivo_norm:
-        return (3, motivo_norm)
-    if "upgrade" in motivo_norm or "up grade" in motivo_norm:
-        return (4, motivo_norm)
-    if "portab" in motivo_norm:
-        return (5, motivo_norm)
-    if "outro" in motivo_norm:
-        return (90, motivo_norm)
-    if "nao informado" in motivo_norm:
-        return (99, motivo_norm)
-    return (50, motivo_norm)
-
-def _cor_motivo_gross_sts(motivo: str, idx_fallback: int = 0) -> str:
-    """Retorna cor estável dos motivos dentro da paleta do dashboard."""
-    motivo_norm = normalizar_chave_visual(motivo)
-    mapa = {
-        "novo": "#790E09",
-        "renov": "#A61C14",
-        "migra": "#C53A2B",
-        "upgrade": "#D95F4A",
-        "up grade": "#D95F4A",
-        "portab": "#E87F69",
-        "outro": "#6B7280",
-        "nao informado": "#94A3B8",
-    }
-    for chave, cor in mapa.items():
-        if chave in motivo_norm:
-            return cor
-    paleta_fallback = ["#5A0A06", "#8D1A12", "#B23A2F", "#C86E61", "#7C3F3A", "#A95C54"]
-    return paleta_fallback[idx_fallback % len(paleta_fallback)]
-
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
-def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
-    """Carrega a base de migracoes PME e padroniza os campos usados na tabela analitica."""
-    _ = file_mtime
-    path_obj = Path(path)
-    colunas_saida = ["REGIONAL", "MES_ANO", "QTDE"]
-    if not path_obj.exists():
-        return pd.DataFrame(columns=colunas_saida)
-
-    try:
-        header_df = _read_excel_with_copy_fallback(path_obj, nrows=0)
-    except Exception:
-        return pd.DataFrame(columns=colunas_saida)
-
-    coluna_data = encontrar_coluna_por_alias(
-        header_df.columns,
-        "DAT_REFERENCIA",
-        "DATA_REFERENCIA",
-        "DAT REFERENCIA"
-    )
-    coluna_regional = encontrar_coluna_por_alias(
-        header_df.columns,
-        "DSC_REGIONAL_CMV",
-        "DSC REGIONAL CMV",
-        "REGIONAL_CMV",
-        "REGIONAL CMV",
-        "DSC_REGIONAL",
-        "REGIONAL"
-    )
-    coluna_qtde = encontrar_coluna_por_alias(
-        header_df.columns,
-        "QTDE_FINAL",
-        "QTDE FINAL",
-        "QTDE",
-        "QTD",
-        "QUANTIDADE"
-    )
-
-    if not coluna_data or not coluna_regional or not coluna_qtde:
-        return pd.DataFrame(columns=colunas_saida)
-
-    try:
-        df = _read_excel_with_copy_fallback(
-            path_obj,
-            usecols=[coluna_data, coluna_regional, coluna_qtde]
-        )
-    except Exception:
-        return pd.DataFrame(columns=colunas_saida)
-
-    if df is None or df.empty:
-        return pd.DataFrame(columns=colunas_saida)
-
-    df = df.rename(
-        columns={
-            coluna_data: "DAT_REFERENCIA",
-            coluna_regional: "REGIONAL",
-            coluna_qtde: "QTDE",
-        }
-    ).reset_index(drop=True)
-
-    df["DAT_REFERENCIA"] = pd.to_datetime(
-        df["DAT_REFERENCIA"],
-        format="mixed",
-        errors="coerce",
-        dayfirst=True
-    )
-    df["REGIONAL"] = (
-        df["REGIONAL"]
-        .astype("string")
-        .str.strip()
-        .str.upper()
-        .str[:3]
-        .replace({"": pd.NA, "NAN": pd.NA, "NON": pd.NA, "NUL": pd.NA})
-    )
-    df["QTDE"] = normalizar_numerico_serie(df["QTDE"]).fillna(0.0)
-
-    df = df.loc[
-        df["DAT_REFERENCIA"].notna() &
-        df["REGIONAL"].notna()
-    ].reset_index(drop=True)
-
-    if df.empty:
-        return pd.DataFrame(columns=colunas_saida)
-
-    df["MES_ANO"] = df["DAT_REFERENCIA"].map(_formatar_mes_ano_backlog)
-    df = df.loc[df["MES_ANO"].notna()].reset_index(drop=True)
-
-    compactar_colunas_categoricas(df, ["REGIONAL", "MES_ANO"])
-    return df[colunas_saida]
-
-def _prever_tendencia_mensal_migracoes(valores_hist: pd.Series | np.ndarray | list[float]) -> float:
-    """
-    Projeta o próximo mês pela média móvel dos 2 últimos meses realizados
-    com crescimento adicional de 10%.
-    """
-    serie = pd.Series(valores_hist, dtype="float64").replace([np.inf, -np.inf], np.nan).dropna()
-    if serie.empty:
-        return 0.0
-
-    y = serie.to_numpy(dtype=float)
-    janela = y[-min(2, len(y)):]
-    return float(max(np.mean(janela) * 1.10, 0.0))
-
-def _resolver_coluna_mes_migracoes(colunas_valor: list[str], mes_ref: str | None) -> str:
-    """Resolve mes selecionado para coluna real ou tendencia da tabela de migracoes."""
-    if not colunas_valor:
-        return ""
-    mes_ref_norm = str(mes_ref or "").replace("TEND.", "").strip().lower()
-    for coluna in colunas_valor:
-        coluna_norm = str(coluna).replace("TEND.", "").strip().lower()
-        if coluna_norm == mes_ref_norm:
-            return str(coluna)
-    return str(colunas_valor[-1])
-
-def _formatar_mom_migracoes(valor: float | int | None) -> str:
-    try:
-        valor_float = float(valor)
-    except Exception:
-        valor_float = 0.0
-    if valor_float > 0.05:
-        seta = "▲"
-    elif valor_float < -0.05:
-        seta = "▼"
-    else:
-        seta = "•"
-    return f"{seta} {valor_float:+.1f}%".replace(".", ",")
-
-def obter_meses_mom_migracoes(df_migracoes: pd.DataFrame) -> tuple[list[str], str]:
-    """Retorna meses reais + proximo mes de tendencia para o filtro de MoM."""
-    if df_migracoes is None or df_migracoes.empty or "MES_ANO" not in df_migracoes.columns:
-        return [], ""
-
-    meses_reais = sorted(
-        df_migracoes["MES_ANO"].dropna().astype(str).unique().tolist(),
-        key=mes_ano_para_data
-    )
-    if not meses_reais:
-        return [], ""
-
-    try:
-        data_tend = pd.Timestamp(mes_ano_para_data(meses_reais[-1])) + pd.DateOffset(months=1)
-        mes_tendencia = _formatar_mes_ano_backlog(data_tend)
-    except Exception:
-        mes_tendencia = ""
-
-    meses_opcoes = meses_reais.copy()
-    if mes_tendencia and mes_tendencia not in meses_opcoes:
-        meses_opcoes.append(mes_tendencia)
-    return meses_opcoes, str(mes_tendencia or "")
-
-def montar_tabela_migracoes_pme_regionais(
-    df_migracoes: pd.DataFrame,
-    mes_mom_ref: str | None = None
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Monta a tabela regional x mes para migracoes PME somando QTDE."""
-    colunas_vazias = ["REGIONAL"]
-    if df_migracoes is None or df_migracoes.empty:
-        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
-
-    meses_ordem = sorted(
-        df_migracoes["MES_ANO"].dropna().astype(str).unique().tolist(),
-        key=mes_ano_para_data
-    )
-    if not meses_ordem:
-        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
-
-    tabela = pd.pivot_table(
-        df_migracoes,
-        index="REGIONAL",
-        columns="MES_ANO",
-        values="QTDE",
-        aggfunc="sum",
-        fill_value=0,
-        observed=False
-    ).reindex(columns=meses_ordem, fill_value=0)
-
-    if tabela.empty:
-        return pd.DataFrame(columns=["REGIONAL", *meses_ordem]), pd.DataFrame(columns=["REGIONAL", *meses_ordem])
-
-    try:
-        data_ref_ult_mes = pd.Timestamp(mes_ano_para_data(meses_ordem[-1]))
-        data_ref_tend = data_ref_ult_mes + pd.DateOffset(months=1)
-        coluna_tendencia = f"TEND. {_formatar_mes_ano_backlog(data_ref_tend)}"
-    except Exception:
-        coluna_tendencia = "TEND."
-
-    tabela[coluna_tendencia] = [
-        _prever_tendencia_mensal_migracoes(
-            pd.to_numeric(tabela.loc[regional, meses_ordem], errors="coerce").fillna(0.0)
-        )
-        for regional in tabela.index
-    ]
-
-    colunas_valor = [*meses_ordem, coluna_tendencia]
-    coluna_mom_ref = _resolver_coluna_mes_migracoes(colunas_valor, mes_mom_ref)
-    mes_mom_base = str(coluna_mom_ref).replace("TEND.", "").strip()
-    mes_mom_anterior = get_mes_anterior(mes_mom_base)
-    coluna_mom_anterior = _resolver_coluna_mes_migracoes(colunas_valor, mes_mom_anterior)
-    if str(coluna_mom_anterior).replace("TEND.", "").strip().lower() != str(mes_mom_anterior).strip().lower():
-        coluna_mom_anterior = ""
-    try:
-        data_mom_ref = pd.Timestamp(mes_ano_para_data(mes_mom_base)).normalize()
-    except Exception:
-        data_mom_ref = pd.Timestamp(mes_ano_para_data(meses_ordem[-1])).normalize()
-    eh_coluna_tendencia = str(coluna_mom_ref).strip().upper().startswith("TEND.")
-    meses_exibicao = [
-        mes for mes in meses_ordem
-        if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() <= data_mom_ref
-    ]
-    if not meses_exibicao:
-        meses_exibicao = [meses_ordem[0]]
-    colunas_exibicao_valor = meses_exibicao.copy()
-    if eh_coluna_tendencia and coluna_tendencia not in colunas_exibicao_valor:
-        colunas_exibicao_valor.append(coluna_tendencia)
-
-    def _calc_mom(row: pd.Series) -> float:
-        valor_atual = float(pd.to_numeric(pd.Series([row.get(coluna_mom_ref, 0.0)]), errors="coerce").fillna(0.0).iloc[0])
-        valor_anterior = (
-            float(pd.to_numeric(pd.Series([row.get(coluna_mom_anterior, 0.0)]), errors="coerce").fillna(0.0).iloc[0])
-            if coluna_mom_anterior else 0.0
-        )
-        return ((valor_atual / valor_anterior) - 1.0) * 100.0 if valor_anterior > 0 else 0.0
-
-    tabela["MoM"] = tabela.apply(_calc_mom, axis=1)
-    if coluna_mom_ref in tabela.columns:
-        tabela = tabela.sort_values(by=[coluna_mom_ref, "MoM"], ascending=[False, False])
-    else:
-        tabela = tabela.sort_index()
-
-    totais_mes = (
-        df_migracoes.groupby("MES_ANO", observed=True)["QTDE"]
-        .sum()
-        .reindex(meses_ordem, fill_value=0)
-    )
-
-    colunas_saida_numericas = [*colunas_exibicao_valor, "MoM"]
-    df_num = tabela[colunas_saida_numericas].reset_index()
-    linha_total = {"REGIONAL": "TOTAL"}
-    for mes in meses_exibicao:
-        linha_total[mes] = float(totais_mes.get(mes, 0))
-    if coluna_tendencia in colunas_exibicao_valor:
-        linha_total[coluna_tendencia] = float(pd.to_numeric(tabela[coluna_tendencia], errors="coerce").fillna(0.0).sum())
-    valor_total_atual = float(linha_total.get(coluna_mom_ref, 0.0))
-    valor_total_anterior = float(linha_total.get(coluna_mom_anterior, 0.0)) if coluna_mom_anterior else 0.0
-    linha_total["MoM"] = ((valor_total_atual / valor_total_anterior) - 1.0) * 100.0 if valor_total_anterior > 0 else 0.0
-    df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
-
-    df_fmt = df_num.copy().astype(object)
-    for col in df_fmt.columns:
-        if col == "REGIONAL":
-            continue
-        serie_col = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0.0)
-        if col == "MoM":
-            df_fmt[col] = serie_col.apply(_formatar_mom_migracoes)
-        else:
-            df_fmt[col] = serie_col.apply(lambda valor: formatar_numero_brasileiro(valor, 0))
-    return df_fmt, df_num
-
-def montar_serie_grafico_migracoes_pme(
-    df_tabela_numerica: pd.DataFrame,
-    regional_ref: str = "Todos"
-) -> pd.DataFrame:
-    """Converte a tabela numerica de migracoes PME em serie mensal para o grafico."""
-    if df_tabela_numerica is None or df_tabela_numerica.empty or "REGIONAL" not in df_tabela_numerica.columns:
-        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
-
-    regional_busca = "TOTAL" if str(regional_ref).strip().lower() in {"", "todos"} else str(regional_ref).strip()
-    linha = df_tabela_numerica[df_tabela_numerica["REGIONAL"].astype(str).str.strip().eq(regional_busca)].copy()
-    if linha.empty:
-        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
-
-    row = linha.iloc[0]
-    registros: list[dict[str, object]] = []
-    for coluna in df_tabela_numerica.columns:
-        if coluna in {"REGIONAL", "MoM"}:
-            continue
-        coluna_str = str(coluna).strip()
-        eh_tendencia = coluna_str.upper().startswith("TEND.")
-        mes_ref = coluna_str.replace("TEND.", "").strip() if eh_tendencia else coluna_str
-        valor = float(pd.to_numeric(pd.Series([row[coluna]]), errors="coerce").fillna(0.0).iloc[0])
-        registros.append(
-            {
-                "MES_ANO": mes_ref,
-                "MES_LABEL": mes_ref.upper(),
-                "QTDE": valor,
-                "TIPO": "TENDENCIA" if eh_tendencia else "REALIZADO",
-            }
-        )
-
-    if not registros:
-        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
-
-    df_serie = pd.DataFrame(registros)
-    df_serie = df_serie.sort_values(
-        by="MES_ANO",
-        key=lambda serie: serie.map(lambda valor: pd.Timestamp(mes_ano_para_data(str(valor))))
-    ).reset_index(drop=True)
-    return df_serie
-
-def criar_grafico_migracoes_pme_mensal(
-    df_serie: pd.DataFrame,
-    regional_ref: str = "Todos",
-    altura: int = 340
-) -> go.Figure:
-    """Cria gráfico mensal de colunas para Migracoes PME com destaque para a tendencia."""
-    if df_serie is None or df_serie.empty:
-        return go.Figure()
-
-    categorias = df_serie["MES_LABEL"].astype(str).tolist()
-    valores = pd.to_numeric(df_serie["QTDE"], errors="coerce").fillna(0.0).astype(float).tolist()
-    tipos = df_serie["TIPO"].astype(str).tolist()
-
-    palette_real = [
-        "#5A0A06", "#63100B", "#6D1511", "#761A16", "#7F1F1B",
-        "#882421", "#922927", "#9B2E2C", "#A43332", "#AE3937"
-    ]
-    cores: list[str] = []
-    idx_real = 0
-    for tipo in tipos:
-        if str(tipo).upper() == "TENDENCIA":
-            cores.append("#D96A5F")
-        else:
-            cores.append(palette_real[min(idx_real, len(palette_real) - 1)])
-            idx_real += 1
-
-    comparacoes: list[dict[str, int]] = []
-    idx_tend = next((idx for idx, tipo in enumerate(tipos) if str(tipo).upper() == "TENDENCIA"), None)
-    if idx_tend is not None and idx_tend > 0:
-        comparacoes.append({"origem": idx_tend - 1, "destino": idx_tend})
-    elif len(categorias) >= 2:
-        comparacoes.append({"origem": len(categorias) - 2, "destino": len(categorias) - 1})
-
-    fig = _criar_grafico_barras_resumo_comparativo(
-        categorias=categorias,
-        valores=valores,
-        cores=cores,
-        altura=altura,
-        comparacoes=comparacoes
-    )
-
-    customdata = [
-        [categorias[idx], "Tendência" if str(tipos[idx]).upper() == "TENDENCIA" else "Realizado"]
-        for idx in range(len(categorias))
-    ]
-    fig.update_traces(
-        customdata=customdata,
-        hovertemplate=(
-            "<b>%{customdata[0]}</b><br>"
-            "<b>Tipo:</b> %{customdata[1]}<br>"
-            "<b>QTDE:</b> %{y:,.0f}<extra></extra>"
-        )
-    )
-    fig.update_layout(
-        paper_bgcolor="#FCFCFD",
-        plot_bgcolor="#FFFFFF",
-        margin=dict(l=16, r=16, t=60, b=44),
-        hoverlabel=dict(
-            bgcolor="white",
-            font_size=12,
-            font_family="Segoe UI",
-            bordercolor="#E2E8F0",
-            font_color="#2F3747"
-        )
-    )
-
-    if idx_tend is not None:
-        fig.add_annotation(
-            x=0.995,
-            y=1.11,
-            xref="paper",
-            yref="paper",
-            xanchor="right",
-            yanchor="top",
-            text="<b>Barra clara = Tendência</b>",
-            showarrow=False,
-            font=dict(size=11, color="#A23B36"),
-            bgcolor="rgba(255,255,255,0.96)",
-            bordercolor="rgba(162, 59, 54, 0.34)",
-            borderwidth=1.0,
-            borderpad=5
-        )
-
-    return fig
-
-FUNIL_FIXA_INDICADORES_CONFIG = [
-    ("INVESTIMENTO", "INVESTIMENTO", 1),
-    ("SESSOES", "SESSÕES", 2),
-    ("PORTEIRA_CEP", "PORTEIRA CEP", 3),
-    ("DADOS_PESSOAIS", "DADOS PESSOAIS", 4),
-    ("ENDERECO", "ENDEREÇO", 5),
-    ("PAGAMENTO", "PAGAMENTO", 6),
-    ("PEDIDOS_TOTAL", "PEDIDOS_TOTAL", 7),
-    ("VENDA_BRUTA", "VENDA BRUTA", 8),
-    ("INSTALACAO", "INSTALAÇÃO", 9),
-]
-FUNIL_FIXA_INDICADOR_LABELS = {
-    chave: label for chave, label, _ in FUNIL_FIXA_INDICADORES_CONFIG
-}
-FUNIL_FIXA_INDICADOR_ORDENS = {
-    chave: ordem for chave, _, ordem in FUNIL_FIXA_INDICADORES_CONFIG
-}
-
-
-def _normalizar_chave_funil_fixa(valor) -> str:
-    if pd.isna(valor):
-        return ""
-    texto = unicodedata.normalize("NFKD", str(valor))
-    texto = texto.encode("ASCII", "ignore").decode("ASCII")
-    texto = texto.strip().upper()
-    texto = re.sub(r"[^A-Z0-9]+", "_", texto)
-    return re.sub(r"_+", "_", texto).strip("_")
-
-
-def _encontrar_coluna_funil_fixa(colunas, *aliases: str) -> str | None:
-    mapa = {}
-    if colunas is None:
-        iterable_colunas = []
-    else:
-        try:
-            iterable_colunas = list(colunas)
-        except Exception:
-            try:
-                iterable_colunas = list(colunas.tolist())
-            except Exception:
-                iterable_colunas = []
-
-    for coluna in iterable_colunas:
-        try:
-            chave = _normalizar_chave_funil_fixa(coluna)
-        except Exception:
-            chave = ""
-        if chave and chave not in mapa:
-            mapa[chave] = coluna
-    for alias in aliases:
-        chave_alias = _normalizar_chave_funil_fixa(alias)
-        if chave_alias in mapa:
-            return mapa[chave_alias]
-    return None
-
-
-def _formatar_mes_ano_funil_fixa(data_ref) -> str:
-    try:
-        ts = pd.Timestamp(data_ref)
-        if pd.isna(ts):
-            return ""
-        meses_pt = {
-            1: "jan", 2: "fev", 3: "mar", 4: "abr", 5: "mai", 6: "jun",
-            7: "jul", 8: "ago", 9: "set", 10: "out", 11: "nov", 12: "dez"
-        }
-        return f"{meses_pt.get(int(ts.month), 'jan')}/{str(int(ts.year))[-2:]}"
-    except Exception:
-        return ""
-
-
-def _normalizar_segmento_funil_fixa(valor) -> str:
-    chave = _normalizar_chave_funil_fixa(valor)
-    if chave == "RESIDENCIAL_CABO":
-        return "PF"
-    if chave == "PF":
-        return "PF"
-    if chave == "PME":
-        return "PME"
-    return str(valor).strip()
-
-
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
-def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
-    _ = file_mtime
-    path_obj = Path(path)
-    if not path_obj.exists():
-        return pd.DataFrame()
-
-    try:
-        df_raw = _read_excel_with_copy_fallback(path_obj)
-    except Exception:
-        return pd.DataFrame()
-    if df_raw is None or df_raw.empty:
-        return pd.DataFrame()
-
-    col_segmento = _encontrar_coluna_funil_fixa(df_raw.columns, "SEGMENTO")
-    col_indicador = _encontrar_coluna_funil_fixa(df_raw.columns, "INDICADOR")
-    col_periodo = _encontrar_coluna_funil_fixa(df_raw.columns, "PERIODO", "PERIODO_MES", "PERIODO MES")
-    col_qtde = _encontrar_coluna_funil_fixa(df_raw.columns, "QTDE")
-    obrigatorias = [col_segmento, col_indicador, col_periodo, col_qtde]
-    if any(col is None for col in obrigatorias):
-        return pd.DataFrame()
-
-    df = df_raw.rename(columns={
-        col_segmento: "SEGMENTO",
-        col_indicador: "INDICADOR",
-        col_periodo: "PERIODO_MES",
-        col_qtde: "QTDE",
-    })[["SEGMENTO", "INDICADOR", "PERIODO_MES", "QTDE"]].copy()
-
-    df["SEGMENTO"] = df["SEGMENTO"].map(_normalizar_segmento_funil_fixa)
-    df["INDICADOR_CHAVE"] = df["INDICADOR"].map(_normalizar_chave_funil_fixa)
-    df = df[df["SEGMENTO"].isin(["PF", "PME"])].copy()
-    df = df[df["INDICADOR_CHAVE"].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
-    if df.empty:
-        return pd.DataFrame()
-
-    df["INDICADOR"] = df["INDICADOR_CHAVE"].map(FUNIL_FIXA_INDICADOR_LABELS)
-    df["INDICADOR_ORDEM"] = df["INDICADOR_CHAVE"].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(999.0)
-    df["PERIODO_MES"] = pd.to_datetime(
-        df["PERIODO_MES"],
-        format="mixed",
-        errors="coerce",
-        dayfirst=True
-    )
-    df["QTDE"] = normalizar_numerico_serie(df["QTDE"]).fillna(0.0)
-    df = df[df["PERIODO_MES"].notna()].copy()
-    df["MES_ANO"] = df["PERIODO_MES"].apply(_formatar_mes_ano_funil_fixa).astype(str).str.strip().str.lower()
-    df["MES_ANO_ORDEM"] = (df["PERIODO_MES"].dt.year * 100 + df["PERIODO_MES"].dt.month).astype(int)
-    compactar_colunas_categoricas(df, ["SEGMENTO", "INDICADOR", "MES_ANO"])
-    return df
-
-
-def _calcular_pesos_origem_tend_funil_fixa(
-    df_base: pd.DataFrame,
-    segmento_ref: str,
-    indicador_ref: str,
-    mes_ref_ordem: int,
-    qtd_meses_hist: int = 3
-) -> pd.Series:
-    if df_base is None or df_base.empty:
-        return pd.Series(dtype=float)
-
-    base_ref = df_base[
-        df_base["SEGMENTO"].astype(str).eq(str(segmento_ref)) &
-        df_base["INDICADOR"].astype(str).eq(str(indicador_ref))
-    ].copy()
-    if base_ref.empty:
-        return pd.Series(dtype=float)
-
-    colunas_peso = ["ORIGEM_AGG"]
-    if "CANAL_ENTRADA" in base_ref.columns:
-        colunas_peso.append("CANAL_ENTRADA")
-
-    meses_hist = sorted(
-        base_ref.loc[
-            pd.to_numeric(base_ref["MES_ANO_ORDEM"], errors="coerce").fillna(0).astype(int).lt(int(mes_ref_ordem)),
-            "MES_ANO_ORDEM"
-        ].dropna().astype(int).unique().tolist()
-    )[-max(int(qtd_meses_hist), 1):]
-
-    base_hist = base_ref[base_ref["MES_ANO_ORDEM"].isin(meses_hist)].copy()
-    if not base_hist.empty:
-        tabela_hist = base_hist.pivot_table(
-            index=colunas_peso,
-            columns="MES_ANO_ORDEM",
-            values="QTDE",
-            aggfunc="sum",
-            fill_value=0.0
-        )
-        pesos = pd.to_numeric(tabela_hist.mean(axis=1), errors="coerce").fillna(0.0)
-        pesos = pesos[pesos.gt(0)]
-        if not pesos.empty and float(pesos.sum()) > 0:
-            return pesos / float(pesos.sum())
-
-    base_prev = base_ref[
-        pd.to_numeric(base_ref["MES_ANO_ORDEM"], errors="coerce").fillna(0).astype(int).lt(int(mes_ref_ordem))
-    ].copy()
-    if not base_prev.empty:
-        pesos = pd.to_numeric(
-            base_prev.groupby(colunas_peso, observed=True)["QTDE"].sum(),
-            errors="coerce"
-        ).fillna(0.0)
-        pesos = pesos[pesos.gt(0)]
-        if not pesos.empty and float(pesos.sum()) > 0:
-            return pesos / float(pesos.sum())
-
-    base_mes = base_ref[
-        pd.to_numeric(base_ref["MES_ANO_ORDEM"], errors="coerce").fillna(0).astype(int).eq(int(mes_ref_ordem))
-    ].copy()
-    if not base_mes.empty:
-        pesos = pd.to_numeric(
-            base_mes.groupby(colunas_peso, observed=True)["QTDE"].sum(),
-            errors="coerce"
-        ).fillna(0.0)
-        pesos = pesos[pesos.gt(0)]
-        if not pesos.empty and float(pesos.sum()) > 0:
-            return pesos / float(pesos.sum())
-
-    combos_hist = (
-        base_ref[colunas_peso]
-        .dropna()
-        .astype(str)
-        .apply(lambda col: col.str.strip())
-        .drop_duplicates()
-    )
-    if not combos_hist.empty:
-        peso_uniforme = 1.0 / float(len(combos_hist))
-        if len(colunas_peso) == 1:
-            return pd.Series(
-                {str(linha["ORIGEM_AGG"]).strip(): peso_uniforme for _, linha in combos_hist.iterrows()},
-                dtype=float
-            )
-        return pd.Series(
-            {
-                (str(linha["ORIGEM_AGG"]).strip(), str(linha["CANAL_ENTRADA"]).strip()): peso_uniforme
-                for _, linha in combos_hist.iterrows()
-            },
-            dtype=float
-        )
-
-    return pd.Series({"DEMAIS": 1.0}, dtype=float)
-
-
-def _aplicar_tend_funil_fixa(df_funil: pd.DataFrame, df_tend: pd.DataFrame) -> pd.DataFrame:
-    if df_funil is None or df_funil.empty:
-        return pd.DataFrame()
-
-    base = df_funil.copy()
-    base["EH_TEND"] = pd.to_numeric(base.get("EH_TEND", 0), errors="coerce").fillna(0).astype(int)
-    if df_tend is None or df_tend.empty:
-        return base
-
-    base_sem_tend = base.copy()
-    chaves_tend = (
-        df_tend[["SEGMENTO", "INDICADOR", "MES_ANO_ORDEM"]]
-        .drop_duplicates()
-        .to_dict("records")
-    )
-    for chave in chaves_tend:
-        segmento_ref = str(chave["SEGMENTO"]).strip()
-        indicador_ref = str(chave["INDICADOR"]).strip()
-        mes_ref_ordem = int(chave["MES_ANO_ORDEM"])
-        base_sem_tend = base_sem_tend[
-            ~(
-                base_sem_tend["SEGMENTO"].astype(str).eq(segmento_ref) &
-                base_sem_tend["INDICADOR"].astype(str).eq(indicador_ref) &
-                pd.to_numeric(base_sem_tend["MES_ANO_ORDEM"], errors="coerce").fillna(0).astype(int).eq(mes_ref_ordem)
-            )
-        ].copy()
-
-    linhas_tend = []
-    for _, linha_tend in df_tend.iterrows():
-        segmento_ref = str(linha_tend.get("SEGMENTO", "")).strip()
-        indicador_ref = str(linha_tend.get("INDICADOR", "")).strip()
-        indicador_chave = str(linha_tend.get("INDICADOR_CHAVE", "")).strip()
-        indicador_ordem = float(pd.to_numeric(pd.Series([linha_tend.get("INDICADOR_ORDEM", 999.0)]), errors="coerce").fillna(999.0).iloc[0])
-        mes_ref_ordem = int(pd.to_numeric(pd.Series([linha_tend.get("MES_ANO_ORDEM", 0)]), errors="coerce").fillna(0).iloc[0])
-        qtde_tend = float(pd.to_numeric(pd.Series([linha_tend.get("QTDE", 0.0)]), errors="coerce").fillna(0.0).iloc[0])
-        if qtde_tend <= 0 or mes_ref_ordem <= 0:
-            continue
-
-        pesos_origem = _calcular_pesos_origem_tend_funil_fixa(
-            df_base=base,
-            segmento_ref=segmento_ref,
-            indicador_ref=indicador_ref,
-            mes_ref_ordem=mes_ref_ordem,
-            qtd_meses_hist=3
-        )
-        pesos_origem = pd.to_numeric(pesos_origem, errors="coerce").fillna(0.0)
-        pesos_origem = pesos_origem[pesos_origem.gt(0)]
-        if pesos_origem.empty:
-            continue
-        pesos_origem = pesos_origem / float(pesos_origem.sum())
-
-        chaves_peso = list(pesos_origem.index)
-        valores_alloc = [qtde_tend * float(pesos_origem.loc[chave_peso]) for chave_peso in chaves_peso]
-        if valores_alloc:
-            ajuste_final = qtde_tend - float(np.sum(valores_alloc))
-            idx_maior = int(np.argmax(valores_alloc))
-            valores_alloc[idx_maior] += ajuste_final
-
-        periodo_ref = pd.Timestamp(linha_tend.get("PERIODO_MES"))
-        mes_rotulo = str(linha_tend.get("MES_ANO", "")).strip().lower() or _formatar_mes_ano_funil_fixa(periodo_ref)
-        for chave_peso, qtde_alloc in zip(chaves_peso, valores_alloc):
-            if isinstance(chave_peso, tuple):
-                origem_ref = chave_peso[0] if len(chave_peso) > 0 else "DEMAIS"
-                canal_entrada_ref = chave_peso[1] if len(chave_peso) > 1 else "Não Informado"
-            else:
-                origem_ref = chave_peso
-                canal_entrada_ref = "Não Informado"
-            linhas_tend.append({
-                "SEGMENTO": segmento_ref,
-                "ORIGEM_AGG": str(origem_ref).strip(),
-                "CANAL_ENTRADA": str(canal_entrada_ref).strip(),
-                "INDICADOR": indicador_ref,
-                "PERIODO_MES": periodo_ref,
-                "QTDE": float(qtde_alloc),
-                "INDICADOR_ORDEM": indicador_ordem,
-                "MES_ANO": mes_rotulo,
-                "MES_ANO_ORDEM": mes_ref_ordem,
-                "INDICADOR_CHAVE": indicador_chave,
-                "EH_TEND": 1,
-            })
-
-    if not linhas_tend:
-        return base
-
-    df_tend_alloc = pd.DataFrame(linhas_tend)
-    for coluna in base_sem_tend.columns:
-        if coluna not in df_tend_alloc.columns:
-            df_tend_alloc[coluna] = np.nan
-    df_tend_alloc = df_tend_alloc[base_sem_tend.columns.tolist()]
-
-    df_out = pd.concat([base_sem_tend, df_tend_alloc], ignore_index=True, sort=False)
-    df_out["QTDE"] = normalizar_numerico_serie(df_out["QTDE"]).fillna(0.0)
-    df_out["MES_ANO_ORDEM"] = normalizar_numerico_serie(df_out["MES_ANO_ORDEM"]).fillna(0).astype(int)
-    df_out["INDICADOR_ORDEM"] = normalizar_numerico_serie(df_out["INDICADOR_ORDEM"]).fillna(999.0)
-    df_out["EH_TEND"] = pd.to_numeric(df_out.get("EH_TEND", 0), errors="coerce").fillna(0).astype(int)
-    return df_out
-
-
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
-def load_funil_fixa_ecommerce_data(
-    path: str,
-    file_mtime: float | None = None,
-    tend_path: str | None = None,
-    tend_file_mtime: float | None = None
-) -> pd.DataFrame:
-    _ = file_mtime
-    _ = tend_file_mtime
-    path_obj = Path(path)
-    if not path_obj.exists():
-        return pd.DataFrame()
-
-    try:
-        df_raw = _read_excel_with_copy_fallback(path_obj)
-    except Exception:
-        return pd.DataFrame()
-    if df_raw is None or df_raw.empty:
-        return pd.DataFrame()
-
-    col_segmento = _encontrar_coluna_funil_fixa(df_raw.columns, "SEGMENTO")
-    col_origem = _encontrar_coluna_funil_fixa(df_raw.columns, "ORIGEM_AGG", "ORIGEM AGG")
-    col_canal_entrada = _encontrar_coluna_funil_fixa(df_raw.columns, "CANAL_ENTRADA", "CANAL ENTRADA", "CANAL DE ENTRADA")
-    col_indicador = _encontrar_coluna_funil_fixa(df_raw.columns, "INDICADOR")
-    col_indicador_ordem = _encontrar_coluna_funil_fixa(df_raw.columns, "INDICADOR_ORDEM", "INDICADOR ORDEM")
-    col_periodo = _encontrar_coluna_funil_fixa(df_raw.columns, "PERIODO_MES", "PERIODO MES")
-    col_mes_ano = _encontrar_coluna_funil_fixa(df_raw.columns, "MES_ANO", "MÊS_ANO")
-    col_mes_ordem = _encontrar_coluna_funil_fixa(df_raw.columns, "MES_ANO_ORDEM", "MES ANO ORDEM")
-    col_qtde = _encontrar_coluna_funil_fixa(df_raw.columns, "QTDE")
-
-    obrigatorias = [col_segmento, col_origem, col_indicador, col_periodo, col_qtde]
-    if any(col is None for col in obrigatorias):
-        return pd.DataFrame()
-
-    rename_map = {
-        col_segmento: "SEGMENTO",
-        col_origem: "ORIGEM_AGG",
-        col_indicador: "INDICADOR",
-        col_periodo: "PERIODO_MES",
-        col_qtde: "QTDE",
-    }
-    if col_indicador_ordem:
-        rename_map[col_indicador_ordem] = "INDICADOR_ORDEM"
-    if col_canal_entrada:
-        rename_map[col_canal_entrada] = "CANAL_ENTRADA"
-    if col_mes_ano:
-        rename_map[col_mes_ano] = "MES_ANO"
-    if col_mes_ordem:
-        rename_map[col_mes_ordem] = "MES_ANO_ORDEM"
-
-    df = df_raw.rename(columns=rename_map)[list(rename_map.values())].copy()
-
-    if "CANAL_ENTRADA" not in df.columns:
-        df["CANAL_ENTRADA"] = "Não Informado"
-
-    for coluna_txt in ["SEGMENTO", "ORIGEM_AGG", "CANAL_ENTRADA", "INDICADOR"]:
-        df[coluna_txt] = df[coluna_txt].astype(str).str.strip()
-        df = df[df[coluna_txt].ne("")]
-
-    df["SEGMENTO"] = df["SEGMENTO"].map(_normalizar_segmento_funil_fixa)
-    df["INDICADOR_CHAVE"] = df["INDICADOR"].map(_normalizar_chave_funil_fixa)
-    df = df[df["SEGMENTO"].isin(["PF", "PME"])].copy()
-    df = df[df["INDICADOR_CHAVE"].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
-    df["INDICADOR"] = df["INDICADOR_CHAVE"].map(FUNIL_FIXA_INDICADOR_LABELS)
-
-    df["QTDE"] = normalizar_numerico_serie(df["QTDE"]).fillna(0.0)
-    if "INDICADOR_ORDEM" not in df.columns:
-        df["INDICADOR_ORDEM"] = 999.0
-    df["INDICADOR_ORDEM"] = normalizar_numerico_serie(df["INDICADOR_ORDEM"]).fillna(999.0)
-    df["INDICADOR_ORDEM"] = df["INDICADOR_CHAVE"].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(df["INDICADOR_ORDEM"])
-
-    df["PERIODO_MES"] = pd.to_datetime(
-        df["PERIODO_MES"],
-        format="mixed",
-        errors="coerce",
-        dayfirst=True
-    )
-    if "MES_ANO_ORDEM" in df.columns:
-        df["MES_ANO_ORDEM"] = normalizar_numerico_serie(df["MES_ANO_ORDEM"])
-    else:
-        df["MES_ANO_ORDEM"] = np.nan
-
-    if "MES_ANO" not in df.columns:
-        df["MES_ANO"] = ""
-    df["MES_ANO"] = df["MES_ANO"].fillna("").astype(str).str.strip().str.lower()
-
-    mask_periodo = df["PERIODO_MES"].notna()
-    df.loc[mask_periodo, "MES_ANO"] = df.loc[mask_periodo, "PERIODO_MES"].apply(_formatar_mes_ano_funil_fixa)
-    df.loc[mask_periodo, "MES_ANO_ORDEM"] = (
-        df.loc[mask_periodo, "PERIODO_MES"].dt.year * 100 +
-        df.loc[mask_periodo, "PERIODO_MES"].dt.month
-    )
-
-    df["MES_ANO"] = df["MES_ANO"].astype(str).str.strip().str.lower()
-    df["MES_ANO_ORDEM"] = normalizar_numerico_serie(df["MES_ANO_ORDEM"]).fillna(0).astype(int)
-    df = df[df["MES_ANO_ORDEM"] > 0].copy()
-    df["EH_TEND"] = 0
-
-    tend_path_obj = resolver_arquivo_dashboard(
-        Path(tend_path) if tend_path else TEND_FUNIL_FIXA_FILE_PATH,
-        TEND_FUNIL_FIXA_FILE_PATH,
-        path_obj.with_name("tend_funil_ecom.xlsx"),
-        "tend_funil_ecom.xlsx"
-    )
-    tend_path_obj = tend_path_obj if Path(tend_path_obj).exists() else None
-    if tend_path_obj is not None:
-        df_tend = load_tend_funil_fixa_data(str(tend_path_obj), tend_file_mtime)
-        if not df_tend.empty:
-            df = _aplicar_tend_funil_fixa(df, df_tend)
-
-    compactar_colunas_categoricas(df, ["SEGMENTO", "ORIGEM_AGG", "CANAL_ENTRADA", "INDICADOR", "MES_ANO"])
-    return df
-
-
-def _calcular_janela_meses_funil_fixa(
-    df_funil: pd.DataFrame,
-    qtd_meses: int = 13,
-    mes_foco_ordem: int | None = None
-) -> list[int]:
-    if df_funil is None or df_funil.empty or "MES_ANO_ORDEM" not in df_funil.columns:
-        return []
-    meses = sorted(df_funil["MES_ANO_ORDEM"].dropna().astype(int).unique().tolist())
-    if mes_foco_ordem is not None:
-        meses = [mes for mes in meses if int(mes) <= int(mes_foco_ordem)]
-    if not meses:
-        return []
-    return meses[-max(int(qtd_meses), 1):]
-
-
-def _obter_mes_tend_funil_fixa(df_funil: pd.DataFrame) -> int | None:
-    if df_funil is None or df_funil.empty or "EH_TEND" not in df_funil.columns:
-        return None
-    meses_tend = sorted(
-        df_funil.loc[
-            pd.to_numeric(df_funil.get("EH_TEND", 0), errors="coerce").fillna(0).astype(int).gt(0),
-            "MES_ANO_ORDEM"
-        ].dropna().astype(int).unique().tolist()
-    )
-    return int(meses_tend[-1]) if meses_tend else None
-
-
-def _formatar_valor_funil_fixa(valor: float) -> str:
-    return formatar_numero_brasileiro(
-        float(pd.to_numeric(pd.Series([valor]), errors="coerce").fillna(0.0).iloc[0]),
-        0
-    )
-
-
-def _calcular_mom_funil_fixa(valor_atual: float, valor_anterior: float) -> float:
-    atual = float(valor_atual or 0.0)
-    anterior = float(valor_anterior or 0.0)
-    if anterior == 0:
-        return np.nan
-    return ((atual / anterior) - 1.0) * 100.0
-
-
-def _render_mom_badge_funil_fixa(valor_mom: float) -> str:
-    if pd.isna(valor_mom):
-        return '<span class="mom-pill mom-flat">• n/d</span>'
-    if valor_mom > 0:
-        classe = "mom-up"
-        seta = "▲"
-    elif valor_mom < 0:
-        classe = "mom-down"
-        seta = "▼"
-    else:
-        classe = "mom-flat"
-        seta = "•"
-    texto = f"{seta} {valor_mom:+.1f}%".replace(".", ",")
-    return f'<span class="mom-pill {classe}">{texto}</span>'
-
-
-def montar_estrutura_funil_fixa_ecommerce(
-    df_funil: pd.DataFrame,
-    segmentos_sel: list[str] | None = None,
-    origens_sel: list[str] | None = None,
-    canais_entrada_sel: list[str] | None = None,
-    indicadores_sel: list[str] | None = None,
-    mes_ref_ordem: int | None = None,
-    qtd_meses: int = 13
-) -> dict:
-    estrutura_vazia = {
-        "meses_ordem": [],
-        "meses_rotulos": [],
-        "mes_atual_rotulo": "",
-        "meses_base_mm3": [],
-        "mes_tend_ordem": None,
-        "rows": [],
-        "observacao_mm3": ""
-    }
-    if df_funil is None or df_funil.empty:
-        return estrutura_vazia
-
-    base = df_funil.copy()
-    if segmentos_sel:
-        base = base[base["SEGMENTO"].isin(segmentos_sel)].copy()
-    if origens_sel:
-        base = base[base["ORIGEM_AGG"].isin(origens_sel)].copy()
-    if canais_entrada_sel and "CANAL_ENTRADA" in base.columns:
-        base = base[base["CANAL_ENTRADA"].isin(canais_entrada_sel)].copy()
-    if indicadores_sel:
-        base = base[base["INDICADOR"].isin(indicadores_sel)].copy()
-    if base.empty:
-        return estrutura_vazia
-
-    mapa_meses = (
-        base[["MES_ANO_ORDEM", "MES_ANO"]]
-        .drop_duplicates()
-        .sort_values(["MES_ANO_ORDEM", "MES_ANO"])
-        .drop_duplicates(subset=["MES_ANO_ORDEM"], keep="last")
-    )
-    mapa_ordem_rotulo = {
-        int(linha["MES_ANO_ORDEM"]): str(linha["MES_ANO"]).strip().upper()
-        for _, linha in mapa_meses.iterrows()
-    }
-    mes_tend_ordem = _obter_mes_tend_funil_fixa(base)
-    meses_ordem = _calcular_janela_meses_funil_fixa(
-        base,
-        qtd_meses=qtd_meses,
-        mes_foco_ordem=mes_ref_ordem
-    )
-    if not meses_ordem:
-        return estrutura_vazia
-    meses_rotulos = [mapa_ordem_rotulo.get(ordem, str(ordem)) for ordem in meses_ordem]
-
-    agg = (
-        base.groupby(["INDICADOR", "ORIGEM_AGG", "INDICADOR_ORDEM", "MES_ANO_ORDEM"], observed=True)["QTDE"]
-        .sum()
-        .reset_index()
-    )
-    if agg.empty:
-        return estrutura_vazia
-
-    tabela_child = agg.pivot_table(
-        index=["INDICADOR", "ORIGEM_AGG", "INDICADOR_ORDEM"],
-        columns="MES_ANO_ORDEM",
-        values="QTDE",
-        aggfunc="sum",
-        fill_value=0.0
-    )
-    tabela_child = tabela_child.reindex(columns=meses_ordem, fill_value=0.0)
-
-    mes_atual_ordem = meses_ordem[-1]
-    mes_mais_recente_disponivel = max(mapa_ordem_rotulo.keys()) if mapa_ordem_rotulo else None
-    meses_mm3 = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
-    aplicar_mm3_mes_atual = bool(
-        meses_mm3 and
-        mes_mais_recente_disponivel is not None and
-        int(mes_atual_ordem) == int(mes_mais_recente_disponivel) and
-        (mes_tend_ordem is None or int(mes_atual_ordem) != int(mes_tend_ordem))
-    )
-    if aplicar_mm3_mes_atual:
-        tabela_child[mes_atual_ordem] = tabela_child[meses_mm3].mean(axis=1)
-
-    tabela_parent = tabela_child.groupby(level=["INDICADOR", "INDICADOR_ORDEM"]).sum()
-    tabela_child_reset = tabela_child.reset_index()
-
-    rows = []
-    indicadores_ordenados = sorted(
-        [(idx[0], float(idx[1] if not pd.isna(idx[1]) else 999.0)) for idx in tabela_parent.index],
-        key=lambda item: (item[1], str(item[0]).upper())
-    )
-
-    for idx_pai, (indicador, indicador_ordem) in enumerate(indicadores_ordenados, start=1):
-        serie_pai = tabela_parent.loc[(indicador, indicador_ordem)]
-        atual_pai = float(serie_pai.get(mes_atual_ordem, 0.0))
-        anterior_pai = float(serie_pai.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
-        row_id = f"funil-pai-{idx_pai}"
-        filhos = []
-
-        filhos_df = tabela_child_reset[
-            tabela_child_reset["INDICADOR"].astype(str).eq(str(indicador)) &
-            pd.to_numeric(tabela_child_reset["INDICADOR_ORDEM"], errors="coerce").fillna(999.0).eq(float(indicador_ordem))
-        ].copy()
-        filhos_df["_ordem_total"] = filhos_df[meses_ordem].sum(axis=1)
-        filhos_df["_ordem_mes_ref"] = pd.to_numeric(filhos_df[mes_atual_ordem], errors="coerce").fillna(0.0)
-        filhos_df = filhos_df.sort_values(
-            by=["_ordem_total", "_ordem_mes_ref", "ORIGEM_AGG"],
-            ascending=[False, False, True],
-            na_position="last"
-        )
-
-        for idx_filho, (_, linha_filho) in enumerate(filhos_df.iterrows(), start=1):
-            origem = str(linha_filho.get("ORIGEM_AGG", "")).strip()
-            atual_filho = float(linha_filho.get(mes_atual_ordem, 0.0))
-            anterior_filho = float(linha_filho.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
-            raw_values_filho = [float(linha_filho.get(mes, 0.0)) for mes in meses_ordem]
-            filhos.append({
-                "id": f"{row_id}-filho-{idx_filho}",
-                "parent_id": row_id,
-                "label": str(origem),
-                "level": 1,
-                "values": [_formatar_valor_funil_fixa(valor) for valor in raw_values_filho],
-                "raw_values": raw_values_filho,
-                "sort_mes_ref": float(raw_values_filho[-1]) if raw_values_filho else 0.0,
-                "sort_total": float(sum(raw_values_filho)) if raw_values_filho else 0.0,
-                "sort_vector": [float(v) for v in raw_values_filho[::-1]],
-                "mom_html": _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_filho, anterior_filho)),
-            })
-
-        filhos = sorted(
-            filhos,
-            key=lambda item: (
-                *tuple(-float(v) for v in item.get("sort_vector", [])),
-                -float(item.get("sort_total", 0.0)),
-                str(item.get("label", "")).upper(),
-            )
-        )
-
-        raw_values_pai = [float(serie_pai.get(mes, 0.0)) for mes in meses_ordem]
-        rows.append({
-            "id": row_id,
-            "label": str(indicador),
-            "level": 0,
-            "values": [_formatar_valor_funil_fixa(valor) for valor in raw_values_pai],
-            "raw_values": raw_values_pai,
-            "mom_html": _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_pai, anterior_pai)),
-            "children": filhos,
-        })
-
-    observacao_mm3 = ""
-    if mes_tend_ordem is not None and int(mes_atual_ordem) == int(mes_tend_ordem):
-        meses_ref_tend = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
-        rotulos_ref_tend = ", ".join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_ref_tend) if meses_ref_tend else ""
-        complemento = f" pela proporcao media dos ultimos 3 meses ({rotulos_ref_tend})." if rotulos_ref_tend else "."
-        observacao_mm3 = (
-            f"O mes {mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem))} foi carregado pelo arquivo de tend"
-            f"{complemento}"
-        )
-    elif aplicar_mm3_mes_atual and meses_mm3:
-        observacao_mm3 = (
-            f"O mês {mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem))} foi preenchido com média móvel "
-            f"dos últimos {len(meses_mm3)} meses ({', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3)})."
-        )
-
-    return {
-        "meses_ordem": meses_ordem,
-        "meses_rotulos": meses_rotulos,
-        "mes_atual_rotulo": mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem)),
-        "meses_base_mm3": [mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3] if aplicar_mm3_mes_atual else [],
-        "mes_tend_ordem": mes_tend_ordem,
-        "rows": rows,
-        "observacao_mm3": observacao_mm3,
-    }
-
-
-def criar_tabela_html_funil_fixa_ecommerce(
-    estrutura: dict,
-    table_id: str,
-    max_body_height: int = 760
-) -> str:
-    if not estrutura or not estrutura.get("rows"):
-        return ""
-
-    qtd_meses = max(len(estrutura.get("meses_rotulos", [])), 1)
-    largura_primeira_coluna = 148
-    largura_coluna_mom = 72
-    mes_tend_ordem = estrutura.get("mes_tend_ordem")
-    colgroup_html = (
-        "<colgroup>"
-        f'<col style="width:{largura_primeira_coluna}px;">'
-        + "".join(
-            f'<col style="width:calc((100% - {largura_primeira_coluna + largura_coluna_mom}px) / {qtd_meses});">'
-            for _ in range(qtd_meses)
-        )
-        + f'<col style="width:{largura_coluna_mom}px;">'
-        + "</colgroup>"
-    )
-
-    def _render_databar_cell(valor_bruto: float, valor_formatado: str, max_coluna: float, eh_col_tend: bool = False) -> str:
-        valor_num = float(pd.to_numeric(pd.Series([valor_bruto]), errors="coerce").fillna(0.0).iloc[0])
-        max_ref = float(pd.to_numeric(pd.Series([max_coluna]), errors="coerce").fillna(0.0).iloc[0])
-        if max_ref <= 0 or valor_num <= 0:
-            largura = 0.0
-        else:
-            largura = max(8.0, min(100.0, (valor_num / max_ref) * 100.0))
-
-        return (
-            f'<td class="ff-data-cell{" ff-col-tend" if eh_col_tend else ""}">'
-            '<div class="ff-data-bar-wrap">'
-            f'<div class="ff-data-bar-fill" style="width:{largura:.1f}%;"></div>'
-            f'<span class="ff-data-bar-text">{escape(str(valor_formatado))}</span>'
-            "</div>"
-            "</td>"
-        )
-
-    cabecalhos_meses = "".join(
-        f'<th class="ff-col-mes{" ff-col-tend" if estrutura.get("meses_ordem", [])[idx] == mes_tend_ordem else ""}">{escape(str(rotulo))}</th>'
-        for idx, rotulo in enumerate(estrutura.get("meses_rotulos", []))
-    )
-
-    linhas_html = []
-    for row in estrutura.get("rows", []):
-        possui_filhos = bool(row.get("children"))
-        btn_toggle = (
-            f'<button class="ff-toggle" data-target="{escape(str(row.get("id")), quote=True)}" aria-label="Expandir {escape(str(row.get("label")))}">+</button>'
-            if possui_filhos else '<span class="ff-toggle ff-toggle-placeholder"></span>'
-        )
-        valores_html = "".join(
-            f'<td class="{"ff-col-tend" if estrutura.get("meses_ordem", [])[idx_coluna] == mes_tend_ordem else ""}">{escape(str(valor))}</td>'
-            for idx_coluna, valor in enumerate(row.get("values", []))
-        )
-        linhas_html.append(
-            f'<tr class="ff-row ff-row-parent" data-row-id="{escape(str(row.get("id")), quote=True)}">'
-            f'<td class="ff-sticky ff-row-label">{btn_toggle}<span class="ff-label-text">{escape(str(row.get("label")))}</span></td>'
-            f"{valores_html}"
-            f'<td class="ff-mom-cell">{row.get("mom_html", "")}</td>'
-            "</tr>"
-        )
-        maximos_filhos = []
-        if row.get("children"):
-            qtd_colunas = len(row.get("values", []))
-            for idx_coluna in range(qtd_colunas):
-                max_coluna = max(
-                    [
-                        float(pd.to_numeric(pd.Series([child.get("raw_values", [0.0] * qtd_colunas)[idx_coluna]]), errors="coerce").fillna(0.0).iloc[0])
-                        for child in row.get("children", [])
-                    ] or [0.0]
-                )
-                maximos_filhos.append(max_coluna)
-        for child in row.get("children", []):
-            child_values_html = "".join(
-                _render_databar_cell(
-                    valor_bruto=child.get("raw_values", [0.0] * len(child.get("values", [])))[idx_coluna],
-                    valor_formatado=child.get("values", [""])[idx_coluna],
-                    max_coluna=maximos_filhos[idx_coluna] if idx_coluna < len(maximos_filhos) else 0.0,
-                    eh_col_tend=estrutura.get("meses_ordem", [])[idx_coluna] == mes_tend_ordem
-                )
-                for idx_coluna in range(len(child.get("values", [])))
-            )
-            linhas_html.append(
-                f'<tr class="ff-row ff-row-child" data-parent-row="{escape(str(row.get("id")), quote=True)}" style="display:none;">'
-                f'<td class="ff-sticky ff-row-label ff-row-label-child"><span class="ff-child-indent"></span><span class="ff-label-text">{escape(str(child.get("label")))}</span></td>'
-                f"{child_values_html}"
-                f'<td class="ff-mom-cell">{child.get("mom_html", "")}</td>'
-                "</tr>"
-            )
-
-    observacao = ""
-
-    return f'''
-    <div id="{escape(table_id, quote=True)}" class="ff-wrapper">
-      <style>
-        #{table_id}.ff-wrapper {{font-family:'Manrope','Segoe UI',sans-serif; color:#312B2A; margin-top:2px;}}
-        #{table_id} .ff-note {{margin:0 0 6px 2px; font-size:11px; color:#6B5C59;}}
-        #{table_id} .ff-table-box {{
-            position:relative;
-            border:1px solid rgba(121,14,9,0.70);
-            border-radius:6px;
-            overflow-y:auto;
-            overflow-x:hidden;
-            max-height:{int(max_body_height)}px;
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,248,247,0.96) 100%);
-            box-shadow:
-                0 18px 40px rgba(90,10,6,0.14),
-                0 4px 14px rgba(15,23,42,0.07),
-                inset 0 0 0 1px rgba(255,255,255,0.92);
-        }}
-        #{table_id} .ff-table-box::before {{
-            content:none;
-            display:none;
-        }}
-        #{table_id} table {{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; margin-top:0; font-variant-numeric:tabular-nums; background:#FFFFFF;}}
-        #{table_id} thead th {{
-            position:sticky;
-            top:0;
-            z-index:3;
-            background:linear-gradient(180deg, #790E09 0%, #4E0805 100%);
-            color:#FFFFFF;
-            font-size:9.4px;
-            letter-spacing:0.24px;
-            text-transform:uppercase;
-            padding:8px 5px;
-            border-right:1px solid rgba(255,255,255,0.18);
-            border-bottom:1px solid rgba(61,7,4,0.92);
-            white-space:nowrap;
-            overflow:hidden;
-            text-overflow:ellipsis;
-            font-weight:800;
-        }}
-        #{table_id} thead th:first-child {{left:0; z-index:4; border-top-left-radius:5px; text-align:left; padding-left:12px; background:linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);}}
-        #{table_id} thead th:last-child {{border-top-right-radius:5px; background:linear-gradient(180deg, #4F5861 0%, #343B43 100%);}}
-        #{table_id} thead th.ff-col-tend {{background:linear-gradient(135deg, #B7443B 0%, #8F241D 100%); color:#FFFFFF;}}
-        #{table_id} tbody td {{
-            padding:7px 5px;
-            font-size:11.3px;
-            border-bottom:1px solid rgba(121,14,9,0.075);
-            border-right:1px solid rgba(121,14,9,0.045);
-            white-space:nowrap;
-            text-align:right;
-            color:#312B2A;
-            background:#FFFFFF;
-            overflow:hidden;
-            text-overflow:ellipsis;
-            font-weight:520;
-        }}
-        #{table_id} tbody td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.075) 0%, rgba(183,68,59,0.030) 100%); color:#111827;}}
-        #{table_id} tbody tr.ff-row-parent td {{
-            background:linear-gradient(180deg, #FFF6F4 0%, #FFFFFF 100%);
-            font-weight:650;
-            color:#171717;
-            border-top:1px solid rgba(121,14,9,0.08);
-        }}
-        #{table_id} tbody tr.ff-row-parent td:not(.ff-sticky):not(.ff-mom-cell) {{
-            background:linear-gradient(180deg, #FFFDFC 0%, #FFFFFF 100%);
-            color:#111827;
-            letter-spacing:-0.02em;
-        }}
-        #{table_id} tbody tr.ff-row-parent td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.085) 0%, rgba(183,68,59,0.035) 100%); color:#111827;}}
-        #{table_id} tbody tr.ff-row-child td {{background:#FFFDFC; color:#3E454E; font-weight:510;}}
-        #{table_id} tbody tr.ff-row-child:nth-child(even) td {{background:#FFF8F7;}}
-        #{table_id} tbody tr.ff-row-child td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.070) 0%, rgba(183,68,59,0.028) 100%); color:#111827;}}
-        #{table_id} tbody tr:hover td {{background:linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;}}
-        #{table_id} tbody tr:hover td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.10) 0%, rgba(183,68,59,0.042) 100%) !important;}}
-        #{table_id} .ff-sticky {{
-            position:sticky;
-            left:0;
-            z-index:2;
-            text-align:left !important;
-            min-width:{largura_primeira_coluna}px;
-            max-width:{largura_primeira_coluna}px;
-            width:{largura_primeira_coluna}px;
-        }}
-        #{table_id} .ff-row-parent .ff-sticky {{z-index:3; color:#111827; background:linear-gradient(180deg, #FFF4F1 0%, #FFFDFC 100%);}}
-        #{table_id} .ff-row-label {{display:flex; align-items:center; gap:6px;}}
-        #{table_id} .ff-label-text {{overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.01em;}}
-        #{table_id} .ff-row-parent .ff-label-text {{text-transform:uppercase; font-size:11.2px; font-weight:650;}}
-        #{table_id} .ff-row-label-child {{padding-left:8px; color:#4B5563 !important;}}
-        #{table_id} .ff-child-indent {{display:inline-block; width:12px; height:1px; background:linear-gradient(90deg, rgba(121,14,9,0.42), rgba(121,14,9,0.08)); margin-right:1px;}}
-        #{table_id} .ff-toggle {{width:18px; height:18px; border-radius:3px; border:1px solid rgba(121,14,9,0.26); background:linear-gradient(180deg,#FFFFFF 0%,#FFEAE6 100%); color:#790E09; font-weight:900; line-height:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:12px; padding:0; flex:0 0 auto; box-shadow:0 1px 0 rgba(255,255,255,0.9), 0 4px 10px rgba(121,14,9,0.08);}}
-        #{table_id} .ff-toggle:hover {{background:linear-gradient(180deg,#FFFFFF 0%,#FFDCD5 100%); transform:translateY(-1px);}}
-        #{table_id} .ff-toggle-placeholder {{border-color:transparent; background:transparent; cursor:default; box-shadow:none;}}
-        #{table_id} .ff-col-mes {{min-width:0;}}
-        #{table_id} .ff-mom-cell {{text-align:center !important; width:{largura_coluna_mom}px; min-width:{largura_coluna_mom}px;}}
-        #{table_id} .ff-data-cell {{padding:4px 3px;}}
-        #{table_id} .ff-data-bar-wrap {{position:relative; width:100%; min-width:0; height:20px; border-radius:3px; background:linear-gradient(180deg, rgba(121,14,9,0.035) 0%, rgba(121,14,9,0.075) 100%); overflow:hidden; border:1px solid rgba(121,14,9,0.055); box-shadow:inset 0 1px 0 rgba(255,255,255,0.82);}}
-        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-wrap {{background:linear-gradient(180deg, rgba(183,68,59,0.045) 0%, rgba(183,68,59,0.085) 100%); border-color:rgba(183,68,59,0.10);}}
-        #{table_id} .ff-data-bar-fill {{position:absolute; inset:0 auto 0 0; background:linear-gradient(90deg, rgba(121,14,9,0.13) 0%, rgba(255,40,0,0.15) 100%); border-right:1px solid rgba(121,14,9,0.10);}}
-        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-fill {{background:linear-gradient(90deg, rgba(183,68,59,0.16) 0%, rgba(183,68,59,0.08) 100%); border-right-color:rgba(183,68,59,0.12);}}
-        #{table_id} .ff-data-bar-text {{position:relative; z-index:1; display:flex; align-items:center; justify-content:flex-end; height:100%; padding:0 5px; font-size:10.7px; color:#2F3747; letter-spacing:-0.04em; font-weight:600; text-shadow:0 1px 0 rgba(255,255,255,0.75);}}
-        #{table_id} .mom-pill {{display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:2px 4px; border-radius:3px; font-size:10.7px; font-weight:650; letter-spacing:0.02em; border:1px solid rgba(100,116,139,0.14); background:rgba(255,255,255,0.70); box-shadow:inset 0 1px 0 rgba(255,255,255,0.88);}}
-        #{table_id} .mom-up {{color:#14532D; border-color:rgba(20,83,45,0.16); background:linear-gradient(180deg, rgba(240,253,244,0.90) 0%, rgba(255,255,255,0.70) 100%);}}
-        #{table_id} .mom-down {{color:#991B1B; border-color:rgba(153,27,27,0.16); background:linear-gradient(180deg, rgba(254,242,242,0.90) 0%, rgba(255,255,255,0.72) 100%);}}
-        #{table_id} .mom-flat {{color:#334155; border-color:rgba(100,116,139,0.16); background:linear-gradient(180deg, rgba(248,250,252,0.92) 0%, rgba(255,255,255,0.72) 100%);}}
-        #{table_id} ::-webkit-scrollbar {{height:10px; width:10px;}}
-        #{table_id} ::-webkit-scrollbar-thumb {{background:linear-gradient(180deg, rgba(121,14,9,0.34), rgba(121,14,9,0.20)); border-radius:999px; border:2px solid rgba(255,248,247,0.92);}}
-        #{table_id} ::-webkit-scrollbar-track {{background:rgba(121,14,9,0.04);}}
-      </style>
-      {observacao}
-      <div class="ff-table-box">
-        <table>
-          {colgroup_html}
-          <thead>
-            <tr>
-              <th class="ff-sticky">Indicador / Origem</th>
-              {cabecalhos_meses}
-              <th>MoM</th>
-            </tr>
-          </thead>
-          <tbody>
-            {"".join(linhas_html)}
-          </tbody>
-        </table>
-      </div>
-      <script>
-        (function() {{
-          const root = document.getElementById({table_id!r});
-          if (!root) return;
-          root.querySelectorAll('.ff-toggle[data-target]').forEach((btn) => {{
-            btn.addEventListener('click', () => {{
-              const target = btn.getAttribute('data-target');
-              const children = root.querySelectorAll(`[data-parent-row="${{target}}"]`);
-              const expanded = btn.getAttribute('data-expanded') === 'true';
-              children.forEach((row) => {{ row.style.display = expanded ? 'none' : ''; }});
-              btn.setAttribute('data-expanded', expanded ? 'false' : 'true');
-              btn.textContent = expanded ? '+' : '−';
-            }});
-          }});
-        }})();
-      </script>
-    </div>
-    '''
-
-
-def _preparar_base_mes_funil_segmentado_fixa(
-    df_funil: pd.DataFrame,
-    origens_sel: list[str] | None = None,
-    canais_entrada_sel: list[str] | None = None,
-    indicadores_sel: list[str] | None = None,
-    qtd_meses: int | None = None
-) -> tuple[pd.DataFrame, dict[int, str], int | None, list[int], int | None]:
-    base_vazia = (pd.DataFrame(), {}, None, [], None)
-    if df_funil is None or df_funil.empty:
-        return base_vazia
-
-    base = df_funil.copy()
-    if origens_sel:
-        base = base[base["ORIGEM_AGG"].isin(origens_sel)].copy()
-    if canais_entrada_sel and "CANAL_ENTRADA" in base.columns:
-        base = base[base["CANAL_ENTRADA"].isin(canais_entrada_sel)].copy()
-    if indicadores_sel:
-        base = base[base["INDICADOR"].isin(indicadores_sel)].copy()
-    if base.empty:
-        return base_vazia
-
-    if qtd_meses is None:
-        meses_ordem = sorted(base["MES_ANO_ORDEM"].dropna().astype(int).unique().tolist())
-    else:
-        meses_ordem = _calcular_janela_meses_funil_fixa(base, qtd_meses=qtd_meses)
-    if not meses_ordem:
-        return base_vazia
-
-    mapa_meses = (
-        base[["MES_ANO_ORDEM", "MES_ANO"]]
-        .drop_duplicates()
-        .sort_values(["MES_ANO_ORDEM", "MES_ANO"])
-        .drop_duplicates(subset=["MES_ANO_ORDEM"], keep="last")
-    )
-    mapa_ordem_rotulo = {
-        int(linha["MES_ANO_ORDEM"]): str(linha["MES_ANO"]).strip().upper()
-        for _, linha in mapa_meses.iterrows()
-    }
-    mes_tend_ordem = _obter_mes_tend_funil_fixa(base)
-
-    agg = (
-        base.groupby(["SEGMENTO", "INDICADOR", "INDICADOR_ORDEM", "MES_ANO_ORDEM"], as_index=False, observed=True)["QTDE"]
-        .sum()
-    )
-    if agg.empty:
-        return base_vazia
-
-    tabela = agg.pivot_table(
-        index=["SEGMENTO", "INDICADOR", "INDICADOR_ORDEM"],
-        columns="MES_ANO_ORDEM",
-        values="QTDE",
-        aggfunc="sum",
-        fill_value=0.0
-    )
-    tabela = tabela.reindex(columns=meses_ordem, fill_value=0.0)
-
-    mes_atual_ordem = meses_ordem[-1]
-    meses_mm3 = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
-    aplicar_mm3 = bool(meses_mm3 and (mes_tend_ordem is None or int(mes_atual_ordem) != int(mes_tend_ordem)))
-    if aplicar_mm3:
-        tabela[mes_atual_ordem] = tabela[meses_mm3].mean(axis=1)
-
-    base_mes = (
-        tabela.reset_index()
-        .melt(
-            id_vars=["SEGMENTO", "INDICADOR", "INDICADOR_ORDEM"],
-            value_vars=meses_ordem,
-            var_name="MES_ANO_ORDEM",
-            value_name="QTDE"
-        )
-    )
-    base_mes["MES_ANO_ORDEM"] = normalizar_numerico_serie(base_mes["MES_ANO_ORDEM"]).fillna(0).astype(int)
-    base_mes["QTDE"] = normalizar_numerico_serie(base_mes["QTDE"]).fillna(0.0)
-    return base_mes, mapa_ordem_rotulo, mes_atual_ordem, (meses_mm3 if aplicar_mm3 else []), mes_tend_ordem
-
-
-def _resolver_mes_ordem_funil_segmentado_fixa(
-    mapa_ordem_rotulo: dict[int, str],
-    mes_ref,
-    fallback_ordem: int | None = None
-) -> int | None:
-    if not mapa_ordem_rotulo:
-        return fallback_ordem
-
-    mes_norm = normalizar_chave_visual(str(mes_ref or ""))
-    for mes_ordem, rotulo in mapa_ordem_rotulo.items():
-        if normalizar_chave_visual(rotulo) == mes_norm:
-            return int(mes_ordem)
-
-    try:
-        mes_num = int(float(mes_ref))
-        if mes_num in mapa_ordem_rotulo:
-            return mes_num
-    except Exception:
-        pass
-
-    return fallback_ordem
-
-
-def _formatar_valor_real_funil_segmentado(indicador: str, valor: float) -> str:
-    valor_num = float(pd.to_numeric(pd.Series([valor]), errors="coerce").fillna(0.0).iloc[0])
-    if normalizar_chave_visual(indicador) == "investimento":
-        return f"R$ {formatar_numero_brasileiro(valor_num, 0)}"
-    return formatar_numero_brasileiro(valor_num, 0)
-
-
-def _formatar_percentual_step_funil_segmentado(
-    valor_atual: float,
-    valor_anterior: float | None,
-    valor_base_primeiro_step: float | None = None
-) -> str:
-    atual = float(pd.to_numeric(pd.Series([valor_atual]), errors="coerce").fillna(0.0).iloc[0])
-    if valor_anterior is None:
-        if valor_base_primeiro_step is None:
-            return ""
-        base_primeiro = float(pd.to_numeric(pd.Series([valor_base_primeiro_step]), errors="coerce").fillna(0.0).iloc[0])
-        if base_primeiro <= 0:
-            return "n/d"
-        percentual_primeiro = (atual / base_primeiro) * 100.0
-        return f"{formatar_numero_brasileiro(percentual_primeiro, 1)}%"
-
-    anterior = float(pd.to_numeric(pd.Series([valor_anterior]), errors="coerce").fillna(0.0).iloc[0])
-    if anterior <= 0:
-        return "n/d"
-
-    percentual = (atual / anterior) * 100.0
-    return f"{formatar_numero_brasileiro(percentual, 1)}%"
-
-
-def _gerar_larguras_visuais_funil_segmentado(qtd_etapas: int) -> list[float]:
-    if qtd_etapas <= 0:
-        return []
-    if qtd_etapas == 1:
-        return [100.0]
-    return np.linspace(100.0, 40.0, qtd_etapas).tolist()
-
-
-def criar_grafico_funil_segmentado_fixa(
-    df_funil: pd.DataFrame,
-    mes_ref: str,
-    origens_sel: list[str] | None = None,
-    canais_entrada_sel: list[str] | None = None,
-    indicadores_sel: list[str] | None = None
-) -> tuple[go.Figure, str]:
-    figura_vazia = go.Figure()
-    if df_funil is None or df_funil.empty:
-        return figura_vazia, ""
-
-    indicadores_plot = [
-        label for _, label, _ in FUNIL_FIXA_INDICADORES_CONFIG
-        if (not indicadores_sel) or (label in indicadores_sel)
-    ]
-    if not indicadores_plot:
-        return figura_vazia, ""
-
-    base_mes, mapa_ordem_rotulo, mes_atual_ordem, meses_mm3, mes_tend_ordem = _preparar_base_mes_funil_segmentado_fixa(
-        df_funil=df_funil,
-        origens_sel=origens_sel,
-        canais_entrada_sel=canais_entrada_sel,
-        indicadores_sel=indicadores_sel,
-        qtd_meses=None
-    )
-    if base_mes.empty or not mapa_ordem_rotulo:
-        return figura_vazia, ""
-
-    mes_ref_ordem = _resolver_mes_ordem_funil_segmentado_fixa(
-        mapa_ordem_rotulo=mapa_ordem_rotulo,
-        mes_ref=mes_ref,
-        fallback_ordem=mes_atual_ordem
-    )
-    if mes_ref_ordem is None:
-        return figura_vazia, ""
-
-    base_mes = base_mes[base_mes["MES_ANO_ORDEM"].eq(int(mes_ref_ordem))].copy()
-    if base_mes.empty:
-        return figura_vazia, ""
-
-    base_mes["SEGMENTO"] = base_mes["SEGMENTO"].astype(str).str.strip()
-    base_mes["INDICADOR"] = base_mes["INDICADOR"].astype(str).str.strip()
-
-    base_skeleton = pd.MultiIndex.from_product(
-        [["PME", "PF"], indicadores_plot],
-        names=["SEGMENTO", "INDICADOR"]
-    ).to_frame(index=False)
-    base_skeleton["INDICADOR_ORDEM"] = base_skeleton["INDICADOR"].map(
-        {label: ordem for _, label, ordem in FUNIL_FIXA_INDICADORES_CONFIG}
-    ).fillna(999.0)
-
-    base_plot = base_skeleton.merge(
-        base_mes[["SEGMENTO", "INDICADOR", "QTDE"]],
-        on=["SEGMENTO", "INDICADOR"],
-        how="left"
-    )
-    base_plot["QTDE"] = normalizar_numerico_serie(base_plot["QTDE"]).fillna(0.0)
-    base_plot["INDICADOR_NORM"] = base_plot["INDICADOR"].apply(normalizar_chave_visual)
-    total_investimento_mes = float(
-        pd.to_numeric(
-            base_plot.loc[base_plot["INDICADOR_NORM"].eq("investimento"), "QTDE"],
-            errors="coerce"
-        ).fillna(0.0).sum()
-    )
-
-    fig = make_subplots(
-        rows=1,
-        cols=2,
-        specs=[[{"type": "funnel"}, {"type": "funnel"}]],
-        horizontal_spacing=0.12,
-        subplot_titles=("PME", "PF")
-    )
-
-    segmentos_plot = [
-        (1, "PME", "#790E09", "rgba(121,14,9,0.16)", "#FFFFFF"),
-        (2, "PF", "#AEAFAF", "rgba(174,175,175,0.28)", "#312B2A"),
-    ]
-
-    for coluna_ref, segmento_ref, cor_ref, cor_conector, cor_texto in segmentos_plot:
-        df_seg = (
-            base_plot[base_plot["SEGMENTO"].eq(segmento_ref)]
-            .sort_values(["INDICADOR_ORDEM", "INDICADOR"])
-            .copy()
-        )
-        valores = []
-        textos = []
-        customdata = []
-        larguras_visuais = _gerar_larguras_visuais_funil_segmentado(len(df_seg))
-        valores_reais = df_seg["QTDE"].astype(float).tolist()
-        valor_anterior_real = None
-        etapa_anterior = ""
-
-        for idx_seg, (_, linha_seg) in enumerate(df_seg.iterrows()):
-            indicador_ref = str(linha_seg.get("INDICADOR", "")).strip()
-            valor_real = float(linha_seg.get("QTDE", 0.0))
-            valor_rotulo = _formatar_valor_real_funil_segmentado(indicador_ref, valor_real)
-            indicador_norm = normalizar_chave_visual(indicador_ref)
-            eh_primeiro_step_investimento = valor_anterior_real is None and indicador_norm == "investimento"
-            percentual_step = _formatar_percentual_step_funil_segmentado(
-                valor_real,
-                valor_anterior_real,
-                valor_base_primeiro_step=total_investimento_mes if eh_primeiro_step_investimento else None
-            )
-
-            largura_plot = float(larguras_visuais[idx_seg]) if valor_real > 0 else 0.0
-            valores.append(largura_plot)
-            texto_label = valor_rotulo if not percentual_step else f"{valor_rotulo} | {percentual_step}"
-            if percentual_step:
-                if eh_primeiro_step_investimento:
-                    texto_hover_step = f"<br><b>% do investimento total do mês:</b> {percentual_step}"
-                elif etapa_anterior:
-                    texto_hover_step = f"<br><b>% vs etapa anterior ({etapa_anterior}):</b> {percentual_step}"
-                else:
-                    texto_hover_step = ""
-            else:
-                texto_hover_step = ""
-            textos.append(texto_label)
-            customdata.append([
-                segmento_ref,
-                valor_rotulo,
-                percentual_step,
-                etapa_anterior,
-                texto_hover_step,
-            ])
-
-            valor_anterior_real = valor_real
-            etapa_anterior = indicador_ref
-
-        fig.add_trace(go.Funnel(
-            name=segmento_ref,
-            y=df_seg["INDICADOR"].tolist(),
-            x=valores,
-            text=textos,
-            textinfo="text",
-            textposition="auto",
-            textfont=dict(size=14, color=cor_texto, family="Segoe UI"),
-            marker=dict(
-                color=cor_ref,
-                line=dict(color="rgba(255,255,255,0.96)", width=1.2)
-            ),
-            connector=dict(
-                line=dict(color=cor_conector, width=1.0)
-            ),
-            opacity=0.98,
-            customdata=customdata,
-            hovertemplate=(
-                "<b>%{customdata[0]}</b><br>"
-                "<b>Etapa:</b> %{y}<br>"
-                "<b>Valor:</b> %{customdata[1]}%{customdata[4]}<extra></extra>"
-            )
-        ), row=1, col=coluna_ref)
-
-        if sum(valores_reais) <= 0:
-            x_pos = 0.22 if segmento_ref == "PME" else 0.78
-            fig.add_annotation(
-                x=x_pos,
-                y=0.5,
-                xref="paper",
-                yref="paper",
-                text="Sem dados",
-                showarrow=False,
-                font=dict(size=12, color="#6B5C59", family="Segoe UI")
-            )
-
-    fig.update_layout(
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
-        margin=dict(l=16, r=16, t=58, b=14),
-        height=max(540, 56 * len(indicadores_plot)),
-        showlegend=False,
-        funnelgap=0.08,
-        funnelmode="overlay",
-        uniformtext=dict(minsize=12, mode="hide"),
-        hoverlabel=dict(
-            bgcolor="white",
-            bordercolor="#E2E8F0",
-            font_size=12,
-            font_family="Segoe UI",
-            font_color="#2F3747"
-        )
-    )
-    fig.update_yaxes(
-        tickfont=dict(size=14, color="#000000", family="Segoe UI"),
-        showticklabels=True
-    )
-    fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
-    for anotacao in fig.layout.annotations:
-        texto_anotacao = normalizar_chave_visual(getattr(anotacao, "text", ""))
-        if texto_anotacao == "pme":
-            anotacao.font = dict(size=19, family="Sora", color="#201717")
-            anotacao.bgcolor = "rgba(121,14,9,0.08)"
-            anotacao.bordercolor = "rgba(121,14,9,0.18)"
-            anotacao.borderwidth = 1
-            anotacao.borderpad = 5
-            anotacao.yshift = 4
-        elif texto_anotacao == "pf":
-            anotacao.font = dict(size=19, family="Sora", color="#201717")
-            anotacao.bgcolor = "rgba(148,163,184,0.18)"
-            anotacao.bordercolor = "rgba(107,114,128,0.22)"
-            anotacao.borderwidth = 1
-            anotacao.borderpad = 5
-            anotacao.yshift = 4
-        else:
-            anotacao.font = dict(size=15, family="Segoe UI", color="#312B2A")
-
-    observacao_mm3 = ""
-    if mes_tend_ordem is not None and int(mes_ref_ordem) == int(mes_tend_ordem):
-        meses_ref_tend = sorted(
-            [m for m in mapa_ordem_rotulo.keys() if int(m) < int(mes_tend_ordem)]
-        )[-3:]
-        meses_base = ", ".join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_ref_tend) if meses_ref_tend else ""
-        complemento = f" pela proporcao media dos ultimos 3 meses ({meses_base})." if meses_base else "."
-        observacao_mm3 = (
-            f"O mes {mapa_ordem_rotulo.get(int(mes_ref_ordem), str(mes_ref_ordem))} foi carregado pelo arquivo de tend"
-            f"{complemento}"
-        )
-    elif mes_atual_ordem is not None and int(mes_ref_ordem) == int(mes_atual_ordem) and meses_mm3:
-        meses_base = ", ".join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3)
-        observacao_mm3 = (
-            f"O mes {mapa_ordem_rotulo.get(int(mes_ref_ordem), str(mes_ref_ordem))} foi ajustado pela media "
-            f"movel dos ultimos {len(meses_mm3)} meses ({meses_base})."
-        )
-
-    return fig, observacao_mm3
-
-@fragmento_dashboard
-def render_visual_funil_fixa_ecommerce() -> None:
-    funil_path = resolver_arquivo_dashboard(
-        FUNIL_FIXA_FILE_PATH,
-        "base_funil_ecomm_fixa.xlsx",
-        DASHBOARD_LEGACY_MOBILITY_DIR / "base_funil_ecomm_fixa.xlsx"
-    )
-    funil_path = funil_path if Path(funil_path).exists() else None
-    tend_path = resolver_arquivo_dashboard(
-        TEND_FUNIL_FIXA_FILE_PATH,
-        "tend_funil_ecom.xlsx",
-        DASHBOARD_LEGACY_MOBILITY_DIR / "tend_funil_ecom.xlsx"
-    )
-    tend_path = tend_path if Path(tend_path).exists() else None
-
-    st.markdown(
-        build_visual_title_html(
-            "FUNIL DE VENDAS - E-COMMERCE",
-            "cart",
-            subtitle="Acompanhamento da jornada do cliente no e-commerce da Fixa."
-        ),
-        unsafe_allow_html=True
-    )
-
-    if funil_path is None:
-        st.warning("Arquivo do FUNIL FIXA não encontrado no caminho configurado.")
-        st.code(str(FUNIL_FIXA_FILE_PATH))
-        return
-
-    funil_mtime = Path(funil_path).stat().st_mtime if Path(funil_path).exists() else None
-    tend_mtime = Path(tend_path).stat().st_mtime if tend_path is not None and Path(tend_path).exists() else None
-    df_funil = load_funil_fixa_ecommerce_data(
-        str(funil_path),
-        funil_mtime,
-        str(tend_path) if tend_path is not None else None,
-        tend_mtime
-    )
-    if df_funil.empty:
-        st.warning("Não foi possível carregar dados válidos do funil FIXA/E-Commerce.")
-        return
-
-    segmentos_disp = [
-        segmento for segmento in ["PF", "PME"]
-        if segmento in set(df_funil["SEGMENTO"].dropna().astype(str).str.strip().unique().tolist())
-    ]
-    opcoes_segmento = ["Todos"] + segmentos_disp
-    indice_padrao_segmento = opcoes_segmento.index("PME") if "PME" in opcoes_segmento else 0
-    meses_funil_disp = (
-        df_funil[["MES_ANO_ORDEM", "MES_ANO"]]
-        .drop_duplicates()
-        .sort_values(["MES_ANO_ORDEM", "MES_ANO"])
-        .drop_duplicates(subset=["MES_ANO_ORDEM"], keep="last")
-    )
-    meses_funil_labels = meses_funil_disp["MES_ANO"].astype(str).str.strip().str.lower().tolist()
-    mapa_mes_funil_ordem = {
-        str(linha["MES_ANO"]).strip().lower(): int(linha["MES_ANO_ORDEM"])
-        for _, linha in meses_funil_disp.iterrows()
-    }
-    mes_funil_default = meses_funil_labels[-1] if meses_funil_labels else get_mes_atual_formatado().strip().lower()
-
-    col_f1, col_f2, col_f3, col_f4 = st.columns([0.9, 1.05, 1.2, 0.95], gap="medium")
-
-    with col_f1:
-        render_filter_label("Segmento")
-        segmento_sel = st.selectbox(
-            "Filtro de segmento do funil fixa",
-            options=opcoes_segmento,
-            index=indice_padrao_segmento,
-            key="funil_fixa_segmento_v2",
-            label_visibility="collapsed"
-        )
-
-    base_origem_ref = (
-        df_funil.copy()
-        if segmento_sel == "Todos"
-        else df_funil[df_funil["SEGMENTO"].astype(str).eq(str(segmento_sel))].copy()
-    )
-    origens_disp = sorted(base_origem_ref["ORIGEM_AGG"].dropna().astype(str).str.strip().unique().tolist())
-    opcoes_origem = ["Todos"] + origens_disp
-    with col_f2:
-        render_filter_label("Origem")
-        origem_sel = st.selectbox(
-            "Filtro de origem do funil fixa",
-            options=opcoes_origem,
-            index=0,
-            key="funil_fixa_origem_v2",
-            label_visibility="collapsed"
-        )
-
-    base_canal_entrada_ref = (
-        base_origem_ref.copy()
-        if origem_sel == "Todos"
-        else base_origem_ref[base_origem_ref["ORIGEM_AGG"].astype(str).eq(str(origem_sel))].copy()
-    )
-    canais_entrada_disp = (
-        sorted(base_canal_entrada_ref["CANAL_ENTRADA"].dropna().astype(str).str.strip().unique().tolist())
-        if "CANAL_ENTRADA" in base_canal_entrada_ref.columns
-        else []
-    )
-    opcoes_canal_entrada = ["Todos"] + canais_entrada_disp
-    with col_f3:
-        render_filter_label("CANAL DE ENTRADA")
-        canal_entrada_sel = st.selectbox(
-            "Filtro de canal de entrada do funil fixa",
-            options=opcoes_canal_entrada,
-            index=0,
-            key="funil_fixa_canal_entrada_v1",
-            label_visibility="collapsed"
-        )
-    with col_f4:
-        render_filter_label("Mês do gráfico")
-        mes_grafico_sel = st.selectbox(
-            "Filtro de mês do gráfico do funil fixa",
-            options=meses_funil_labels,
-            index=meses_funil_labels.index(mes_funil_default) if mes_funil_default in meses_funil_labels else 0,
-            key="funil_fixa_mes_grafico_v1",
-            label_visibility="collapsed"
-        )
-
-    segmentos_sel = None if segmento_sel == "Todos" else [segmento_sel]
-    origens_sel = None if origem_sel == "Todos" else [origem_sel]
-    canais_entrada_sel = None if canal_entrada_sel == "Todos" else [canal_entrada_sel]
-    indicadores_sel = None
-    mes_ref_ordem_sel = mapa_mes_funil_ordem.get(str(mes_grafico_sel).strip().lower())
-
-    estrutura = montar_estrutura_funil_fixa_ecommerce(
-        df_funil=df_funil,
-        segmentos_sel=segmentos_sel,
-        origens_sel=origens_sel,
-        canais_entrada_sel=canais_entrada_sel,
-        indicadores_sel=indicadores_sel,
-        mes_ref_ordem=mes_ref_ordem_sel,
-        qtd_meses=13
-    )
-
-    if not estrutura.get("rows"):
-        st.info("Sem dados para os filtros selecionados.")
-        return
-
-    altura_tabela = max(520, 118 + 36 * len(estrutura.get("rows", [])))
-    altura_corpo_tabela = min(max(altura_tabela - 84, 360), 840)
-    html_tabela = criar_tabela_html_funil_fixa_ecommerce(
-        estrutura,
-        table_id="funil-fixa-ecommerce",
-        max_body_height=altura_corpo_tabela
-    )
-    components.html(
-        html_tabela,
-        height=min(altura_corpo_tabela + 52, 900),
-        scrolling=False
-    )
-
-    st.markdown(
-        build_visual_title_html(
-            "FUNIL POR SEGMENTO - PME X PF",
-            "cart",
-            "subsection-title",
-            subtitle=f"MÊS: {str(mes_grafico_sel).upper()}",
-            extra_style="margin-top:-10px;"
-        ),
-        unsafe_allow_html=True
-    )
-    fig_funil_segmentado, observacao_funil_segmentado = criar_grafico_funil_segmentado_fixa(
-        df_funil=df_funil,
-        mes_ref=mes_grafico_sel,
-        origens_sel=origens_sel,
-        canais_entrada_sel=canais_entrada_sel,
-        indicadores_sel=indicadores_sel
-    )
-    if not fig_funil_segmentado.data:
-        st.info("Sem dados disponíveis para montar o gráfico do funil no mês selecionado.")
-    else:
-        st.plotly_chart(
-            fig_funil_segmentado,
-            width="stretch",
-            config={"displayModeBar": False, "displaylogo": False}
-        )
-
-@fragmento_dashboard
-def render_bloco_migracoes_pme() -> None:
-    def _resolver_caminho_migracoes_pme() -> Path | None:
-        candidatos_brutos = [
-            ANALITICO_MIGRACOES_FILE_PATH,
-            "ANALITICO_MIGRACOES_fev26.xlsx",
-            DASHBOARD_APP_DIR / "ANALITICO_MIGRACOES_fev26.xlsx",
-            DASHBOARD_FILES_DIR_LOCAL / "ANALITICO_MIGRACOES_fev26.xlsx",
-            DASHBOARD_FILES_DIR_PROD / "ANALITICO_MIGRACOES_fev26.xlsx",
-        ]
-        candidatos: list[Path] = []
-        vistos: set[str] = set()
-        for candidato in candidatos_brutos:
-            if candidato is None:
-                continue
-            path_obj = Path(candidato)
-            if not path_obj.is_absolute():
-                path_obj = resolver_arquivo_dashboard(path_obj)
-            chave = str(path_obj).strip().lower()
-            if chave and chave not in vistos:
-                candidatos.append(path_obj)
-                vistos.add(chave)
-
-        melhor_path: Path | None = None
-        melhor_score: tuple[int, int] = (-1, -1)
-        for path_obj in candidatos:
-            if not path_obj.exists():
-                continue
-            try:
-                header_df = _read_excel_with_copy_fallback(path_obj, nrows=0)
-            except Exception:
-                continue
-
-            col_data = encontrar_coluna_por_alias(
-                header_df.columns,
-                "DAT_REFERENCIA",
-                "DATA_REFERENCIA",
-                "DAT REFERENCIA"
-            )
-            col_regional = encontrar_coluna_por_alias(
-                header_df.columns,
-                "DSC_REGIONAL_CMV",
-                "DSC REGIONAL CMV",
-                "REGIONAL_CMV",
-                "REGIONAL CMV",
-                "DSC_REGIONAL",
-                "REGIONAL"
-            )
-            col_qtde = encontrar_coluna_por_alias(
-                header_df.columns,
-                "QTDE_FINAL",
-                "QTDE FINAL",
-                "QTDE",
-                "QTD",
-                "QUANTIDADE"
-            )
-            score_campos = sum(col is not None for col in [col_data, col_regional, col_qtde])
-            score = (
-                100 if score_campos == 3 else score_campos,
-                int(path_obj.stat().st_size) if path_obj.exists() else 0,
-            )
-            if score > melhor_score:
-                melhor_score = score
-                melhor_path = path_obj
-
-        return melhor_path
-
-    st.markdown(
-        build_visual_title_html(
-            "MIGRAÇÕES PME - QTDE POR REGIONAL E MÊS",
-            "grid",
-            "subsection-title",
-            extra_style="margin-top:18px;"
-        ),
-        unsafe_allow_html=True
-    )
-
-    migracoes_path = _resolver_caminho_migracoes_pme()
-
-    if migracoes_path is None:
-        st.info("Arquivo `ANALITICO_MIGRACOES_fev26.xlsx` não encontrado no caminho configurado.")
-        return
-
-    migracoes_mtime = Path(migracoes_path).stat().st_mtime if Path(migracoes_path).exists() else None
-    df_migracoes_pme = load_migracoes_pme_data(str(migracoes_path), migracoes_mtime)
-
-    if df_migracoes_pme.empty:
-        st.info("Sem dados disponíveis para montar a tabela de Migrações PME.")
-        return
-
-    opcoes_mes_mom_migracoes, mes_tend_migracoes = obter_meses_mom_migracoes(df_migracoes_pme)
-    if not opcoes_mes_mom_migracoes:
-        st.info("Sem meses disponíveis para montar a tabela de Migrações PME.")
-        tabela_migracoes_fmt, tabela_migracoes_num = pd.DataFrame(), pd.DataFrame()
-    else:
-        col_mig_mes_mom, col_mig_mes_spacer = st.columns([0.85, 2.65], gap="medium")
-        with col_mig_mes_mom:
-            render_filter_label("Mês MoM")
-            mes_migracoes_mom_ref = st.selectbox(
-                "Selecione o mês de referência do MoM de Migrações PME",
-                options=opcoes_mes_mom_migracoes,
-                index=max(len(opcoes_mes_mom_migracoes) - 1, 0),
-                key="funil_movel_migracoes_pme_mes_mom",
-                label_visibility="collapsed",
-                format_func=lambda mes: (
-                    f"{str(mes).upper()} (TEND.)"
-                    if str(mes).strip().lower() == str(mes_tend_migracoes).strip().lower()
-                    else str(mes).upper()
-                )
-            )
-        with col_mig_mes_spacer:
-            st.empty()
-
-        tabela_migracoes_fmt, tabela_migracoes_num = montar_tabela_migracoes_pme_regionais(
-            df_migracoes_pme,
-            mes_mom_ref=mes_migracoes_mom_ref
-        )
-
-    if tabela_migracoes_fmt.empty:
-        st.info("Sem dados disponíveis para montar a tabela de Migrações PME.")
-    else:
-        st.markdown(
-            criar_tabela_html_migracoes_regionais(
-                df_formatado=tabela_migracoes_fmt,
-                df_numerico=tabela_migracoes_num,
-                table_id="tabela-analitico-migracoes-pme"
-            ),
-            unsafe_allow_html=True
-        )
-
-    st.markdown(
-        build_visual_title_html(
-            "MIGRAÇÕES PME - EVOLUÇÃO MENSAL",
-            "trend",
-            "subsection-title",
-            extra_style="margin-top:14px;"
-        ),
-        unsafe_allow_html=True
-    )
-
-    if tabela_migracoes_num.empty:
-        st.info("Sem dados disponíveis para montar o gráfico mensal de Migrações PME.")
-        return
-
-    regionais_migracoes_disp = [
-        regional for regional in tabela_migracoes_num["REGIONAL"].astype(str).tolist()
-        if str(regional).strip().upper() != "TOTAL"
-    ]
-    opcoes_regional_migracoes = ["Todos"] + regionais_migracoes_disp
-
-    col_mig_filtro, col_mig_spacer = st.columns([0.95, 2.55], gap="medium")
-    with col_mig_filtro:
-        render_filter_label("Regional")
-        regional_migracoes_ref = st.selectbox(
-            "Selecione a regional de Migrações PME",
-            options=opcoes_regional_migracoes,
-            index=0,
-            key="funil_movel_migracoes_pme_regional",
-            label_visibility="collapsed"
-        )
-    with col_mig_spacer:
-        st.empty()
-
-    serie_grafico_migracoes = montar_serie_grafico_migracoes_pme(
-        tabela_migracoes_num,
-        regional_ref=regional_migracoes_ref
-    )
-    if serie_grafico_migracoes.empty:
-        st.info("Sem dados disponíveis para montar o gráfico mensal de Migrações PME.")
-    else:
-        fig_migracoes_mensal = criar_grafico_migracoes_pme_mensal(
-            serie_grafico_migracoes,
-            regional_ref=regional_migracoes_ref
-        )
-        st.plotly_chart(
-            fig_migracoes_mensal,
-            width="stretch",
-            config={"displayModeBar": False, "displaylogo": False}
-        )
 
 _EXPORT_WRAPPER_NAMES = {
     "_plotly_chart_com_exportacao",
@@ -3046,19 +600,23 @@ def _config_plotly_exportacao(fig, config_usuario: dict | None) -> dict:
 
 def obter_bases_funil_home() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Resolve as bases do funil da capa sem depender da ordem de execução das abas."""
-    estado = st.session_state
-    base_funil_home = estado.get("base_funil_cotacoes")
+    base_funil_home = globals().get("base_funil_cotacoes", pd.DataFrame())
     if base_funil_home is None or getattr(base_funil_home, "empty", True):
-        base_funil_home = estado.get("df_perf_base", pd.DataFrame())
+        base_funil_home = globals().get("df_perf_base", pd.DataFrame())
+    if (base_funil_home is None or getattr(base_funil_home, "empty", True)) and "preparar_base_performance" in globals() and "df" in globals():
+        try:
+            df_origem = globals().get("df", pd.DataFrame())
+            if df_origem is not None and not getattr(df_origem, "empty", True):
+                base_funil_home = preparar_base_performance(df_origem)
+        except Exception:
+            base_funil_home = pd.DataFrame()
 
-    df_cotacoes_home = estado.get("df_cotacoes_base", pd.DataFrame())
+    df_cotacoes_home = globals().get("df_cotacoes_base", pd.DataFrame())
     if df_cotacoes_home is None or getattr(df_cotacoes_home, "empty", True):
         try:
-            cotacoes_path = resolver_arquivo_dashboard(
-                COTACOES_FILE_PATH,
-                "RelatorioFluxoVidaCotacao.xlsx"
-            )
-            if cotacoes_path:
+            cotacoes_path_ref = globals().get("COTACOES_FILE_PATH", None)
+            if cotacoes_path_ref:
+                cotacoes_path = resolver_arquivo_dashboard(cotacoes_path_ref, "RelatorioFluxoVidaCotacao.xlsx")
                 cotacoes_path = cotacoes_path if Path(cotacoes_path).exists() else None
                 if cotacoes_path is not None:
                     cotacoes_mtime = Path(cotacoes_path).stat().st_mtime
@@ -3067,8 +625,6 @@ def obter_bases_funil_home() -> tuple[pd.DataFrame, pd.DataFrame]:
                         cotacoes_mtime,
                         COTACOES_CACHE_VERSION
                     )
-                    if df_cotacoes_home is not None and not getattr(df_cotacoes_home, "empty", True):
-                        estado["df_cotacoes_base"] = df_cotacoes_home
         except Exception:
             df_cotacoes_home = pd.DataFrame()
 
@@ -7178,18 +4734,25 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """
     Carrega e pré-trata a base principal.
     O file_mtime é usado apenas para invalidar cache quando o arquivo muda.
     """
     _ = file_mtime  # parâmetro sentinela para invalidação de cache
+    path_obj = Path(path)
     try:
-        header_df = load_excel_cached(path, file_mtime, nrows=0)
-        colunas_disponiveis = list(getattr(header_df, "columns", []))
-        colunas_leitura = [col for col in PRIMARY_BASE_USECOLS if col in colunas_disponiveis]
-        df = load_excel_cached(path, file_mtime, usecols=colunas_leitura or None)
+        if path_obj.suffix.lower() == ".parquet":
+            df = load_tabular_cached(str(path_obj), file_mtime)
+            header_df = pd.DataFrame(columns=df.columns)
+            colunas_disponiveis = list(getattr(df, "columns", []))
+            colunas_leitura = list(colunas_disponiveis)
+        else:
+            header_df = load_excel_cached(path, file_mtime, nrows=0)
+            colunas_disponiveis = list(getattr(header_df, "columns", []))
+            colunas_leitura = [col for col in PRIMARY_BASE_USECOLS if col in colunas_disponiveis]
+            df = load_excel_cached(path, file_mtime, usecols=colunas_leitura or None)
     except FileNotFoundError:
         st.error("Arquivo de dados não encontrado!")
         st.stop()
@@ -7237,6 +4800,16 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     if 'DAT_MOVIMENTO2' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['DAT_MOVIMENTO2']):
         df['DAT_MOVIMENTO2'] = pd.to_datetime(df['DAT_MOVIMENTO2'], errors='coerce')
 
+    if 'mes_ano' not in df.columns and 'DAT_MOVIMENTO2' in df.columns:
+        df['mes_ano'] = df['DAT_MOVIMENTO2'].apply(lambda dt: _formatar_mes_ano_backlog(dt) if pd.notna(dt) else None)
+    if 'dat_tratada' not in df.columns and 'mes_ano' in df.columns:
+        df['dat_tratada'] = df['mes_ano']
+
+    if 'ANO' not in df.columns and 'DAT_MOVIMENTO2' in df.columns:
+        df['ANO'] = pd.to_datetime(df['DAT_MOVIMENTO2'], errors='coerce').dt.year
+    if 'DAT_MÊS' not in df.columns and 'DAT_MOVIMENTO2' in df.columns:
+        df['DAT_MÊS'] = pd.to_datetime(df['DAT_MOVIMENTO2'], errors='coerce').dt.month
+
     if 'QTDE' in df.columns:
         df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0)
     if 'DESAFIO_QTD' in df.columns:
@@ -7251,10 +4824,11 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
 
     compactar_colunas_categoricas(df, colunas_texto)
     del header_df, colunas_disponiveis, colunas_leitura, rename_map, colunas_descartar
+    gc.collect()
     return df
 
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_excel_cached(
     path: str,
     file_mtime: float | None = None,
@@ -7269,14 +4843,24 @@ DASHBOARD_DATA_DIR = DASHBOARD_APP_DIR
 RAW_PRIMARY_BASE_FILE_PATH = resolver_arquivo_dashboard("base_final_trt_new3.xlsx")
 RAW_LIGACOES_FILE_PATH = resolver_arquivo_dashboard("televendas_ligacoes2.xlsx")
 RAW_COTACOES_FILE_PATH = resolver_arquivo_dashboard("RelatorioFluxoVidaCotacao.xlsx")
+RAW_BACKLOG_CONSOLIDADO_FILE_PATH = resolver_arquivo_dashboard("backlog_consolidado.csv")
 CHURN_FILE_PATH = resolver_arquivo_dashboard("base_final_churn.xlsx")
+RAW_MIGRACOES_FILE_PATH = resolver_arquivo_dashboard("ANALITICO_MIGRACOES_fev26.xlsx")
+RAW_FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
+    "base_funil_ecomm_fixa.xlsx",
+    DASHBOARD_LEGACY_MOBILITY_DIR / "base_funil_ecomm_fixa.xlsx"
+)
+RAW_TEND_FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
+    "tend_funil_ecom.xlsx",
+    DASHBOARD_LEGACY_MOBILITY_DIR / "tend_funil_ecom.xlsx"
+)
 
 
 def _resolver_primeiro_arquivo_existente(*candidatos: str | Path) -> Path:
     return resolver_arquivo_dashboard(candidatos[0], *candidatos[1:]) if candidatos else DASHBOARD_APP_DIR
 
 
-@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE)
+@st.cache_data(show_spinner=False, max_entries=CACHE_MAX_ENTRIES_LARGE, persist="disk")
 def load_tabular_cached(
     path: str,
     file_mtime: float | None = None,
@@ -7306,9 +4890,191 @@ def load_tabular_cached(
     return pd.read_excel(path_obj, usecols=usecols, nrows=nrows)
 
 
-LIGACOES_FILE_PATH = RAW_LIGACOES_FILE_PATH
-COTACOES_FILE_PATH = RAW_COTACOES_FILE_PATH
-PEDIDOS_FILE_PATH = RAW_PRIMARY_BASE_FILE_PATH
+PRIMARY_BASE_FILE_PATH = resolver_arquivo_preprocessado("base_principal.parquet", RAW_PRIMARY_BASE_FILE_PATH)
+ATIVADOS_FILE_PATH = resolver_arquivo_preprocessado(
+    "ativados_base.parquet",
+    "evolucao_mensal_agregado.parquet",
+    PRIMARY_BASE_FILE_PATH,
+    RAW_PRIMARY_BASE_FILE_PATH
+)
+BASE_PERFORMANCE_FILE_PATH = resolver_arquivo_preprocessado("base_performance_mensal.parquet")
+ANALITICA_DIARIA_FILE_PATH = resolver_arquivo_preprocessado("analitica_diaria.parquet")
+PEDIDOS_FILE_PATH = resolver_arquivo_preprocessado("pedidos_ecommerce.parquet", RAW_PRIMARY_BASE_FILE_PATH)
+LIGACOES_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_receptivo.parquet", RAW_LIGACOES_FILE_PATH)
+LIGACOES_MENSAL_AGREGADO_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_mensal_agregado.parquet")
+LIGACOES_PERFORMANCE_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_performance_mensal.parquet")
+COTACOES_FILE_PATH = resolver_arquivo_preprocessado("cotacoes_agregado.parquet", RAW_COTACOES_FILE_PATH)
+BACKLOG_CONSOLIDADO_FILE_PATH = resolver_arquivo_preprocessado(
+    "backlog_consolidado_limpo.parquet",
+    RAW_BACKLOG_CONSOLIDADO_FILE_PATH
+)
+ANALITICO_MIGRACOES_FILE_PATH = resolver_arquivo_preprocessado("migracoes_pme.parquet", RAW_MIGRACOES_FILE_PATH)
+DESATIVADOS_FILE_PATH = resolver_arquivo_preprocessado("desativados_base.parquet", CHURN_FILE_PATH)
+
+
+def _carregar_dataframe_preprocessado(
+    path: str,
+    file_mtime: float | None = None,
+    *,
+    required_cols: set[str] | None = None,
+    text_cols: list[str] | tuple[str, ...] | None = None,
+    numeric_cols: list[str] | tuple[str, ...] | None = None,
+    date_cols: list[str] | tuple[str, ...] | None = None,
+    category_cols: list[str] | tuple[str, ...] | None = None,
+    default_values: dict[str, object] | None = None
+) -> pd.DataFrame:
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    try:
+        df = load_tabular_cached(str(path_obj), file_mtime)
+    except Exception:
+        return pd.DataFrame()
+
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    for coluna, valor_default in (default_values or {}).items():
+        if coluna not in df.columns:
+            df[coluna] = valor_default
+
+    if required_cols and not set(required_cols).issubset(set(df.columns)):
+        return pd.DataFrame()
+
+    for coluna in (date_cols or []):
+        if coluna in df.columns:
+            df[coluna] = pd.to_datetime(df[coluna], errors='coerce')
+
+    for coluna in (text_cols or []):
+        if coluna in df.columns:
+            df[coluna] = df[coluna].astype('string').str.strip()
+
+    for coluna in (numeric_cols or []):
+        if coluna in df.columns:
+            df[coluna] = normalizar_numerico_serie(df[coluna]).fillna(0.0)
+
+    compactar_colunas_categoricas(df, list(category_cols or text_cols or []))
+    return df
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+def load_ativados_dashboard_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    df = _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'},
+        text_cols=['REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada', 'DSC_MOTIVO_STS'],
+        numeric_cols=['QTDE', 'DESAFIO_QTD', 'TEND_QTD', 'ANO', 'DAT_MÊS'],
+        date_cols=['DAT_MOVIMENTO2'],
+        category_cols=['REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada', 'DSC_MOTIVO_STS']
+    )
+    if df.empty:
+        return df
+    df['REGIONAL'] = df['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
+    return df
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+def load_base_performance_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={
+            'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+            'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF',
+            'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
+        },
+        text_cols=[
+            'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+            'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF'
+        ],
+        numeric_cols=['QTDE', 'DESAFIO_QTD', 'TEND_QTD'],
+        category_cols=[
+            'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
+            'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF'
+        ]
+    )
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+def load_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={
+            'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM', 'DATA_DIA',
+            'QTDE', 'DESAFIO_QTD', 'TEND_QTD', 'DSC_INDICADOR', 'DSC_IND_NORM', 'IND_NORM'
+        },
+        text_cols=[
+            'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM',
+            'DSC_INDICADOR', 'DSC_IND_NORM', 'IND_NORM'
+        ],
+        numeric_cols=['QTDE', 'DESAFIO_QTD', 'TEND_QTD'],
+        date_cols=['DAT_MOVIMENTO2', 'DATA_DIA'],
+        category_cols=[
+            'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM',
+            'DSC_INDICADOR', 'DSC_IND_NORM', 'IND_NORM'
+        ]
+    )
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+def load_ligacoes_mensal_agregado_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={'REGIONAL', 'mes_ano', 'ANO', 'MES_NUM', 'TOTAL_QTD', 'FIXA_QTD', 'CONTA_QTD', 'CTC_QTD'},
+        text_cols=['REGIONAL', 'mes_ano'],
+        numeric_cols=['ANO', 'MES_NUM', 'TOTAL_QTD', 'FIXA_QTD', 'CONTA_QTD', 'CTC_QTD'],
+        category_cols=['REGIONAL', 'mes_ano']
+    )
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+def load_ligacoes_performance_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return load_base_performance_data(path, file_mtime)
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+def load_desativados_base_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    df = _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={'COD_PLATAFORMA', 'REGIONAL', 'CANAL_PLAN', 'INADIMPLENTE', 'mes_ano', 'QTDE', 'QTDE_SILENTE'},
+        text_cols=['COD_PLATAFORMA', 'REGIONAL', 'CANAL_PLAN', 'INADIMPLENTE', 'mes_ano'],
+        numeric_cols=['QTDE', 'QTDE_SILENTE', 'FLG_SILENTE'],
+        date_cols=['DAT_MOVIMENTO2'],
+        category_cols=['COD_PLATAFORMA', 'REGIONAL', 'CANAL_PLAN', 'INADIMPLENTE', 'mes_ano']
+    )
+    if df.empty:
+        return df
+    df['REGIONAL'] = df['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
+    return df
+
+BACKLOG_CANAIS_PERMITIDOS = [
+    "DAC",
+    "DAC Adequacao de Pacote",
+    "Hospitality PME",
+    "Internet",
+    "Ativo Aquisicao Direto",
+    "Ativo Aquisicao Indireto",
+    "Ativo Rentabilizacao Indireto",
+    "Receptivo",
+    "Receptivo Rentabilizacao Exclusivo",
+]
+BACKLOG_MAPEAMENTO_CANAIS_NORM = {
+    normalizar_chave_visual("DAC"): "S2S+DAC",
+    normalizar_chave_visual("DAC Adequacao de Pacote"): "S2S+DAC",
+    normalizar_chave_visual("Hospitality PME"): "Hospitality PME",
+    normalizar_chave_visual("Internet"): "E-Commerce",
+    normalizar_chave_visual("Ativo Aquisicao Direto"): "Televendas Ativo",
+    normalizar_chave_visual("Ativo Aquisicao Indireto"): "Televendas Ativo",
+    normalizar_chave_visual("Ativo Rentabilizacao Indireto"): "Televendas Ativo",
+    normalizar_chave_visual("Receptivo"): "Televendas Receptivo",
+    normalizar_chave_visual("Receptivo Rentabilizacao Exclusivo"): "Televendas Receptivo",
+}
+MIGRACOES_PME_CANAIS = ["E-Commerce", "Inside Sales", "Televendas"]
 COTACOES_ORDEM_CANAIS = [
     "Televendas Ativo",
     "Televendas Receptivo",
@@ -7351,7 +5117,7 @@ def _filtrar_regra_cotacoes_novas_linhas(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df.loc[mask_regra]
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
 def load_cotacoes_data(
     path: str,
     file_mtime: float | None = None,
@@ -7535,17 +5301,16 @@ def _agregar_cotacoes_dataframe(df_cot: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=colunas_saida)
 
     if "VALOR_NOVAS_LINHAS" in df_cot.columns and "QTD_NOVAS_LINHAS_ATIVAR" not in df_cot.columns:
+        df_agg = df_cot.copy()
+        df_agg["STATUS_ATUAL"] = (
+            df_agg["STATUS_ATUAL"]
+            .astype(str)
+            .str.strip()
+            .replace({"": "Status nao informado", "nan": "Status nao informado"})
+        )
+        df_agg["VALOR_NOVAS_LINHAS"] = normalizar_numerico_serie(df_agg["VALOR_NOVAS_LINHAS"]).fillna(0.0)
         df_agg = (
-            df_cot.assign(
-                STATUS_ATUAL=(
-                    df_cot["STATUS_ATUAL"]
-                    .astype(str)
-                    .str.strip()
-                    .replace({"": "Status nao informado", "nan": "Status nao informado"})
-                ),
-                VALOR_NOVAS_LINHAS=normalizar_numerico_serie(df_cot["VALOR_NOVAS_LINHAS"]).fillna(0.0)
-            )
-            .groupby(["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL"], as_index=False, observed=True)["VALOR_NOVAS_LINHAS"]
+            df_agg.groupby(["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL"], as_index=False, observed=True)["VALOR_NOVAS_LINHAS"]
             .sum()
         )
         compactar_colunas_categoricas(df_agg, ["mes_ano", "CANAL_PLAN", "REGIONAL", "STATUS_ATUAL"])
@@ -7578,6 +5343,7 @@ def preparar_agregados_cotacoes(
     df_cot = load_cotacoes_data(path, file_mtime, cache_version)
     df_agg = _agregar_cotacoes_dataframe(df_cot)
     del df_cot
+    gc.collect()
     return df_agg
 
 def diagnosticar_cotacoes_loader(path: str | Path) -> dict:
@@ -7692,8 +5458,8 @@ def diagnosticar_cotacoes_loader(path: str | Path) -> dict:
     diag["sum_final"] = float(pd.to_numeric(df_final["QTD_NOVAS_LINHAS_ATIVAR"], errors="coerce").fillna(0).sum())
     return diag
 
-def _formatar_mes_ano_pt(data_valor) -> str | None:
-    """Formata datas como mmm/aa em PT-BR."""
+def _formatar_mes_ano_backlog(data_valor) -> str | None:
+    """Formata datas do backlog como mmm/aa em PT-BR."""
     if pd.isna(data_valor):
         return None
     data_ts = pd.Timestamp(data_valor)
@@ -7703,374 +5469,174 @@ def _formatar_mes_ano_pt(data_valor) -> str | None:
     }
     return f"{meses_pt.get(data_ts.month, 'jan')}/{data_ts.strftime('%y')}"
 
-def mes_ano_para_data(valor_mes) -> pd.Timestamp:
-    """Converte rótulos `mmm/aa` em Timestamp do primeiro dia do mês."""
-    if valor_mes is None or (isinstance(valor_mes, float) and pd.isna(valor_mes)):
-        return pd.Timestamp(1900, 1, 1)
-
-    if isinstance(valor_mes, (pd.Timestamp, datetime, date)):
-        try:
-            return pd.Timestamp(valor_mes).normalize().replace(day=1)
-        except Exception:
-            return pd.Timestamp(1900, 1, 1)
-
-    texto = str(valor_mes).strip().lower()
-    if not texto:
-        return pd.Timestamp(1900, 1, 1)
-
-    texto = texto.replace("tend.", "").strip()
-    mapa_meses = {
-        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
-        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
-    }
-
-    match = re.match(r"^([a-z]{3})/(\d{2,4})$", texto, flags=re.IGNORECASE)
-    if match:
-        mes_str, ano_str = match.groups()
-        mes_num = mapa_meses.get(mes_str.lower())
-        if mes_num:
-            ano_num = int(ano_str)
-            if ano_num < 100:
-                ano_num += 2000
-            try:
-                return pd.Timestamp(ano_num, mes_num, 1)
-            except Exception:
-                return pd.Timestamp(1900, 1, 1)
-
-    try:
-        data_ref = pd.to_datetime(texto, errors="coerce", dayfirst=True)
-        if pd.notna(data_ref):
-            return pd.Timestamp(data_ref).normalize().replace(day=1)
-    except Exception:
-        pass
-
-    return pd.Timestamp(1900, 1, 1)
-
-def get_mes_atual_formatado() -> str:
-    """Retorna o mês atual no formato `mmm/aa` usando o fuso de São Paulo."""
-    try:
-        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
-    except Exception:
-        hoje = date.today()
-    return _formatar_mes_ano_pt(hoje) or "jan/00"
-
-def get_mes_anterior(mes_atual: str) -> str:
-    """Retorna o mês imediatamente anterior ao mês informado em `mmm/aa`."""
-    try:
-        data_ref = mes_ano_para_data(mes_atual)
-        if pd.isna(data_ref) or int(getattr(data_ref, "year", 1900)) <= 1900:
-            return str(mes_atual or "")
-        data_anterior = (pd.Timestamp(data_ref) - pd.DateOffset(months=1)).normalize()
-        return _formatar_mes_ano_pt(data_anterior) or str(mes_atual or "")
-    except Exception:
-        return str(mes_atual or "")
-
-def normalizar_mes_dashboard(mes_ref: str | None) -> str:
-    """Normaliza rótulos de mês para comparações consistentes no dashboard."""
-    return str(mes_ref or "").strip().lower()
-
-def eh_mes_atual_dashboard(mes_ref: str | None, mes_corrente: str | None = None) -> bool:
-    """Indica se o mês de referência corresponde ao mês corrente do dashboard."""
-    mes_corrente_norm = normalizar_mes_dashboard(mes_corrente or get_mes_atual_formatado())
-    return normalizar_mes_dashboard(mes_ref) == mes_corrente_norm
-
-def deve_usar_tendencia_dashboard(
-    mes_ref: str | None,
-    valor_tendencia: float | int | None,
-    mes_corrente: str | None = None
-) -> bool:
-    """Usa tendência somente quando o mês em foco é o atual e existe valor positivo."""
-    try:
-        tendencia = float(valor_tendencia or 0.0)
-    except Exception:
-        tendencia = 0.0
-    return eh_mes_atual_dashboard(mes_ref, mes_corrente) and tendencia > 0
-
-def _formatar_mes_ano_backlog(data_valor) -> str | None:
-    """Mantém compatibilidade com a lógica mensal reaproveitada do backup app10.py."""
-    return _formatar_mes_ano_pt(data_valor)
-
-def escolher_valor_realizado_ou_tendencia(
-    valor_realizado: float | int | None,
-    valor_tendencia: float | int | None,
-    mes_ref: str | None,
-    mes_corrente: str | None = None
-) -> tuple[float, bool]:
-    """Retorna o valor exibido e se ele veio da tendência."""
-    try:
-        real = float(valor_realizado or 0.0)
-    except Exception:
-        real = 0.0
-    try:
-        tendencia = float(valor_tendencia or 0.0)
-    except Exception:
-        tendencia = 0.0
-    usar_tendencia = deve_usar_tendencia_dashboard(mes_ref, tendencia, mes_corrente)
-    return (tendencia if usar_tendencia else real), usar_tendencia
-
-def obter_mes_referencia_grafico(mes_ref: str | None = None) -> tuple[int, str]:
-    """Extrai o mês de referência selecionado no dashboard com fallback para o mês atual."""
-    mes_ref_txt = str(mes_ref or "").strip().lower()
-    if mes_ref_txt:
-        try:
-            data_ref = pd.Timestamp(mes_ano_para_data(mes_ref_txt)).normalize()
-            if int(data_ref.year) >= 2000:
-                return int(data_ref.month), str(mes_ref_txt).upper()
-        except Exception:
-            pass
-
-    mes_atual = get_mes_atual_formatado()
-    data_atual = pd.Timestamp(mes_ano_para_data(mes_atual)).normalize()
-    return int(data_atual.month), str(mes_atual).upper()
-
-def gerar_intervalo_meses_retroativos(mes_final: str, qtd_meses: int = 13) -> list[str]:
-    """Retorna os últimos N meses até o mês de referência no formato mmm/aa."""
-    try:
-        data_final = pd.Timestamp(mes_ano_para_data(str(mes_final))).normalize()
-    except Exception:
-        return [str(mes_final).strip().lower()]
-
-    intervalo = []
-    for deslocamento in range(max(int(qtd_meses), 1) - 1, -1, -1):
-        data_ref = data_final - pd.DateOffset(months=deslocamento)
-        intervalo.append(_formatar_mes_ano_backlog(data_ref).lower())
-    return intervalo
-
-def obter_janela_meses_disponiveis(
-    mes_ref: str,
-    meses_disponiveis: list[str] | pd.Series,
-    qtd_meses: int = 13
-) -> list[str]:
-    """Retorna a janela cronológica dos últimos N meses existentes até o mês de referência."""
-    if meses_disponiveis is None:
-        valores_meses = []
-    else:
-        valores_meses = list(meses_disponiveis)
-
-    meses_validos = sorted(
-        list({
-            str(mes).strip().lower()
-            for mes in valores_meses
-            if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
-        }),
-        key=mes_ano_para_data
-    )
-    if not meses_validos:
-        return []
-
-    mes_ref_norm = str(mes_ref).strip().lower()
-    if mes_ref_norm not in meses_validos:
-        mes_ref_norm = meses_validos[-1]
-
-    janela = gerar_intervalo_meses_retroativos(mes_ref_norm, qtd_meses=qtd_meses)
-    meses_set = set(meses_validos)
-    return [mes for mes in janela if mes in meses_set]
-
-def _obter_cores_serie_mensal_produto(produto_ref: str) -> tuple[str, str, str, str]:
-    """Define a paleta do gráfico mensal conforme o produto selecionado."""
-    produto_norm = normalizar_rotulo_produto(produto_ref)
-    if produto_norm == 'FIXA':
-        return '#475569', '#64748B', '#334155', '#5A6268'
-    if produto_norm == 'CONTA':
-        return '#790E09', '#FF2800', '#790E09', '#5A6268'
-    return '#8D1A12', '#FF2800', '#790E09', '#5A6268'
-
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=1, persist="disk")
-def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float | None = None) -> pd.DataFrame:
-    """Carrega e normaliza a base de ligações para reaproveitamento no app."""
-    path_obj = Path(path)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
+def load_backlog_consolidado_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega o backlog consolidado com os mesmos filtros do notebook de preparo."""
     _ = file_mtime
+    path_obj = Path(path)
     if not path_obj.exists():
         return pd.DataFrame()
 
-    ligacoes_mtime = file_mtime if file_mtime is not None else path_obj.stat().st_mtime
     suffixes = [s.lower() for s in path_obj.suffixes]
-
     if path_obj.suffix.lower() == ".parquet" or ".csv" in suffixes:
         try:
-            df_opt = load_tabular_cached(str(path_obj), ligacoes_mtime)
+            header_opt = load_tabular_cached(str(path_obj), file_mtime, nrows=0)
         except Exception:
-            return pd.DataFrame()
-        if df_opt is None or df_opt.empty:
-            return pd.DataFrame()
-
-        df_opt = df_opt.reset_index(drop=True)
-
-        if "DATA_DIA" not in df_opt.columns and "DAT_MOVIMENTO2" in df_opt.columns:
-            df_opt["DATA_DIA"] = pd.to_datetime(df_opt["DAT_MOVIMENTO2"], errors="coerce").dt.normalize()
-        elif "DATA_DIA" in df_opt.columns:
-            df_opt["DATA_DIA"] = pd.to_datetime(df_opt["DATA_DIA"], errors="coerce").dt.normalize()
-
-        if "DAT_MOVIMENTO2" not in df_opt.columns and "DATA_DIA" in df_opt.columns:
-            df_opt["DAT_MOVIMENTO2"] = pd.to_datetime(df_opt["DATA_DIA"], errors="coerce").dt.normalize()
-        elif "DAT_MOVIMENTO2" in df_opt.columns:
-            df_opt["DAT_MOVIMENTO2"] = pd.to_datetime(df_opt["DAT_MOVIMENTO2"], errors="coerce").dt.normalize()
-
-        if "mes_ano" not in df_opt.columns:
-            if "DATA_DIA" in df_opt.columns:
-                df_opt["mes_ano"] = df_opt["DATA_DIA"].apply(
-                    lambda dt: _formatar_mes_ano_pt(dt) if pd.notna(dt) else None
-                )
-            elif "dat_tratada" in df_opt.columns:
-                df_opt["mes_ano"] = df_opt["dat_tratada"].astype(str).str.strip()
-            else:
-                df_opt["mes_ano"] = ""
-
-        if "dat_tratada" not in df_opt.columns:
-            df_opt["dat_tratada"] = df_opt["mes_ano"]
-
-        if "REGIONAL" not in df_opt.columns:
-            if "DSC_REGIONAL_CMV" in df_opt.columns:
-                df_opt["REGIONAL"] = df_opt["DSC_REGIONAL_CMV"]
-            else:
-                df_opt["REGIONAL"] = ""
-
-        if "FLAG_FIXA" not in df_opt.columns:
-            if "CABEADO" in df_opt.columns:
-                df_opt["FLAG_FIXA"] = df_opt["CABEADO"].astype(str).str.strip().str.upper().isin({"SIM", "S", "TRUE", "1", "FIXA"})
-            else:
-                df_opt["FLAG_FIXA"] = False
+            header_opt = pd.DataFrame()
+        if {"NM_CANAL_VENDA_SUBGRUPO", "MES_ANO", "QTD_CONTRATOS"}.issubset(set(getattr(header_opt, "columns", []))):
+            try:
+                df_opt = load_tabular_cached(str(path_obj), file_mtime)
+            except Exception:
+                df_opt = pd.DataFrame()
         else:
-            df_opt["FLAG_FIXA"] = pd.Series(df_opt["FLAG_FIXA"], index=df_opt.index).fillna(False).astype(bool)
+            df_opt = pd.DataFrame()
+        if not df_opt.empty and {"NM_CANAL_VENDA_SUBGRUPO", "MES_ANO", "QTD_CONTRATOS"}.issubset(set(df_opt.columns)):
+            if "NM_REGIONAL" not in df_opt.columns:
+                df_opt["NM_REGIONAL"] = "Não Informado"
+            if "NOME_OS_TIPO_STATUS_AGENDA" not in df_opt.columns:
+                df_opt["NOME_OS_TIPO_STATUS_AGENDA"] = "Não Informado"
+            df_opt["NM_REGIONAL"] = (
+                df_opt["NM_REGIONAL"].astype("string").str.strip().replace({"": "Não Informado", "nan": "Não Informado"})
+            )
+            df_opt["NM_CANAL_VENDA_SUBGRUPO"] = df_opt["NM_CANAL_VENDA_SUBGRUPO"].astype("string").str.strip()
+            df_opt["MES_ANO"] = df_opt["MES_ANO"].astype("string").str.strip()
+            df_opt["NOME_OS_TIPO_STATUS_AGENDA"] = (
+                df_opt["NOME_OS_TIPO_STATUS_AGENDA"]
+                .astype("string")
+                .str.strip()
+                .replace({"": "Não Informado", "nan": "Não Informado"})
+            )
+            df_opt["QTD_CONTRATOS"] = normalizar_numerico_serie(df_opt["QTD_CONTRATOS"]).fillna(0.0)
+            df_opt = df_opt[["NM_REGIONAL", "NM_CANAL_VENDA_SUBGRUPO", "MES_ANO", "QTD_CONTRATOS", "NOME_OS_TIPO_STATUS_AGENDA"]]
+            compactar_colunas_categoricas(df_opt, ["NM_REGIONAL", "NM_CANAL_VENDA_SUBGRUPO", "MES_ANO", "NOME_OS_TIPO_STATUS_AGENDA"])
+            return df_opt
 
-        if "CANAL_PLAN" not in df_opt.columns:
-            df_opt["CANAL_PLAN"] = "Televendas Receptivo"
-        if "COD_PLATAFORMA" not in df_opt.columns:
-            df_opt["COD_PLATAFORMA"] = np.where(df_opt["FLAG_FIXA"], "FIXA", "CONTA")
-        if "DSC_INDICADOR" not in df_opt.columns:
-            df_opt["DSC_INDICADOR"] = "LIGACOES"
-        if "CABEADO" not in df_opt.columns:
-            df_opt["CABEADO"] = np.where(df_opt["FLAG_FIXA"], "SIM", "NAO")
-        if "TIPO_CHAMADA" not in df_opt.columns:
-            if "TELEFONE" in df_opt.columns:
-                telefone_ref = df_opt["TELEFONE"].astype(str)
-                df_opt["TIPO_CHAMADA"] = np.where(
-                    telefone_ref.str.contains("0960|8449", regex=True, na=False),
-                    "Click to Call",
-                    "DEMAIS"
-                )
-            else:
-                df_opt["TIPO_CHAMADA"] = "DEMAIS"
-        if "DESAFIO_QTD" not in df_opt.columns:
-            df_opt["DESAFIO_QTD"] = 0.0
-        if "TELEFONE" not in df_opt.columns:
-            df_opt["TELEFONE"] = ""
-
-        if "QTDE" not in df_opt.columns:
-            if "QTD" in df_opt.columns:
-                df_opt["QTDE"] = df_opt["QTD"]
-            else:
-                df_opt["QTDE"] = 0.0
-
-        df_opt["REGIONAL"] = df_opt["REGIONAL"].astype(str).str.strip().str[:3].str.upper()
-        df_opt["mes_ano"] = df_opt["mes_ano"].astype(str).str.strip()
-        df_opt["dat_tratada"] = df_opt["dat_tratada"].astype(str).str.strip()
-        df_opt["QTDE"] = normalizar_numerico_serie(df_opt["QTDE"]).fillna(0.0)
-        df_opt["DESAFIO_QTD"] = normalizar_numerico_serie(df_opt["DESAFIO_QTD"]).fillna(0.0)
-        df_opt["FLAG_FIXA"] = pd.Series(df_opt["FLAG_FIXA"], index=df_opt.index).fillna(False).astype(bool)
-
-        colunas_saida = [
-            "DAT_MOVIMENTO2", "DATA_DIA", "mes_ano", "dat_tratada", "REGIONAL",
-            "CANAL_PLAN", "COD_PLATAFORMA", "DSC_INDICADOR", "QTDE", "DESAFIO_QTD",
-            "CABEADO", "TIPO_CHAMADA", "TELEFONE", "FLAG_FIXA"
-        ]
-        df_saida = df_opt.loc[:, [c for c in colunas_saida if c in df_opt.columns]]
-        compactar_colunas_categoricas(
-            df_saida,
-            ["mes_ano", "dat_tratada", "REGIONAL", "CANAL_PLAN", "COD_PLATAFORMA", "DSC_INDICADOR", "CABEADO", "TIPO_CHAMADA"]
-        )
-        return df_saida
-
-    try:
-        header_df = _read_excel_with_copy_fallback(path_obj, nrows=0)
-    except Exception:
-        return pd.DataFrame()
-
-    colunas_disponiveis = set(header_df.columns)
-    qtd_col = next((col for col in ["QTDE", "QTD"] if col in colunas_disponiveis), None)
-    cabeado_col = "CABEADO" if "CABEADO" in colunas_disponiveis else None
-    if qtd_col is None or cabeado_col is None:
-        return pd.DataFrame()
-
-    coluna_data = next(
-        (
-            col_ref for col_ref in ["DATA_DIA", "DATA_MOVIMENTO", "DAT_MOVIMENTO", "DAT_MOVIMENTO2", "PERIODO"]
-            if col_ref in colunas_disponiveis
-        ),
-        None
-    )
-    if coluna_data is None:
-        return pd.DataFrame()
-
-    colunas_leitura = [qtd_col, cabeado_col, coluna_data]
-    for col_opcional in ["DSC_REGIONAL_CMV", "REGIONAL", "TELEFONE", "TIPO_CHAMADA", "FLAG_FIXA"]:
-        if col_opcional in colunas_disponiveis and col_opcional not in colunas_leitura:
-            colunas_leitura.append(col_opcional)
-
-    try:
-        df_lig = _read_excel_with_copy_fallback(path_obj, usecols=colunas_leitura)
-    except Exception:
-        return pd.DataFrame()
-    if df_lig is None or df_lig.empty:
-        return pd.DataFrame()
-
-    serie_data_ref = pd.to_datetime(df_lig[coluna_data], errors="coerce")
-    mask_data_valida = serie_data_ref.notna()
-    df_work = df_lig.loc[mask_data_valida].reset_index(drop=True)
-    df_work["DAT_MOVIMENTO2"] = serie_data_ref.loc[mask_data_valida].reset_index(drop=True)
-    if df_work.empty:
-        return pd.DataFrame()
-
-    df_work["DATA_DIA"] = pd.to_datetime(df_work["DAT_MOVIMENTO2"], errors="coerce").dt.normalize()
-    df_work["mes_ano"] = df_work["DAT_MOVIMENTO2"].apply(
-        lambda dt: _formatar_mes_ano_pt(dt) if pd.notna(dt) else None
-    )
-    df_work["dat_tratada"] = df_work["mes_ano"]
-
-    col_reg = next((c for c in ["DSC_REGIONAL_CMV", "REGIONAL"] if c in df_work.columns), None)
-    if col_reg is not None:
-        df_work["REGIONAL"] = df_work[col_reg].astype(str).str.strip().str[:3].str.upper()
-    else:
-        df_work["REGIONAL"] = ""
-
-    df_work["QTDE"] = normalizar_numerico_serie(df_work[qtd_col]).fillna(0.0)
-    df_work["CABEADO"] = df_work[cabeado_col].astype(str).str.strip().str.upper()
-
-    if "TIPO_CHAMADA" in df_work.columns:
-        df_work["TIPO_CHAMADA"] = df_work["TIPO_CHAMADA"].astype(str).str.strip()
-    else:
-        telefone_ref = df_work["TELEFONE"].astype(str) if "TELEFONE" in df_work.columns else pd.Series("", index=df_work.index)
-        df_work["TIPO_CHAMADA"] = np.where(
-            telefone_ref.str.contains("0960|8449", regex=True, na=False),
-            "Click to Call",
-            "DEMAIS"
-        )
-
-    if "FLAG_FIXA" in df_work.columns:
-        df_work["FLAG_FIXA"] = pd.Series(df_work["FLAG_FIXA"], index=df_work.index).fillna(False).astype(bool)
-    else:
-        df_work["FLAG_FIXA"] = df_work["CABEADO"].isin({"SIM", "S", "TRUE", "1", "FIXA"})
-
-    df_work["COD_PLATAFORMA"] = np.where(df_work["FLAG_FIXA"], "FIXA", "CONTA")
-    df_work["CANAL_PLAN"] = "Televendas Receptivo"
-    df_work["DSC_INDICADOR"] = "LIGACOES"
-    df_work["DESAFIO_QTD"] = 0.0
-    if "TELEFONE" not in df_work.columns:
-        df_work["TELEFONE"] = ""
-
-    colunas_saida = [
-        "DAT_MOVIMENTO2", "DATA_DIA", "mes_ano", "dat_tratada", "REGIONAL",
-        "CANAL_PLAN", "COD_PLATAFORMA", "DSC_INDICADOR", "QTDE", "DESAFIO_QTD",
-        "CABEADO", "TIPO_CHAMADA", "TELEFONE", "FLAG_FIXA"
+    usecols = [
+        "SK_DATA",
+        "NR_CONTRATO",
+        "NM_VISAO_ANALISE",
+        "NM_REGIONAL",
+        "NM_CANAL_VENDA_SUBGRUPO",
+        "NOME_OS_TIPO_STATUS_AGENDA",
+        "DT_AGENDA_ORDEM_SERVICO",
     ]
-    df_saida = df_work.loc[:, [c for c in colunas_saida if c in df_work.columns]]
-    compactar_colunas_categoricas(
-        df_saida,
-        ["mes_ano", "dat_tratada", "REGIONAL", "CANAL_PLAN", "COD_PLATAFORMA", "DSC_INDICADOR", "CABEADO", "TIPO_CHAMADA"]
-    )
-    return df_saida
+    try:
+        header_raw = pd.read_csv(path_obj, nrows=0)
+    except UnicodeDecodeError:
+        header_raw = pd.read_csv(path_obj, encoding="latin-1", nrows=0)
+    except Exception:
+        header_raw = pd.DataFrame()
+    colunas_disponiveis_backlog = set(getattr(header_raw, "columns", []))
+    usecols = [col for col in usecols if col in colunas_disponiveis_backlog]
+    colunas_obrigatorias_backlog = {"NR_CONTRATO", "NM_VISAO_ANALISE", "NM_REGIONAL", "NM_CANAL_VENDA_SUBGRUPO"}
+    if not colunas_obrigatorias_backlog.issubset(set(usecols)) or not ({"SK_DATA", "DT_AGENDA_ORDEM_SERVICO"} & set(usecols)):
+        return pd.DataFrame()
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
+    read_kwargs = {
+        "usecols": usecols,
+        "low_memory": False,
+        "dtype": {
+            "SK_DATA": "string",
+            "NR_CONTRATO": "string",
+            "NM_VISAO_ANALISE": "string",
+            "NM_REGIONAL": "string",
+            "NM_CANAL_VENDA_SUBGRUPO": "string",
+            "NOME_OS_TIPO_STATUS_AGENDA": "string",
+            "DT_AGENDA_ORDEM_SERVICO": "string",
+        }
+    }
+    try:
+        df = pd.read_csv(path_obj, **read_kwargs)
+    except UnicodeDecodeError:
+        df = pd.read_csv(path_obj, encoding="latin-1", **read_kwargs)
+    except Exception:
+        return pd.DataFrame()
+
+    for coluna in [
+        "SK_DATA",
+        "NR_CONTRATO",
+        "NM_VISAO_ANALISE",
+        "NM_REGIONAL",
+        "NM_CANAL_VENDA_SUBGRUPO",
+        "NOME_OS_TIPO_STATUS_AGENDA",
+        "DT_AGENDA_ORDEM_SERVICO",
+    ]:
+        if coluna in df.columns:
+            df[coluna] = df[coluna].astype("string").str.strip()
+
+    canais_permitidos_norm = {normalizar_chave_visual(v) for v in BACKLOG_CANAIS_PERMITIDOS}
+    canais_backlog_norm = df["NM_CANAL_VENDA_SUBGRUPO"].map(normalizar_chave_visual)
+    filtro = (
+        df["NM_VISAO_ANALISE"].map(normalizar_chave_visual).eq(normalizar_chave_visual("Novos Domicilios")) &
+        canais_backlog_norm.isin(canais_permitidos_norm)
+    )
+    df = df.loc[filtro]
+    if df.empty:
+        return pd.DataFrame()
+
+    df["NM_CANAL_VENDA_SUBGRUPO"] = (
+        canais_backlog_norm.loc[df.index]
+        .map(BACKLOG_MAPEAMENTO_CANAIS_NORM)
+        .fillna(df["NM_CANAL_VENDA_SUBGRUPO"].astype("string").str.strip())
+        .astype("string")
+        .str.strip()
+        .replace({"": pd.NA, "nan": pd.NA})
+    )
+    df["NR_CONTRATO"] = (
+        df["NR_CONTRATO"]
+        .astype("string")
+        .str.strip()
+        .str.replace(r"\.0$", "", regex=True)
+        .replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NULL": pd.NA})
+    )
+    df["NM_REGIONAL"] = (
+        df["NM_REGIONAL"]
+        .astype("string")
+        .str.strip()
+        .replace({"": "Não Informado", "nan": "Não Informado"})
+    )
+    if "NOME_OS_TIPO_STATUS_AGENDA" not in df.columns:
+        df["NOME_OS_TIPO_STATUS_AGENDA"] = "Não Informado"
+    df["NOME_OS_TIPO_STATUS_AGENDA"] = (
+        df["NOME_OS_TIPO_STATUS_AGENDA"]
+        .astype("string")
+        .str.strip()
+        .replace({"": "Não Informado", "nan": "Não Informado", "None": "Não Informado", "NULL": "Não Informado"})
+    )
+    data_sk = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
+    if "SK_DATA" in df.columns:
+        sk_data_norm = (
+            df["SK_DATA"]
+            .astype("string")
+            .str.strip()
+            .str.replace(r"\.0$", "", regex=True)
+            .str.zfill(8)
+        )
+        data_sk = pd.to_datetime(sk_data_norm, format="%Y%m%d", errors="coerce")
+
+    data_agenda = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
+    if "DT_AGENDA_ORDEM_SERVICO" in df.columns:
+        data_agenda = pd.to_datetime(df["DT_AGENDA_ORDEM_SERVICO"], errors="coerce")
+
+    df["DATA_BACKLOG_REF"] = data_sk.combine_first(data_agenda)
+    df = df.loc[
+        df["NM_CANAL_VENDA_SUBGRUPO"].notna() &
+        df["NR_CONTRATO"].notna() &
+        df["DATA_BACKLOG_REF"].notna()
+    ]
+    if df.empty:
+        return pd.DataFrame()
+
+    df["MES_ANO"] = df["DATA_BACKLOG_REF"].map(_formatar_mes_ano_backlog)
+    df = df.loc[
+        df["MES_ANO"].notna(),
+        ["NM_REGIONAL", "NM_CANAL_VENDA_SUBGRUPO", "MES_ANO", "NR_CONTRATO", "NOME_OS_TIPO_STATUS_AGENDA"]
+    ]
+    compactar_colunas_categoricas(df, ["NM_REGIONAL", "NM_CANAL_VENDA_SUBGRUPO", "MES_ANO", "NOME_OS_TIPO_STATUS_AGENDA"])
+    return df
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
 def load_pedidos_dashboard_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     """Carrega a base otimizada de pedidos E-Commerce já consolidada por mês/regional/canal."""
     _ = file_mtime
@@ -8097,12 +5663,10 @@ def load_pedidos_dashboard_data(path: str, file_mtime: float | None = None) -> p
     if not colunas_minimas.issubset(set(df_ped.columns)):
         return pd.DataFrame()
 
-    datas_movimento = pd.to_datetime(df_ped["DAT_MOVIMENTO2"], errors="coerce")
-    mask_datas_validas = datas_movimento.notna()
-    df_ped = df_ped.loc[mask_datas_validas].reset_index(drop=True)
+    df_ped["DAT_MOVIMENTO2"] = pd.to_datetime(df_ped["DAT_MOVIMENTO2"], errors="coerce")
+    df_ped = df_ped[df_ped["DAT_MOVIMENTO2"].notna()].copy()
     if df_ped.empty:
         return pd.DataFrame()
-    df_ped["DAT_MOVIMENTO2"] = datas_movimento.loc[mask_datas_validas].reset_index(drop=True)
 
     if "ID_AFILIADOS" not in df_ped.columns:
         df_ped["ID_AFILIADOS"] = ""
@@ -8130,6 +5694,237 @@ def load_pedidos_dashboard_data(path: str, file_mtime: float | None = None) -> p
     )
     return df_ped
 
+def montar_tabela_backlog_canais(
+    df_backlog: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Monta a tabela canal x mês do backlog com linha total no topo."""
+    colunas_vazias = ["CANAL"]
+    if df_backlog is None or df_backlog.empty:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    meses_ordem = sorted(
+        df_backlog["MES_ANO"].dropna().astype(str).unique().tolist(),
+        key=mes_ano_para_data
+    )
+    if not meses_ordem:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+    mes_corrente_backlog = get_mes_atual_formatado().strip().lower()
+    if mes_corrente_backlog not in [str(m).strip().lower() for m in meses_ordem]:
+        try:
+            if pd.Timestamp(mes_ano_para_data(mes_corrente_backlog)) >= pd.Timestamp(mes_ano_para_data(str(meses_ordem[-1]))):
+                meses_ordem.append(mes_corrente_backlog)
+        except Exception:
+            pass
+    mes_foco_backlog = (
+        mes_corrente_backlog
+        if mes_corrente_backlog in [str(m).strip().lower() for m in meses_ordem]
+        else str(meses_ordem[-1]).strip().lower()
+    )
+    meses_ordem = obter_janela_meses_disponiveis(mes_foco_backlog, meses_ordem, qtd_meses=13)
+    if not meses_ordem:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    if "QTD_CONTRATOS" in df_backlog.columns:
+        tabela = pd.pivot_table(
+            df_backlog,
+            index="NM_CANAL_VENDA_SUBGRUPO",
+            columns="MES_ANO",
+            values="QTD_CONTRATOS",
+            aggfunc="sum",
+            fill_value=0
+        ).reindex(columns=meses_ordem, fill_value=0)
+        totais_mes = (
+            df_backlog.groupby("MES_ANO", observed=True)["QTD_CONTRATOS"]
+            .sum()
+            .reindex(meses_ordem, fill_value=0)
+        )
+    else:
+        tabela = pd.pivot_table(
+            df_backlog,
+            index="NM_CANAL_VENDA_SUBGRUPO",
+            columns="MES_ANO",
+            values="NR_CONTRATO",
+            aggfunc=pd.Series.nunique,
+            fill_value=0
+        ).reindex(columns=meses_ordem, fill_value=0)
+        totais_mes = (
+            df_backlog.groupby("MES_ANO", observed=True)["NR_CONTRATO"]
+            .nunique()
+            .reindex(meses_ordem, fill_value=0)
+        )
+
+    if tabela.empty:
+        return pd.DataFrame(columns=["CANAL", *meses_ordem]), pd.DataFrame(columns=["CANAL", *meses_ordem])
+
+    tabela = tabela.assign(_ordem=tabela.sum(axis=1)).sort_values("_ordem", ascending=False).drop(columns="_ordem")
+
+    df_num = tabela.reset_index().rename(columns={"NM_CANAL_VENDA_SUBGRUPO": "CANAL"})
+    linha_total = {"CANAL": "TOTAL"}
+    for mes in meses_ordem:
+        linha_total[mes] = float(totais_mes.get(mes, 0))
+    df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
+
+    df_fmt = df_num.copy().astype(object)
+    for col in df_fmt.columns:
+        if col == "CANAL":
+            continue
+        df_fmt[col] = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0).apply(
+            lambda valor: formatar_numero_brasileiro(valor, 0)
+        )
+    return df_fmt, df_num
+
+def _interpolar_cores_hex(cor_inicio: str, cor_fim: str, qtd: int) -> list[str]:
+    """Gera escala linear entre duas cores hexadecimais."""
+    if qtd <= 0:
+        return []
+    if qtd == 1:
+        return [cor_fim]
+
+    def _hex_para_rgb(cor: str) -> tuple[int, int, int]:
+        cor_limpa = str(cor).strip().lstrip("#")
+        return tuple(int(cor_limpa[i:i + 2], 16) for i in (0, 2, 4))
+
+    rgb_inicio = _hex_para_rgb(cor_inicio)
+    rgb_fim = _hex_para_rgb(cor_fim)
+    cores = []
+    for idx in range(qtd):
+        peso = idx / max(qtd - 1, 1)
+        rgb = tuple(
+            int(round(rgb_inicio[pos] + (rgb_fim[pos] - rgb_inicio[pos]) * peso))
+            for pos in range(3)
+        )
+        cores.append("#" + "".join(f"{valor:02X}" for valor in rgb))
+    return cores
+
+def criar_grafico_cascata_backlog_status(
+    df_backlog: pd.DataFrame,
+    mes_ref: str,
+    canal_ref: str = "Todos",
+    regional_ref: str = "Todos"
+) -> go.Figure:
+    """Cria cascata de distribuição do backlog por status de agenda."""
+    fig_vazia = go.Figure()
+    col_status = "NOME_OS_TIPO_STATUS_AGENDA"
+    col_canal = "NM_CANAL_VENDA_SUBGRUPO"
+    col_regional = "NM_REGIONAL"
+    col_mes = "MES_ANO"
+    col_contrato = "NR_CONTRATO"
+    col_qtd = "QTD_CONTRATOS"
+
+    if df_backlog is None or df_backlog.empty or col_status not in df_backlog.columns:
+        return fig_vazia
+
+    base = df_backlog.copy()
+    base[col_mes] = base[col_mes].astype(str).str.strip().str.lower()
+    base[col_status] = (
+        base[col_status]
+        .astype("string")
+        .str.strip()
+        .replace({"": "Não Informado", "nan": "Não Informado", "None": "Não Informado", "NULL": "Não Informado"})
+    )
+    base = base[base[col_mes].eq(str(mes_ref).strip().lower())]
+    if canal_ref and str(canal_ref).strip().lower() != "todos" and col_canal in base.columns:
+        base = base[base[col_canal].astype(str).str.strip().eq(str(canal_ref).strip())]
+    if regional_ref and str(regional_ref).strip().lower() != "todos" and col_regional in base.columns:
+        base = base[base[col_regional].astype(str).str.strip().eq(str(regional_ref).strip())]
+    if base.empty:
+        return fig_vazia
+
+    if col_qtd in base.columns and col_contrato not in base.columns:
+        serie_status = (
+            base.groupby(col_status, observed=True)[col_qtd]
+            .sum()
+            .sort_values(ascending=False)
+        )
+    else:
+        serie_status = (
+            base.groupby(col_status, observed=True)[col_contrato]
+            .nunique()
+            .sort_values(ascending=False)
+        )
+
+    serie_status = serie_status[serie_status.gt(0)]
+    if serie_status.empty:
+        return fig_vazia
+
+    labels = [str(label) for label in serie_status.index.tolist()]
+    valores = [float(valor) for valor in serie_status.tolist()]
+    total = float(sum(valores))
+    labels_plot = [*labels, "TOTAL"]
+    valores_plot = [*valores, total]
+    bases_plot = [0.0, *np.cumsum(valores).astype(float).tolist()[:-1], 0.0]
+    textos = [formatar_numero_brasileiro(valor, 0) for valor in valores]
+    textos.append(formatar_numero_brasileiro(total, 0))
+    cores = [*_interpolar_cores_hex("#F9D6D3", "#8D1A12", len(labels)), "#4B5563"]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=labels_plot,
+            y=valores_plot,
+            base=bases_plot,
+            text=textos,
+            textposition="outside",
+            marker=dict(
+                color=cores,
+                line=dict(color="rgba(255,255,255,0.92)", width=1.1),
+            ),
+            customdata=textos,
+            cliponaxis=False,
+            hovertemplate=(
+                "<b>Status:</b> %{x}<br>"
+                "<b>Contratos:</b> %{customdata}<extra></extra>"
+            ),
+            showlegend=False,
+        )
+    )
+    acumulado_status = np.cumsum(valores).astype(float).tolist()
+    if len(labels) > 1:
+        fig.add_trace(
+            go.Scatter(
+                x=labels,
+                y=acumulado_status,
+                mode="lines",
+                line=dict(color="rgba(121,14,9,0.30)", width=1.2, dash="dot"),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+    fig.add_shape(
+        type="line",
+        xref="paper",
+        yref="y",
+        x0=0,
+        x1=1,
+        y0=total,
+        y1=total,
+        line=dict(color="rgba(75,85,99,0.18)", width=1, dash="dot"),
+    )
+    fig.update_layout(
+        height=460,
+        showlegend=False,
+        plot_bgcolor="white",
+        paper_bgcolor="#FCFCFD",
+        font=dict(family="Manrope, Segoe UI, sans-serif", size=12, color="#2F3747"),
+        margin=dict(l=18, r=18, t=32, b=74),
+        yaxis=dict(
+            title="",
+            showgrid=True,
+            gridcolor="rgba(230,236,244,0.88)",
+            zeroline=False,
+            tickfont=dict(size=11, color="#5B6578"),
+        ),
+        xaxis=dict(
+            title="",
+            tickangle=-18,
+            tickfont=dict(size=11, color="#374151"),
+            showgrid=False,
+        ),
+        bargap=0.28,
+    )
+    fig.update_traces(textfont=dict(size=12, color="#1F2937", family="Manrope, Segoe UI, sans-serif"))
+    return fig
+
 def montar_tabela_cotacoes_canais_mensal(
     df_cotacoes: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -8145,17 +5940,14 @@ def montar_tabela_cotacoes_canais_mensal(
 
     df_base = df_cotacoes.loc[
         df_cotacoes["CANAL_PLAN"].notna() &
-        df_cotacoes["mes_ano"].notna(),
-        ["CANAL_PLAN", "mes_ano", "VALOR_NOVAS_LINHAS"]
-    ]
+        df_cotacoes["mes_ano"].notna()
+    ].copy()
     if df_base.empty:
         return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
 
-    df_base = df_base.assign(
-        CANAL_PLAN=df_base["CANAL_PLAN"].astype("string").str.strip(),
-        mes_ano=df_base["mes_ano"].astype("string").str.strip(),
-        VALOR_NOVAS_LINHAS=normalizar_numerico_serie(df_base["VALOR_NOVAS_LINHAS"]).fillna(0.0)
-    )
+    df_base["CANAL_PLAN"] = df_base["CANAL_PLAN"].astype("string").str.strip()
+    df_base["mes_ano"] = df_base["mes_ano"].astype("string").str.strip()
+    df_base["VALOR_NOVAS_LINHAS"] = normalizar_numerico_serie(df_base["VALOR_NOVAS_LINHAS"]).fillna(0.0)
 
     meses_ordem = sorted(
         df_base["mes_ano"].dropna().astype(str).unique().tolist(),
@@ -8200,7 +5992,7 @@ def montar_tabela_cotacoes_canais_mensal(
         linha_total[mes] = float(totais_mes.get(mes, 0))
     df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
 
-    df_fmt = df_num.astype(object)
+    df_fmt = df_num.copy().astype(object)
     for col in df_fmt.columns:
         if col == "CANAL":
             continue
@@ -8325,7 +6117,7 @@ def montar_tabela_funil_cotacoes(
         intervalo = []
         for deslocamento in range(max(int(qtd_meses), 1) - 1, -1, -1):
             data_ref = data_final - pd.DateOffset(months=deslocamento)
-            intervalo.append(_formatar_mes_ano_pt(data_ref).lower())
+            intervalo.append(_formatar_mes_ano_backlog(data_ref).lower())
         return intervalo
 
     mes_m1 = get_mes_anterior(mes_foco)
@@ -8583,6 +6375,288 @@ def montar_tabela_funil_cotacoes(
                     df_fmt.loc[idx, coluna] = _fmt_num(valor)
 
     return df_fmt, df_num
+
+def montar_tabela_funil_fixa(
+    df_base_principal: pd.DataFrame,
+    canal_ref: str = "Todos",
+    mes_ref: str | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Monta tabela do funil FIXA com linhas:
+    PEDIDOS, VENDA BRUTA, INSTALADOS e taxas de conversao.
+
+    Ajustes de robustez aplicados:
+    - aceita bases sem DESAFIO_QTD / TEND_QTD;
+    - normaliza mês mesmo quando a data vem como datetime/texto;
+    - normaliza canal antes dos filtros;
+    - evita retorno vazio indevido por inconsistência em dat_tratada.
+    """
+    mes_coluna_vazia = str((mes_ref or get_mes_atual_formatado())).strip().upper()
+    colunas_vazias = ["ETAPA", mes_coluna_vazia, "MoM"]
+    if df_base_principal is None or df_base_principal.empty:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    def _normalizar_mes_funil_fixa_local(valor) -> str | None:
+        if pd.isna(valor):
+            return None
+        meses_pt = {
+            1: "jan", 2: "fev", 3: "mar", 4: "abr",
+            5: "mai", 6: "jun", 7: "jul", 8: "ago",
+            9: "set", 10: "out", 11: "nov", 12: "dez"
+        }
+        texto = str(valor).strip().lower()
+        if not texto:
+            return None
+        if re.match(r"^[a-z]{3}/\d{2}$", texto, flags=re.IGNORECASE):
+            return texto
+        dt = pd.to_datetime(valor, errors="coerce", dayfirst=True)
+        if pd.isna(dt):
+            dt = pd.to_datetime(texto, errors="coerce")
+        if pd.notna(dt):
+            return f"{meses_pt.get(int(dt.month), '')}/{str(int(dt.year))[-2:]}" if int(dt.month) in meses_pt else None
+        return None
+
+    def _resolver_coluna_existente_local(df_base: pd.DataFrame, candidatas: list[str]) -> str | None:
+        for col in candidatas:
+            if col in df_base.columns:
+                return col
+        return None
+
+    def _normalizar_plataforma_funil(valor_plataforma) -> str:
+        texto = _normalizar_texto_funil_cotacoes(valor_plataforma)
+        if "FIXA" in texto:
+            return "FIXA"
+        if "CONTA" in texto or "MOVEL" in texto or "MOBILE" in texto:
+            return "CONTA"
+        return texto
+
+    df_principal = df_base_principal.copy()
+
+    col_data_base = _resolver_coluna_existente_local(
+        df_principal,
+        [
+            "dat_tratada", "mes_ano", "MES_ANO", "DATA", "DT_PEDIDO", "DATA_PEDIDO",
+            "DT_VENDA", "DATA_VENDA", "DT_INSTALACAO", "DATA_INSTALACAO",
+            "DAT_MOVIMENTO2", "DAT_MOVIMENTO", "DAT_MOVIMENTO_2", "PERIODO"
+        ]
+    )
+
+    colunas_essenciais = {"CANAL_PLAN", "COD_PLATAFORMA", "DSC_INDICADOR", "QTDE"}
+    if col_data_base is None or not colunas_essenciais.issubset(set(df_principal.columns)):
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    if "DESAFIO_QTD" not in df_principal.columns:
+        df_principal["DESAFIO_QTD"] = 0
+    if "TEND_QTD" not in df_principal.columns:
+        df_principal["TEND_QTD"] = 0
+
+    df_principal = df_principal[
+        ["CANAL_PLAN", "COD_PLATAFORMA", "DSC_INDICADOR", col_data_base, "QTDE", "DESAFIO_QTD", "TEND_QTD"]
+    ].copy()
+    df_principal = df_principal.rename(columns={col_data_base: "_DATA_BASE_FUNIL_FIXA"})
+    df_principal["MES_NORM"] = df_principal["_DATA_BASE_FUNIL_FIXA"].apply(_normalizar_mes_funil_fixa_local)
+    df_principal["CANAL_FUNIL"] = df_principal["CANAL_PLAN"].apply(_mapear_canal_funil_cotacoes)
+    df_principal["PLATAFORMA_NORM"] = df_principal["COD_PLATAFORMA"].apply(_normalizar_plataforma_funil)
+    df_principal["INDICADOR_NORM"] = df_principal["DSC_INDICADOR"].apply(_normalizar_texto_funil_cotacoes)
+    df_principal["QTDE"] = pd.to_numeric(df_principal["QTDE"], errors="coerce").fillna(0.0)
+    df_principal["DESAFIO_QTD"] = pd.to_numeric(df_principal["DESAFIO_QTD"], errors="coerce").fillna(0.0)
+    df_principal["TEND_QTD"] = pd.to_numeric(df_principal["TEND_QTD"], errors="coerce").fillna(0.0)
+    df_principal = df_principal.loc[df_principal["MES_NORM"].notna()].copy()
+
+    if df_principal.empty:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    meses_validos = sorted(
+        df_principal["MES_NORM"].dropna().astype(str).str.strip().str.lower().unique().tolist(),
+        key=mes_ano_para_data
+    )
+    mes_corrente = get_mes_atual_formatado().strip().lower()
+    mes_foco = str(mes_ref or "").strip().lower()
+    if not mes_foco:
+        mes_foco = mes_corrente if mes_corrente in meses_validos else (meses_validos[-1] if meses_validos else mes_corrente)
+    elif mes_foco not in meses_validos and meses_validos:
+        mes_foco = meses_validos[-1]
+
+    def _gerar_intervalo_meses(mes_final: str, qtd_meses: int = 13) -> list[str]:
+        try:
+            data_final = pd.Timestamp(mes_ano_para_data(str(mes_final))).normalize()
+        except Exception:
+            return [str(mes_final).strip().lower()]
+        intervalo = []
+        for deslocamento in range(max(int(qtd_meses), 1) - 1, -1, -1):
+            data_ref = data_final - pd.DateOffset(months=deslocamento)
+            intervalo.append(_formatar_mes_ano_backlog(data_ref).lower())
+        return intervalo
+
+    mes_m1 = get_mes_anterior(mes_foco)
+    usar_tend_mes_foco = mes_foco == mes_corrente
+    meses_serie = _gerar_intervalo_meses(mes_foco, qtd_meses=13)
+    colunas_meses: list[str] = []
+    mapa_coluna_mes: dict[str, str] = {}
+    for mes_item in meses_serie:
+        label_mes = str(mes_item).strip().upper()
+        if usar_tend_mes_foco and str(mes_item).strip().lower() == str(mes_foco).strip().lower():
+            label_mes = f"{label_mes} (TEND.)"
+        colunas_meses.append(label_mes)
+        mapa_coluna_mes[str(mes_item).strip().lower()] = label_mes
+    colunas_saida = ["ETAPA", *colunas_meses, "MoM"]
+
+    canal_escolhido = str(canal_ref or "Todos").strip()
+    canal_funil_escolhido = _mapear_canal_funil_cotacoes(canal_escolhido)
+    exibir_linha_entrada = canal_escolhido.lower() == "todos" or canal_funil_escolhido in {"E-Commerce", "Televendas Receptivo"}
+    usar_ligacoes_como_entrada = canal_funil_escolhido == "Televendas Receptivo"
+    label_entrada = "LIGAÇÕES" if usar_ligacoes_como_entrada else "PEDIDOS"
+    label_conv_1 = "V.B VS LIG" if usar_ligacoes_como_entrada else "V.B VS PED"
+
+    if canal_escolhido.lower() != "todos":
+        df_principal = df_principal.loc[
+            df_principal["CANAL_FUNIL"].astype(str).str.strip().eq(canal_funil_escolhido)
+        ].copy()
+        if df_principal.empty:
+            return pd.DataFrame(columns=colunas_saida), pd.DataFrame(columns=colunas_saida)
+
+    df_principal = df_principal.loc[
+        df_principal["PLATAFORMA_NORM"].astype(str).str.strip().eq("FIXA")
+    ].copy()
+    if df_principal.empty:
+        return pd.DataFrame(columns=colunas_saida), pd.DataFrame(columns=colunas_saida)
+
+    def _somar_indicador_por_mes(df_base: pd.DataFrame, nomes_alvo: set[str], usar_tendencia: bool = False) -> dict[str, float]:
+        if df_base.empty:
+            return {}
+        base_ind = df_base.loc[df_base["INDICADOR_NORM"].isin(nomes_alvo)].copy()
+        if base_ind.empty:
+            return {}
+        coluna_valor = "QTDE"
+        if usar_tendencia and "TEND_QTD" in base_ind.columns:
+            base_ind["VALOR_EXIBICAO"] = np.where(
+                base_ind["MES_NORM"].astype(str).str.strip().str.lower().eq(mes_corrente) & base_ind["TEND_QTD"].gt(0),
+                base_ind["TEND_QTD"],
+                base_ind["QTDE"]
+            )
+            coluna_valor = "VALOR_EXIBICAO"
+        return (
+            base_ind.groupby("MES_NORM", observed=True)[coluna_valor]
+            .sum().astype(float).to_dict()
+        )
+
+    if usar_ligacoes_como_entrada:
+        nomes_entrada = {"LIGACOES", "LIGACAO"}
+    else:
+        nomes_entrada = {"PEDIDOS", "PEDIDO"}
+
+    indicadores_vb = {"VENDA BRUTA", "VENDA_BRUTA", "VB", "GROSS"}
+    indicadores_inst = {"INSTALADOS", "INSTALADO", "ATIVADOS", "ATIVADO", "INSTALACAO", "INSTALACAO LIQUIDA"}
+
+    serie_entrada = _somar_indicador_por_mes(df_principal, nomes_entrada, usar_tendencia=True)
+    serie_vb = _somar_indicador_por_mes(df_principal, indicadores_vb, usar_tendencia=True)
+    serie_inst = _somar_indicador_por_mes(df_principal, indicadores_inst, usar_tendencia=True)
+
+    if not serie_entrada or not serie_vb or not serie_inst:
+        base_idx = df_principal.copy()
+        col = base_idx["INDICADOR_NORM"].astype(str)
+        if not serie_entrada:
+            mask = col.str.contains("LIGACAO|LIGACOES", regex=True) if usar_ligacoes_como_entrada else col.str.contains("PEDIDO|PEDIDOS", regex=True)
+            serie_entrada = (
+                base_idx.loc[mask]
+                .assign(VALOR_EXIBICAO=lambda x: np.where(
+                    x["MES_NORM"].astype(str).str.strip().str.lower().eq(mes_corrente) & x["TEND_QTD"].gt(0),
+                    x["TEND_QTD"], x["QTDE"]
+                ))
+                .groupby("MES_NORM", observed=True)["VALOR_EXIBICAO"].sum().astype(float).to_dict()
+            )
+        if not serie_vb:
+            mask = col.str.contains("VENDA BRUTA|VENDA_BRUTA|\bVB\b|GROSS", regex=True)
+            serie_vb = (
+                base_idx.loc[mask]
+                .assign(VALOR_EXIBICAO=lambda x: np.where(
+                    x["MES_NORM"].astype(str).str.strip().str.lower().eq(mes_corrente) & x["TEND_QTD"].gt(0),
+                    x["TEND_QTD"], x["QTDE"]
+                ))
+                .groupby("MES_NORM", observed=True)["VALOR_EXIBICAO"].sum().astype(float).to_dict()
+            )
+        if not serie_inst:
+            mask = col.str.contains("INSTAL|ATIVAD", regex=True)
+            serie_inst = (
+                base_idx.loc[mask]
+                .assign(VALOR_EXIBICAO=lambda x: np.where(
+                    x["MES_NORM"].astype(str).str.strip().str.lower().eq(mes_corrente) & x["TEND_QTD"].gt(0),
+                    x["TEND_QTD"], x["QTDE"]
+                ))
+                .groupby("MES_NORM", observed=True)["VALOR_EXIBICAO"].sum().astype(float).to_dict()
+            )
+
+    if (not serie_vb and not serie_inst) or (exibir_linha_entrada and not serie_entrada and not serie_vb and not serie_inst):
+        return pd.DataFrame(columns=colunas_saida), pd.DataFrame(columns=colunas_saida)
+
+    def _valor_mes(lookup: dict[str, float], mes_item: str) -> float:
+        return float(pd.to_numeric(pd.Series([lookup.get(str(mes_item).strip().lower(), 0.0)]), errors="coerce").fillna(0.0).iloc[0])
+
+    def _linha_valores(nome_linha: str, lookup: dict[str, float]) -> tuple[dict[str, object], dict[str, object]]:
+        linha_fmt = {"ETAPA": nome_linha}
+        linha_num = {"ETAPA": nome_linha}
+        for mes_item in meses_serie:
+            col_mes = mapa_coluna_mes.get(str(mes_item).strip().lower(), str(mes_item).strip().upper())
+            valor = _valor_mes(lookup, mes_item)
+            linha_num[col_mes] = valor
+            linha_fmt[col_mes] = formatar_numero_brasileiro(valor, 0)
+        valor_atual = _valor_mes(lookup, mes_foco)
+        valor_m1 = _valor_mes(lookup, mes_m1)
+        mom = _calcular_mom_funil_fixa(valor_atual, valor_m1)
+        linha_num["MoM"] = mom
+        linha_fmt["MoM"] = _render_mom_badge_funil_fixa(mom)
+        return linha_fmt, linha_num
+
+    def _linha_conversao(nome_linha: str, lookup_num: dict[str, float], lookup_den: dict[str, float]) -> tuple[dict[str, object], dict[str, object]]:
+        linha_fmt = {"ETAPA": nome_linha}
+        linha_num = {"ETAPA": nome_linha}
+        for mes_item in meses_serie:
+            col_mes = mapa_coluna_mes.get(str(mes_item).strip().lower(), str(mes_item).strip().upper())
+            num = _valor_mes(lookup_num, mes_item)
+            den = _valor_mes(lookup_den, mes_item)
+            perc = ((num / den) * 100.0) if den else np.nan
+            linha_num[col_mes] = perc
+            linha_fmt[col_mes] = (f"{perc:.1f}%".replace('.', ',') if pd.notna(perc) else "n/d")
+        num_atual = _valor_mes(lookup_num, mes_foco)
+        den_atual = _valor_mes(lookup_den, mes_foco)
+        num_m1 = _valor_mes(lookup_num, mes_m1)
+        den_m1 = _valor_mes(lookup_den, mes_m1)
+        perc_atual = ((num_atual / den_atual) * 100.0) if den_atual else np.nan
+        perc_m1 = ((num_m1 / den_m1) * 100.0) if den_m1 else np.nan
+        mom = _calcular_mom_funil_fixa(perc_atual, perc_m1) if pd.notna(perc_atual) and pd.notna(perc_m1) else np.nan
+        linha_num["MoM"] = mom
+        linha_fmt["MoM"] = _render_mom_badge_funil_fixa(mom)
+        return linha_fmt, linha_num
+
+    linhas_fmt: list[dict[str, object]] = []
+    linhas_num: list[dict[str, object]] = []
+
+    if exibir_linha_entrada:
+        lf, ln = _linha_valores(label_entrada, serie_entrada)
+        linhas_fmt.append(lf)
+        linhas_num.append(ln)
+
+    lf, ln = _linha_valores("VENDA BRUTA", serie_vb)
+    linhas_fmt.append(lf)
+    linhas_num.append(ln)
+
+    lf, ln = _linha_valores("INSTALADOS", serie_inst)
+    linhas_fmt.append(lf)
+    linhas_num.append(ln)
+
+    if exibir_linha_entrada:
+        lf, ln = _linha_conversao(label_conv_1, serie_vb, serie_entrada)
+        linhas_fmt.append(lf)
+        linhas_num.append(ln)
+
+    lf, ln = _linha_conversao("INST VS V.B", serie_inst, serie_vb)
+    linhas_fmt.append(lf)
+    linhas_num.append(ln)
+
+    df_fmt = pd.DataFrame(linhas_fmt, columns=colunas_saida)
+    df_num = pd.DataFrame(linhas_num, columns=colunas_saida)
+    return df_fmt, df_num
+
 
 def criar_tabela_html_funil_cotacoes(
     df_formatado: pd.DataFrame,
@@ -8965,12 +7039,12 @@ def criar_tabela_html_funil_cotacoes(
     html += "</tbody></table></div>"
     return html
 
-def criar_tabela_html_tabela_mensal_canais(
+def criar_tabela_html_backlog_canais(
     df_formatado: pd.DataFrame,
     df_numerico: pd.DataFrame,
     table_id: str
 ) -> str:
-    """Cria tabela HTML mensal no padrão premium das tabelas analíticas."""
+    """Cria tabela HTML do backlog no padrão premium das tabelas analíticas."""
     if df_formatado is None or df_formatado.empty:
         return ""
 
@@ -9175,7 +7249,7 @@ def criar_tabela_html_tabela_mensal_canais(
         <thead>
           <tr>
     """
-    mes_atual_referencia_label = get_mes_atual_formatado().strip().lower()
+    mes_atual_backlog_label = get_mes_atual_formatado().strip().lower()
     for idx_col, coluna in enumerate(colunas):
         classes = []
         coluna_norm = str(coluna).replace("TEND.", "").strip().lower()
@@ -9183,7 +7257,7 @@ def criar_tabela_html_tabela_mensal_canais(
             classes.append("col-canal")
         elif str(coluna).strip().upper().startswith("TEND."):
             classes.append("col-total-mes")
-        if idx_col > 0 and coluna_norm == mes_atual_referencia_label:
+        if idx_col > 0 and coluna_norm == mes_atual_backlog_label:
             classes.append("col-mes-atual")
         html += f'<th class="{" ".join(classes)}">{escape(str(coluna))}</th>'
     html += "</tr></thead><tbody>"
@@ -9212,6 +7286,1118 @@ def criar_tabela_html_tabela_mensal_canais(
 
     html += "</tbody></table></div>"
     return html
+
+def criar_tabela_html_migracoes_regionais(
+    df_formatado: pd.DataFrame,
+    df_numerico: pd.DataFrame,
+    table_id: str
+) -> str:
+    """Cria tabela regional x mes para migracoes, com destaque de tendencia e MoM."""
+    if df_formatado is None or df_formatado.empty:
+        return ""
+
+    colunas = list(df_formatado.columns)
+    col_regional = colunas[0] if colunas else "REGIONAL"
+    col_mom = "MoM" if "MoM" in colunas else ""
+    colunas_valor = [col for col in colunas if col not in {col_regional, col_mom}]
+    largura_regional_pct = 10.2
+    largura_mom_pct = 8.3 if col_mom else 0.0
+    largura_mes_pct = (100.0 - largura_regional_pct - largura_mom_pct) / max(len(colunas_valor), 1)
+    larguras: list[float] = []
+    for coluna in colunas:
+        if coluna == col_regional:
+            larguras.append(largura_regional_pct)
+        elif coluna == col_mom:
+            larguras.append(largura_mom_pct)
+        else:
+            larguras.append(largura_mes_pct)
+    colgroup_html = "<colgroup>" + "".join(
+        [f'<col style="width:{largura:.4f}%;">' for largura in larguras]
+    ) + "</colgroup>"
+
+    mask_linhas_valor = (
+        df_numerico.iloc[:, 0].astype(str).str.strip().str.upper().ne("TOTAL")
+        if df_numerico is not None and not df_numerico.empty and df_numerico.shape[1] > 0
+        else pd.Series(dtype=bool)
+    )
+    maximos_coluna: dict[int, float] = {}
+    for idx_col, coluna in enumerate(colunas):
+        if coluna in {col_regional, col_mom} or df_numerico is None or df_numerico.empty or idx_col >= df_numerico.shape[1]:
+            continue
+        serie_valores = pd.to_numeric(df_numerico.iloc[:, idx_col], errors="coerce").fillna(0.0)
+        serie_base = (
+            serie_valores[mask_linhas_valor]
+            if len(mask_linhas_valor) == len(serie_valores) and bool(mask_linhas_valor.any())
+            else serie_valores
+        )
+        maximos_coluna[idx_col] = float(serie_base.max()) if not serie_base.empty else 0.0
+
+    def _largura_data_bar(idx_linha: int, idx_col: int) -> float:
+        try:
+            valor = float(pd.to_numeric(pd.Series([df_numerico.iloc[idx_linha, idx_col]]), errors="coerce").fillna(0.0).iloc[0])
+        except Exception:
+            valor = 0.0
+        max_coluna = float(maximos_coluna.get(idx_col, 0.0) or 0.0)
+        if valor <= 0 or max_coluna <= 0:
+            return 0.0
+        return max(6.0, min(100.0, (valor / max_coluna) * 100.0))
+
+    def _classe_mom(valor) -> str:
+        try:
+            valor_float = float(valor)
+        except Exception:
+            valor_float = 0.0
+        if valor_float > 0.05:
+            return "mom-pos"
+        if valor_float < -0.05:
+            return "mom-neg"
+        return "mom-neut"
+
+    html = f"""
+    <style>
+        .{table_id}-container {{
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid rgba(121,14,9,0.78);
+            border-radius: 5px;
+            box-shadow:
+                0 18px 38px rgba(90,10,6,0.13),
+                0 4px 12px rgba(15,23,42,0.06),
+                inset 0 0 0 1px rgba(255,255,255,0.90);
+            margin: 8px 0 14px 0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F7 100%);
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        table.{table_id} {{
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+            min-width: 820px;
+            table-layout: fixed;
+            font-size: clamp(11.2px, 0.80vw, 12.4px);
+            line-height: 1.14;
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+            font-variant-numeric: tabular-nums;
+            background: #FFFFFF;
+        }}
+        .{table_id} thead th {{
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: linear-gradient(180deg, #790E09 0%, #4E0805 100%);
+            color: #fff;
+            padding: 7px 6px;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: 0.26px;
+            white-space: nowrap;
+            font-size: clamp(10.0px, 0.70vw, 11.0px);
+            border-right: 1px solid rgba(255,255,255,0.20);
+            border-bottom: 1px solid rgba(61,7,4,0.92);
+            text-transform: uppercase;
+            text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+        }}
+        .{table_id} thead th.col-regional {{
+            position: sticky;
+            left: 0;
+            z-index: 50;
+            background: linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);
+            text-align: left;
+            padding-left: 10px;
+        }}
+        .{table_id} thead th.col-tend {{
+            background: linear-gradient(180deg, #6B7280 0%, #4B5563 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.18),
+                inset 0 -3px 0 rgba(255,255,255,0.14);
+        }}
+        .{table_id} thead th.col-mom {{
+            background: linear-gradient(180deg, #4F5861 0%, #343B43 100%);
+        }}
+        .{table_id} tbody td {{
+            position: relative;
+            padding: 8px 6px;
+            text-align: right;
+            border-bottom: 1px solid rgba(121,14,9,0.07);
+            border-right: 1px solid rgba(121,14,9,0.055);
+            color: #2F3747;
+            font-size: clamp(11.3px, 0.80vw, 12.5px);
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }}
+        .{table_id} tbody tr:nth-child(odd) td {{
+            background: #FFFFFF;
+        }}
+        .{table_id} tbody tr:nth-child(even) td {{
+            background: #FFF7F6;
+        }}
+        .{table_id} tbody tr:hover td {{
+            background: linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
+        }}
+        .{table_id} tbody td.col-regional {{
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            text-align: left;
+            padding-left: 10px;
+            color: #5A0A06;
+            font-weight: 800;
+            box-shadow: inset 3px 0 0 #FF2800, 5px 0 12px rgba(90,10,6,0.035);
+        }}
+        .{table_id} tbody td.col-valor {{
+            overflow: hidden;
+        }}
+        .{table_id} tbody td.col-valor::before {{
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            bottom: 5px;
+            width: var(--bar, 0%);
+            max-width: calc(100% - 10px);
+            border-radius: 2px;
+            background: linear-gradient(90deg, rgba(121,14,9,0.115) 0%, rgba(255,40,0,0.035) 100%);
+            pointer-events: none;
+        }}
+        .{table_id} .valor-migracoes {{
+            position: relative;
+            z-index: 2;
+            letter-spacing: -0.015em;
+        }}
+        .{table_id} tbody td.col-tend {{
+            background: linear-gradient(180deg, #F7F8FA 0%, #EEF1F4 100%) !important;
+            color: #2F3747;
+            font-weight: 900;
+            box-shadow: inset 3px 0 0 rgba(100,116,139,0.34);
+        }}
+        .{table_id} tbody td.col-tend::before {{
+            background: linear-gradient(90deg, rgba(100,116,139,0.13) 0%, rgba(100,116,139,0.035) 100%);
+        }}
+        .{table_id} tbody td.col-mom {{
+            background: linear-gradient(180deg, #F5F7F9 0%, #EEF2F5 100%) !important;
+            font-weight: 700;
+            text-align: center;
+            border-left: 1px solid rgba(90,98,104,0.08) !important;
+        }}
+        .{table_id} .mom-chip-migracoes {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 66px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            border: 1px solid rgba(100,116,139,0.16);
+            background: rgba(255,255,255,0.70);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.86);
+            letter-spacing: -0.02em;
+        }}
+        .{table_id} tbody td.mom-pos {{
+            color: #0F8A4B;
+            box-shadow: inset 3px 0 0 rgba(15,138,75,0.62);
+        }}
+        .{table_id} tbody td.mom-neg {{
+            color: #B42318;
+            box-shadow: inset 3px 0 0 rgba(180,35,24,0.62);
+        }}
+        .{table_id} tbody td.mom-neut {{
+            color: #6B7280;
+            box-shadow: inset 3px 0 0 rgba(100,116,139,0.38);
+        }}
+        .{table_id} tbody tr.linha-total td {{
+            background: linear-gradient(180deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 800;
+            border-bottom: 1px solid #A23B36;
+            border-right: 1px solid rgba(255,255,255,0.13);
+            text-shadow: 0 1px 0 rgba(0,0,0,0.22);
+        }}
+        .{table_id} tbody tr.linha-total td.col-valor::before {{
+            display: none;
+        }}
+        .{table_id} tbody tr.linha-total td.col-regional {{
+            z-index: 30;
+            box-shadow: inset 3px 0 0 #FF2800;
+        }}
+        .{table_id} tbody tr.linha-total .mom-chip-migracoes {{
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.22);
+        }}
+        .{table_id}-container::-webkit-scrollbar {{
+            width: 8px;
+            height: 8px;
+        }}
+        .{table_id}-container::-webkit-scrollbar-track {{
+            background: #F5F5F5;
+            border-radius: 10px;
+        }}
+        .{table_id}-container::-webkit-scrollbar-thumb {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%);
+            border-radius: 10px;
+        }}
+    </style>
+    <div class="{table_id}-container">
+      <table class="{table_id}">
+        {colgroup_html}
+        <thead>
+          <tr>
+    """
+    for idx_col, coluna in enumerate(colunas):
+        classes = []
+        coluna_txt = str(coluna).strip()
+        if idx_col == 0:
+            classes.append("col-regional")
+        elif coluna_txt.upper().startswith("TEND."):
+            classes.append("col-tend")
+        elif coluna == col_mom:
+            classes.append("col-mom")
+        html += f'<th class="{" ".join(classes)}">{escape(coluna_txt)}</th>'
+    html += "</tr></thead><tbody>"
+
+    for idx_linha, row in df_formatado.iterrows():
+        regional_ref = str(df_numerico.iloc[idx_linha, 0]) if idx_linha < len(df_numerico) else str(row.iloc[0])
+        is_total = regional_ref.strip().upper() == "TOTAL"
+        classe_linha = ' class="linha-total"' if is_total else ""
+        html += f"<tr{classe_linha}>"
+        for idx_col, coluna in enumerate(colunas):
+            valor = escape(str(row[coluna]))
+            classes = []
+            style_attr = ""
+            valor_html = valor
+            coluna_txt = str(coluna).strip()
+            if idx_col == 0:
+                classes.append("col-regional")
+            elif coluna_txt.upper().startswith("TEND."):
+                classes.extend(["col-valor", "col-tend"])
+                if not is_total:
+                    style_attr = f' style="--bar:{_largura_data_bar(idx_linha, idx_col):.2f}%;"'
+                valor_html = f'<span class="valor-migracoes">{valor}</span>'
+            elif coluna == col_mom:
+                classes.extend(["col-mom", _classe_mom(df_numerico.iloc[idx_linha][coluna])])
+                valor_html = f'<span class="mom-chip-migracoes">{valor}</span>'
+            else:
+                classes.append("col-valor")
+                if not is_total:
+                    style_attr = f' style="--bar:{_largura_data_bar(idx_linha, idx_col):.2f}%;"'
+                valor_html = f'<span class="valor-migracoes">{valor}</span>'
+            html += f'<td class="{" ".join(classes)}"{style_attr}>{valor_html}</td>'
+        html += "</tr>"
+
+    html += "</tbody></table></div>"
+    return html
+
+@st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
+def preparar_base_gross_motivo_status(df_base: pd.DataFrame) -> pd.DataFrame:
+    """Prepara a base de Gross Liquido Conta por motivo para os graficos do Analitico."""
+    colunas_saida = ["dat_tratada", "CANAL_PLAN", "REGIONAL", "MOTIVO_STS", "QTDE"]
+    colunas_minimas = {
+        "dat_tratada", "CANAL_PLAN", "REGIONAL",
+        "COD_PLATAFORMA", "DSC_INDICADOR", "DSC_MOTIVO_STS", "QTDE"
+    }
+    if df_base is None or df_base.empty or not colunas_minimas.issubset(set(df_base.columns)):
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_work = df_base[list(colunas_minimas)].copy()
+    for coluna in ["dat_tratada", "CANAL_PLAN", "REGIONAL", "COD_PLATAFORMA", "DSC_INDICADOR", "DSC_MOTIVO_STS"]:
+        df_work[coluna] = df_work[coluna].astype(str).str.strip()
+
+    df_work["dat_tratada"] = df_work["dat_tratada"].astype(str).str.strip().str.lower()
+    df_work = df_work[df_work["dat_tratada"].str.match(r"^[a-z]{3}/\d{2}$", na=False)].copy()
+    if df_work.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_work["COD_PLATAFORMA"] = df_work["COD_PLATAFORMA"].apply(normalizar_rotulo_produto)
+    indicador_norm = df_work["DSC_INDICADOR"].map(normalizar_chave_visual)
+    mask_gross_conta = (
+        df_work["COD_PLATAFORMA"].eq("CONTA") &
+        indicador_norm.str.contains("gross", na=False) &
+        indicador_norm.str.contains("liq", na=False)
+    )
+    df_work = df_work.loc[mask_gross_conta].copy()
+    if df_work.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_work["QTDE"] = normalizar_numerico_serie(df_work["QTDE"]).fillna(0.0)
+    df_work["CANAL_PLAN"] = (
+        df_work["CANAL_PLAN"]
+        .replace({"": "Canal nao informado", "nan": "Canal nao informado"})
+    )
+    df_work["REGIONAL"] = (
+        df_work["REGIONAL"]
+        .replace({"": "N/I", "nan": "N/I"})
+    )
+    df_work["MOTIVO_STS"] = (
+        df_work["DSC_MOTIVO_STS"]
+        .replace({"": "Nao informado", "nan": "Nao informado", "None": "Nao informado", "NULL": "Nao informado"})
+        .astype(str)
+        .str.strip()
+    )
+    df_work = df_work.loc[df_work["QTDE"].ne(0)].copy()
+    if df_work.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_saida = df_work[["dat_tratada", "CANAL_PLAN", "REGIONAL", "MOTIVO_STS", "QTDE"]].copy()
+    compactar_colunas_categoricas(df_saida, ["dat_tratada", "CANAL_PLAN", "REGIONAL", "MOTIVO_STS"])
+    return df_saida
+
+def _classificar_motivo_gross_sts(motivo: str) -> tuple[int, str]:
+    """Define ordem visual estável para os motivos de gross líquido móvel."""
+    motivo_txt = str(motivo or "").strip()
+    motivo_norm = normalizar_chave_visual(motivo_txt)
+    if not motivo_norm:
+        return (98, "nao informado")
+    if "novo" in motivo_norm:
+        return (1, motivo_norm)
+    if "renov" in motivo_norm:
+        return (2, motivo_norm)
+    if "migra" in motivo_norm:
+        return (3, motivo_norm)
+    if "upgrade" in motivo_norm or "up grade" in motivo_norm:
+        return (4, motivo_norm)
+    if "portab" in motivo_norm:
+        return (5, motivo_norm)
+    if "outro" in motivo_norm:
+        return (90, motivo_norm)
+    if "nao informado" in motivo_norm:
+        return (99, motivo_norm)
+    return (50, motivo_norm)
+
+def _cor_motivo_gross_sts(motivo: str, idx_fallback: int = 0) -> str:
+    """Retorna cor estável dos motivos dentro da paleta do dashboard."""
+    motivo_norm = normalizar_chave_visual(motivo)
+    mapa = {
+        "novo": "#790E09",
+        "renov": "#A61C14",
+        "migra": "#C53A2B",
+        "upgrade": "#D95F4A",
+        "up grade": "#D95F4A",
+        "portab": "#E87F69",
+        "outro": "#6B7280",
+        "nao informado": "#94A3B8",
+    }
+    for chave, cor in mapa.items():
+        if chave in motivo_norm:
+            return cor
+    paleta_fallback = ["#5A0A06", "#8D1A12", "#B23A2F", "#C86E61", "#7C3F3A", "#A95C54"]
+    return paleta_fallback[idx_fallback % len(paleta_fallback)]
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
+def load_migracoes_pme_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega a base de migracoes PME e padroniza os campos usados na tabela analitica."""
+    _ = file_mtime
+    path_obj = Path(path)
+    colunas_saida = ["REGIONAL", "MES_ANO", "QTDE"]
+    if not path_obj.exists():
+        return pd.DataFrame(columns=colunas_saida)
+
+    if path_obj.suffix.lower() == ".parquet":
+        df_opt = _carregar_dataframe_preprocessado(
+            str(path_obj),
+            file_mtime,
+            required_cols=set(colunas_saida),
+            text_cols=["REGIONAL", "MES_ANO"],
+            numeric_cols=["QTDE"],
+            category_cols=["REGIONAL", "MES_ANO"]
+        )
+        if df_opt.empty:
+            return pd.DataFrame(columns=colunas_saida)
+        df_opt["REGIONAL"] = df_opt["REGIONAL"].astype(str).str.strip().str.upper().str[:3]
+        return df_opt[colunas_saida]
+
+    try:
+        header_df = _read_excel_with_copy_fallback(path_obj, nrows=0)
+    except Exception:
+        return pd.DataFrame(columns=colunas_saida)
+
+    coluna_data = encontrar_coluna_por_alias(
+        header_df.columns,
+        "DAT_REFERENCIA",
+        "DATA_REFERENCIA",
+        "DAT REFERENCIA"
+    )
+    coluna_regional = encontrar_coluna_por_alias(
+        header_df.columns,
+        "DSC_REGIONAL_CMV",
+        "DSC REGIONAL CMV",
+        "REGIONAL_CMV",
+        "REGIONAL CMV",
+        "DSC_REGIONAL",
+        "REGIONAL"
+    )
+    coluna_qtde = encontrar_coluna_por_alias(
+        header_df.columns,
+        "QTDE_FINAL",
+        "QTDE FINAL",
+        "QTDE",
+        "QTD",
+        "QUANTIDADE"
+    )
+
+    if not coluna_data or not coluna_regional or not coluna_qtde:
+        return pd.DataFrame(columns=colunas_saida)
+
+    try:
+        df = _read_excel_with_copy_fallback(
+            path_obj,
+            usecols=[coluna_data, coluna_regional, coluna_qtde]
+        )
+    except Exception:
+        return pd.DataFrame(columns=colunas_saida)
+
+    if df is None or df.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df = df.rename(
+        columns={
+            coluna_data: "DAT_REFERENCIA",
+            coluna_regional: "REGIONAL",
+            coluna_qtde: "QTDE",
+        }
+    ).copy()
+
+    df["DAT_REFERENCIA"] = pd.to_datetime(
+        df["DAT_REFERENCIA"],
+        format="mixed",
+        errors="coerce",
+        dayfirst=True
+    )
+    df["REGIONAL"] = (
+        df["REGIONAL"]
+        .astype("string")
+        .str.strip()
+        .str.upper()
+        .str[:3]
+        .replace({"": pd.NA, "NAN": pd.NA, "NON": pd.NA, "NUL": pd.NA})
+    )
+    df["QTDE"] = normalizar_numerico_serie(df["QTDE"]).fillna(0.0)
+
+    df = df[
+        df["DAT_REFERENCIA"].notna() &
+        df["REGIONAL"].notna()
+    ].copy()
+
+    if df.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df["MES_ANO"] = df["DAT_REFERENCIA"].map(_formatar_mes_ano_backlog)
+    df = df[df["MES_ANO"].notna()].copy()
+
+    compactar_colunas_categoricas(df, ["REGIONAL", "MES_ANO"])
+    return df[colunas_saida]
+
+def _prever_tendencia_mensal_migracoes(valores_hist: pd.Series | np.ndarray | list[float]) -> float:
+    """
+    Projeta o próximo mês pela média móvel dos 2 últimos meses realizados
+    com crescimento adicional de 10%.
+    """
+    serie = pd.Series(valores_hist, dtype="float64").replace([np.inf, -np.inf], np.nan).dropna()
+    if serie.empty:
+        return 0.0
+
+    y = serie.to_numpy(dtype=float)
+    janela = y[-min(2, len(y)):]
+    return float(max(np.mean(janela) * 1.10, 0.0))
+
+def _resolver_coluna_mes_migracoes(colunas_valor: list[str], mes_ref: str | None) -> str:
+    """Resolve mes selecionado para coluna real ou tendencia da tabela de migracoes."""
+    if not colunas_valor:
+        return ""
+    mes_ref_norm = str(mes_ref or "").replace("TEND.", "").strip().lower()
+    for coluna in colunas_valor:
+        coluna_norm = str(coluna).replace("TEND.", "").strip().lower()
+        if coluna_norm == mes_ref_norm:
+            return str(coluna)
+    return str(colunas_valor[-1])
+
+def _formatar_mom_migracoes(valor: float | int | None) -> str:
+    try:
+        valor_float = float(valor)
+    except Exception:
+        valor_float = 0.0
+    if valor_float > 0.05:
+        seta = "▲"
+    elif valor_float < -0.05:
+        seta = "▼"
+    else:
+        seta = "•"
+    return f"{seta} {valor_float:+.1f}%".replace(".", ",")
+
+def obter_meses_mom_migracoes(df_migracoes: pd.DataFrame) -> tuple[list[str], str]:
+    """Retorna meses reais + proximo mes de tendencia para o filtro de MoM."""
+    if df_migracoes is None or df_migracoes.empty or "MES_ANO" not in df_migracoes.columns:
+        return [], ""
+
+    meses_reais = sorted(
+        df_migracoes["MES_ANO"].dropna().astype(str).unique().tolist(),
+        key=mes_ano_para_data
+    )
+    if not meses_reais:
+        return [], ""
+
+    try:
+        data_tend = pd.Timestamp(mes_ano_para_data(meses_reais[-1])) + pd.DateOffset(months=1)
+        mes_tendencia = _formatar_mes_ano_backlog(data_tend)
+    except Exception:
+        mes_tendencia = ""
+
+    meses_opcoes = meses_reais.copy()
+    if mes_tendencia and mes_tendencia not in meses_opcoes:
+        meses_opcoes.append(mes_tendencia)
+    return meses_opcoes, str(mes_tendencia or "")
+
+def montar_tabela_migracoes_pme_regionais(
+    df_migracoes: pd.DataFrame,
+    mes_mom_ref: str | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Monta a tabela regional x mes para migracoes PME somando QTDE."""
+    colunas_vazias = ["REGIONAL"]
+    if df_migracoes is None or df_migracoes.empty:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    meses_ordem = sorted(
+        df_migracoes["MES_ANO"].dropna().astype(str).unique().tolist(),
+        key=mes_ano_para_data
+    )
+    if not meses_ordem:
+        return pd.DataFrame(columns=colunas_vazias), pd.DataFrame(columns=colunas_vazias)
+
+    tabela = pd.pivot_table(
+        df_migracoes,
+        index="REGIONAL",
+        columns="MES_ANO",
+        values="QTDE",
+        aggfunc="sum",
+        fill_value=0,
+        observed=False
+    ).reindex(columns=meses_ordem, fill_value=0)
+
+    if tabela.empty:
+        return pd.DataFrame(columns=["REGIONAL", *meses_ordem]), pd.DataFrame(columns=["REGIONAL", *meses_ordem])
+
+    try:
+        data_ref_ult_mes = pd.Timestamp(mes_ano_para_data(meses_ordem[-1]))
+        data_ref_tend = data_ref_ult_mes + pd.DateOffset(months=1)
+        coluna_tendencia = f"TEND. {_formatar_mes_ano_backlog(data_ref_tend)}"
+    except Exception:
+        coluna_tendencia = "TEND."
+
+    tabela[coluna_tendencia] = [
+        _prever_tendencia_mensal_migracoes(
+            pd.to_numeric(tabela.loc[regional, meses_ordem], errors="coerce").fillna(0.0)
+        )
+        for regional in tabela.index
+    ]
+
+    colunas_valor = [*meses_ordem, coluna_tendencia]
+    coluna_mom_ref = _resolver_coluna_mes_migracoes(colunas_valor, mes_mom_ref)
+    mes_mom_base = str(coluna_mom_ref).replace("TEND.", "").strip()
+    mes_mom_anterior = get_mes_anterior(mes_mom_base)
+    coluna_mom_anterior = _resolver_coluna_mes_migracoes(colunas_valor, mes_mom_anterior)
+    if str(coluna_mom_anterior).replace("TEND.", "").strip().lower() != str(mes_mom_anterior).strip().lower():
+        coluna_mom_anterior = ""
+    try:
+        data_mom_ref = pd.Timestamp(mes_ano_para_data(mes_mom_base)).normalize()
+    except Exception:
+        data_mom_ref = pd.Timestamp(mes_ano_para_data(meses_ordem[-1])).normalize()
+    eh_coluna_tendencia = str(coluna_mom_ref).strip().upper().startswith("TEND.")
+    meses_exibicao = [
+        mes for mes in meses_ordem
+        if pd.Timestamp(mes_ano_para_data(str(mes))).normalize() <= data_mom_ref
+    ]
+    if not meses_exibicao:
+        meses_exibicao = [meses_ordem[0]]
+    colunas_exibicao_valor = meses_exibicao.copy()
+    if eh_coluna_tendencia and coluna_tendencia not in colunas_exibicao_valor:
+        colunas_exibicao_valor.append(coluna_tendencia)
+
+    def _calc_mom(row: pd.Series) -> float:
+        valor_atual = float(pd.to_numeric(pd.Series([row.get(coluna_mom_ref, 0.0)]), errors="coerce").fillna(0.0).iloc[0])
+        valor_anterior = (
+            float(pd.to_numeric(pd.Series([row.get(coluna_mom_anterior, 0.0)]), errors="coerce").fillna(0.0).iloc[0])
+            if coluna_mom_anterior else 0.0
+        )
+        return ((valor_atual / valor_anterior) - 1.0) * 100.0 if valor_anterior > 0 else 0.0
+
+    tabela["MoM"] = tabela.apply(_calc_mom, axis=1)
+    if coluna_mom_ref in tabela.columns:
+        tabela = tabela.sort_values(by=[coluna_mom_ref, "MoM"], ascending=[False, False])
+    else:
+        tabela = tabela.sort_index()
+
+    totais_mes = (
+        df_migracoes.groupby("MES_ANO", observed=True)["QTDE"]
+        .sum()
+        .reindex(meses_ordem, fill_value=0)
+    )
+
+    colunas_saida_numericas = [*colunas_exibicao_valor, "MoM"]
+    df_num = tabela[colunas_saida_numericas].reset_index()
+    linha_total = {"REGIONAL": "TOTAL"}
+    for mes in meses_exibicao:
+        linha_total[mes] = float(totais_mes.get(mes, 0))
+    if coluna_tendencia in colunas_exibicao_valor:
+        linha_total[coluna_tendencia] = float(pd.to_numeric(tabela[coluna_tendencia], errors="coerce").fillna(0.0).sum())
+    valor_total_atual = float(linha_total.get(coluna_mom_ref, 0.0))
+    valor_total_anterior = float(linha_total.get(coluna_mom_anterior, 0.0)) if coluna_mom_anterior else 0.0
+    linha_total["MoM"] = ((valor_total_atual / valor_total_anterior) - 1.0) * 100.0 if valor_total_anterior > 0 else 0.0
+    df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
+
+    df_fmt = df_num.copy().astype(object)
+    for col in df_fmt.columns:
+        if col == "REGIONAL":
+            continue
+        serie_col = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0.0)
+        if col == "MoM":
+            df_fmt[col] = serie_col.apply(_formatar_mom_migracoes)
+        else:
+            df_fmt[col] = serie_col.apply(lambda valor: formatar_numero_brasileiro(valor, 0))
+    return df_fmt, df_num
+
+def montar_serie_grafico_migracoes_pme(
+    df_tabela_numerica: pd.DataFrame,
+    regional_ref: str = "Todos"
+) -> pd.DataFrame:
+    """Converte a tabela numerica de migracoes PME em serie mensal para o grafico."""
+    if df_tabela_numerica is None or df_tabela_numerica.empty or "REGIONAL" not in df_tabela_numerica.columns:
+        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
+
+    regional_busca = "TOTAL" if str(regional_ref).strip().lower() in {"", "todos"} else str(regional_ref).strip()
+    linha = df_tabela_numerica[df_tabela_numerica["REGIONAL"].astype(str).str.strip().eq(regional_busca)].copy()
+    if linha.empty:
+        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
+
+    row = linha.iloc[0]
+    registros: list[dict[str, object]] = []
+    for coluna in df_tabela_numerica.columns:
+        if coluna in {"REGIONAL", "MoM"}:
+            continue
+        coluna_str = str(coluna).strip()
+        eh_tendencia = coluna_str.upper().startswith("TEND.")
+        mes_ref = coluna_str.replace("TEND.", "").strip() if eh_tendencia else coluna_str
+        valor = float(pd.to_numeric(pd.Series([row[coluna]]), errors="coerce").fillna(0.0).iloc[0])
+        registros.append(
+            {
+                "MES_ANO": mes_ref,
+                "MES_LABEL": mes_ref.upper(),
+                "QTDE": valor,
+                "TIPO": "TENDENCIA" if eh_tendencia else "REALIZADO",
+            }
+        )
+
+    if not registros:
+        return pd.DataFrame(columns=["MES_ANO", "MES_LABEL", "QTDE", "TIPO"])
+
+    df_serie = pd.DataFrame(registros)
+    df_serie = df_serie.sort_values(
+        by="MES_ANO",
+        key=lambda serie: serie.map(lambda valor: pd.Timestamp(mes_ano_para_data(str(valor))))
+    ).reset_index(drop=True)
+    return df_serie
+
+def criar_grafico_migracoes_pme_mensal(
+    df_serie: pd.DataFrame,
+    regional_ref: str = "Todos",
+    altura: int = 340
+) -> go.Figure:
+    """Cria gráfico mensal de colunas para Migracoes PME com destaque para a tendencia."""
+    if df_serie is None or df_serie.empty:
+        return go.Figure()
+
+    categorias = df_serie["MES_LABEL"].astype(str).tolist()
+    valores = pd.to_numeric(df_serie["QTDE"], errors="coerce").fillna(0.0).astype(float).tolist()
+    tipos = df_serie["TIPO"].astype(str).tolist()
+
+    palette_real = [
+        "#5A0A06", "#63100B", "#6D1511", "#761A16", "#7F1F1B",
+        "#882421", "#922927", "#9B2E2C", "#A43332", "#AE3937"
+    ]
+    cores: list[str] = []
+    idx_real = 0
+    for tipo in tipos:
+        if str(tipo).upper() == "TENDENCIA":
+            cores.append("#D96A5F")
+        else:
+            cores.append(palette_real[min(idx_real, len(palette_real) - 1)])
+            idx_real += 1
+
+    comparacoes: list[dict[str, int]] = []
+    idx_tend = next((idx for idx, tipo in enumerate(tipos) if str(tipo).upper() == "TENDENCIA"), None)
+    if idx_tend is not None and idx_tend > 0:
+        comparacoes.append({"origem": idx_tend - 1, "destino": idx_tend})
+    elif len(categorias) >= 2:
+        comparacoes.append({"origem": len(categorias) - 2, "destino": len(categorias) - 1})
+
+    fig = _criar_grafico_barras_resumo_comparativo(
+        categorias=categorias,
+        valores=valores,
+        cores=cores,
+        altura=altura,
+        comparacoes=comparacoes
+    )
+
+    customdata = [
+        [categorias[idx], "Tendência" if str(tipos[idx]).upper() == "TENDENCIA" else "Realizado"]
+        for idx in range(len(categorias))
+    ]
+    fig.update_traces(
+        customdata=customdata,
+        hovertemplate=(
+            "<b>%{customdata[0]}</b><br>"
+            "<b>Tipo:</b> %{customdata[1]}<br>"
+            "<b>QTDE:</b> %{y:,.0f}<extra></extra>"
+        )
+    )
+    fig.update_layout(
+        paper_bgcolor="#FCFCFD",
+        plot_bgcolor="#FFFFFF",
+        margin=dict(l=16, r=16, t=60, b=44),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Segoe UI",
+            bordercolor="#E2E8F0",
+            font_color="#2F3747"
+        )
+    )
+
+    if idx_tend is not None:
+        fig.add_annotation(
+            x=0.995,
+            y=1.11,
+            xref="paper",
+            yref="paper",
+            xanchor="right",
+            yanchor="top",
+            text="<b>Barra clara = Tendência</b>",
+            showarrow=False,
+            font=dict(size=11, color="#A23B36"),
+            bgcolor="rgba(255,255,255,0.96)",
+            bordercolor="rgba(162, 59, 54, 0.34)",
+            borderwidth=1.0,
+            borderpad=5
+        )
+
+    return fig
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=2)
+def load_ligacoes_raw_tratada(path: str = LIGACOES_FILE_PATH, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega e normaliza a base bruta de ligações uma única vez para reaproveitamento no app."""
+    path_obj = Path(path)
+    _ = file_mtime
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    ligacoes_mtime = file_mtime if file_mtime is not None else path_obj.stat().st_mtime
+    suffixes = [s.lower() for s in path_obj.suffixes]
+
+    if path_obj.suffix.lower() == ".parquet" or ".csv" in suffixes:
+        try:
+            df_opt = load_tabular_cached(str(path_obj), ligacoes_mtime)
+        except Exception:
+            return pd.DataFrame()
+        if df_opt is None or df_opt.empty:
+            return pd.DataFrame()
+
+        if "DATA_DIA" not in df_opt.columns and "DAT_MOVIMENTO2" in df_opt.columns:
+            df_opt["DATA_DIA"] = pd.to_datetime(df_opt["DAT_MOVIMENTO2"], errors="coerce").dt.normalize()
+        elif "DATA_DIA" in df_opt.columns:
+            df_opt["DATA_DIA"] = pd.to_datetime(df_opt["DATA_DIA"], errors="coerce").dt.normalize()
+
+        if "DAT_MOVIMENTO2" not in df_opt.columns and "DATA_DIA" in df_opt.columns:
+            df_opt["DAT_MOVIMENTO2"] = pd.to_datetime(df_opt["DATA_DIA"], errors="coerce").dt.normalize()
+        elif "DAT_MOVIMENTO2" in df_opt.columns:
+            df_opt["DAT_MOVIMENTO2"] = pd.to_datetime(df_opt["DAT_MOVIMENTO2"], errors="coerce").dt.normalize()
+
+        if "mes_ano" not in df_opt.columns and "DATA_DIA" in df_opt.columns:
+            df_opt["mes_ano"] = df_opt["DATA_DIA"].apply(
+                lambda dt: _formatar_mes_ano_backlog(dt) if pd.notna(dt) else None
+            )
+        if "dat_tratada" not in df_opt.columns and "mes_ano" in df_opt.columns:
+            df_opt["dat_tratada"] = df_opt["mes_ano"]
+        if "REGIONAL" not in df_opt.columns:
+            df_opt["REGIONAL"] = ""
+        if "CANAL_PLAN" not in df_opt.columns:
+            df_opt["CANAL_PLAN"] = "Televendas Receptivo"
+        if "COD_PLATAFORMA" not in df_opt.columns:
+            df_opt["COD_PLATAFORMA"] = np.where(
+                pd.Series(df_opt.get("FLAG_FIXA", False)).astype(bool),
+                "FIXA",
+                "CONTA"
+            )
+        if "DSC_INDICADOR" not in df_opt.columns:
+            df_opt["DSC_INDICADOR"] = "LIGACOES"
+        if "CABEADO" not in df_opt.columns:
+            df_opt["CABEADO"] = np.where(
+                pd.Series(df_opt.get("FLAG_FIXA", False)).astype(bool),
+                "SIM",
+                "NAO"
+            )
+        if "TIPO_CHAMADA" not in df_opt.columns:
+            df_opt["TIPO_CHAMADA"] = "DEMAIS"
+        if "FLAG_FIXA" not in df_opt.columns:
+            df_opt["FLAG_FIXA"] = df_opt["CABEADO"].astype(str).str.strip().str.upper().isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
+        if "DESAFIO_QTD" not in df_opt.columns:
+            df_opt["DESAFIO_QTD"] = 0.0
+        if "TELEFONE" not in df_opt.columns:
+            df_opt["TELEFONE"] = ""
+
+        df_opt["REGIONAL"] = df_opt["REGIONAL"].astype(str).str.strip().str[:3].str.upper()
+        df_opt["mes_ano"] = df_opt["mes_ano"].astype(str).str.strip()
+        df_opt["dat_tratada"] = df_opt["dat_tratada"].astype(str).str.strip()
+        df_opt["QTDE"] = normalizar_numerico_serie(df_opt.get("QTDE", 0)).fillna(0.0)
+        df_opt["DESAFIO_QTD"] = normalizar_numerico_serie(df_opt.get("DESAFIO_QTD", 0)).fillna(0.0)
+        df_opt["FLAG_FIXA"] = pd.Series(df_opt["FLAG_FIXA"]).astype(bool)
+
+        colunas_saida = [
+            'DAT_MOVIMENTO2', 'DATA_DIA', 'mes_ano', 'dat_tratada', 'REGIONAL',
+            'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'QTDE', 'DESAFIO_QTD',
+            'CABEADO', 'TIPO_CHAMADA', 'TELEFONE', 'FLAG_FIXA'
+        ]
+        df_saida = df_opt[[c for c in colunas_saida if c in df_opt.columns]].copy()
+        compactar_colunas_categoricas(
+            df_saida,
+            ['mes_ano', 'dat_tratada', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'CABEADO', 'TIPO_CHAMADA']
+        )
+        return df_saida
+
+    header_df = load_excel_cached(str(path_obj), ligacoes_mtime, nrows=0)
+    if header_df is None:
+        return pd.DataFrame()
+
+    colunas_disponiveis = set(header_df.columns)
+    req_cols = {'QTD', 'CABEADO'}
+    if not req_cols.issubset(colunas_disponiveis):
+        return pd.DataFrame()
+
+    coluna_data = None
+    for col_ref in ['DATA_MOVIMENTO', 'DAT_MOVIMENTO', 'DAT_MOVIMENTO2', 'PERIODO']:
+        if col_ref in colunas_disponiveis:
+            coluna_data = col_ref
+            break
+    if coluna_data is None:
+        return pd.DataFrame()
+
+    colunas_leitura = ['QTD', 'CABEADO', coluna_data]
+    for col_opcional in ['DSC_REGIONAL_CMV', 'REGIONAL', 'TELEFONE']:
+        if col_opcional in colunas_disponiveis and col_opcional not in colunas_leitura:
+            colunas_leitura.append(col_opcional)
+
+    df_lig = load_excel_cached(str(path_obj), ligacoes_mtime, usecols=colunas_leitura)
+    if df_lig is None or df_lig.empty:
+        return pd.DataFrame()
+
+    serie_data_ref = pd.to_datetime(df_lig[coluna_data], errors='coerce')
+    mask_data_valida = serie_data_ref.notna()
+    df_work = df_lig.loc[mask_data_valida].copy()
+    df_work['DAT_MOVIMENTO2'] = serie_data_ref.loc[df_work.index]
+    if df_work.empty:
+        return pd.DataFrame()
+
+    meses_pt = {
+        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+    }
+    df_work['mes_ano'] = df_work['DAT_MOVIMENTO2'].apply(
+        lambda dt: f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
+    )
+    df_work['dat_tratada'] = df_work['mes_ano']
+
+    col_reg = next((c for c in ['DSC_REGIONAL_CMV', 'REGIONAL'] if c in df_work.columns), None)
+    if col_reg is not None:
+        df_work['REGIONAL'] = df_work[col_reg].astype(str).str.strip().str[:3].str.upper()
+    else:
+        df_work['REGIONAL'] = ''
+
+    df_work['QTDE'] = pd.to_numeric(df_work['QTD'], errors='coerce').fillna(0.0)
+    telefone_ref = df_work['TELEFONE'].astype(str) if 'TELEFONE' in df_work.columns else pd.Series('', index=df_work.index)
+    df_work['TIPO_CHAMADA'] = np.where(
+        telefone_ref.str.contains('0960|8449', regex=True, na=False),
+        'Click to Call',
+        'DEMAIS'
+    )
+
+    cabeado_norm = df_work['CABEADO'].astype(str).str.strip().str.upper()
+    mask_fixa = cabeado_norm.isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
+    df_work['FLAG_FIXA'] = mask_fixa
+    df_work['COD_PLATAFORMA'] = np.where(mask_fixa, 'FIXA', 'CONTA')
+    df_work['CANAL_PLAN'] = 'Televendas Receptivo'
+    df_work['DSC_INDICADOR'] = 'LIGACOES'
+    df_work['DESAFIO_QTD'] = 0.0
+    if 'TELEFONE' not in df_work.columns:
+        df_work['TELEFONE'] = ''
+    df_work['DATA_DIA'] = pd.to_datetime(df_work['DAT_MOVIMENTO2'], errors='coerce').dt.normalize()
+
+    colunas_saida = [
+        'DAT_MOVIMENTO2', 'DATA_DIA', 'mes_ano', 'dat_tratada', 'REGIONAL',
+        'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'QTDE', 'DESAFIO_QTD',
+        'CABEADO', 'TIPO_CHAMADA', 'TELEFONE', 'FLAG_FIXA'
+    ]
+    df_saida = df_work[[c for c in colunas_saida if c in df_work.columns]]
+    compactar_colunas_categoricas(
+        df_saida,
+        ['mes_ano', 'dat_tratada', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'CABEADO', 'TIPO_CHAMADA']
+    )
+    del df_lig, df_work, serie_data_ref
+    gc.collect()
+    return df_saida
+
+def mes_ano_para_data(mes_ano_str: str) -> datetime:
+    """Converte string 'mes/ano' para objeto datetime"""
+    try:
+        meses_pt = {
+            'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+        }
+        mes_str, ano_str = mes_ano_str.lower().split('/')
+        mes_num = meses_pt.get(mes_str, 1)
+        ano_num = int(f"20{ano_str}")
+        return datetime(ano_num, mes_num, 1)
+    except:
+        return datetime(1900, 1, 1)
+
+def get_mes_atual_formatado() -> str:
+    """Retorna o mês atual no formato 'mmm/aa'"""
+    try:
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    except Exception:
+        hoje = date.today()
+    meses_abreviados = {
+        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+    }
+    mes_abrev = meses_abreviados.get(hoje.month, 'jan')
+    ano_abrev = str(hoje.year)[-2:]
+    return f"{mes_abrev}/{ano_abrev}"
+
+def get_mes_anterior(mes_atual: str) -> str:
+    """Retorna o mês anterior baseado no mês atual no formato 'mmm/aa'"""
+    try:
+        meses_pt = {
+            'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+        }
+        meses_reverso = {v: k for k, v in meses_pt.items()}
+        
+        mes_str, ano_str = mes_atual.lower().split('/')
+        mes_num = meses_pt.get(mes_str, 1)
+        ano_num = int(f"20{ano_str}")
+        
+        if mes_num == 1:  # Janeiro
+            mes_anterior_num = 12
+            ano_anterior_num = ano_num - 1
+        else:
+            mes_anterior_num = mes_num - 1
+            ano_anterior_num = ano_num
+        
+        mes_anterior_str = meses_reverso.get(mes_anterior_num, 'jan')
+        ano_anterior_str = str(ano_anterior_num)[-2:]
+        
+        return f"{mes_anterior_str}/{ano_anterior_str}"
+    except:
+        return mes_atual
+
+def normalizar_mes_dashboard(mes_ref: str | None) -> str:
+    """Normaliza mês do dashboard para comparar regras de realizado/tendência."""
+    return str(mes_ref or "").strip().lower()
+
+def eh_mes_atual_dashboard(mes_ref: str | None, mes_corrente: str | None = None) -> bool:
+    """Indica se o mês selecionado é o mês corrente usado para tendência."""
+    mes_corrente_norm = normalizar_mes_dashboard(mes_corrente or get_mes_atual_formatado())
+    return bool(normalizar_mes_dashboard(mes_ref) == mes_corrente_norm)
+
+def deve_usar_tendencia_dashboard(
+    mes_ref: str | None,
+    valor_tendencia: float | int | None,
+    mes_corrente: str | None = None
+) -> bool:
+    """Regra única: usar tendência somente no mês corrente e quando houver valor positivo."""
+    try:
+        tendencia = float(valor_tendencia or 0.0)
+    except Exception:
+        tendencia = 0.0
+    return eh_mes_atual_dashboard(mes_ref, mes_corrente) and tendencia > 0
+
+def escolher_valor_realizado_ou_tendencia(
+    valor_realizado: float | int | None,
+    valor_tendencia: float | int | None,
+    mes_ref: str | None,
+    mes_corrente: str | None = None
+) -> tuple[float, bool]:
+    """Retorna o valor exibido e se ele veio da tendência."""
+    try:
+        real = float(valor_realizado or 0.0)
+    except Exception:
+        real = 0.0
+    try:
+        tendencia = float(valor_tendencia or 0.0)
+    except Exception:
+        tendencia = 0.0
+    usar_tendencia = deve_usar_tendencia_dashboard(mes_ref, tendencia, mes_corrente)
+    return (tendencia if usar_tendencia else real), usar_tendencia
+
+def obter_mes_referencia_grafico(mes_ref: str | None = None) -> tuple[int, str]:
+    """Extrai o mês de referência selecionado no dashboard com fallback para o mês atual."""
+    mes_ref_txt = str(mes_ref or "").strip().lower()
+    if mes_ref_txt:
+        try:
+            data_ref = pd.Timestamp(mes_ano_para_data(mes_ref_txt)).normalize()
+            if int(data_ref.year) >= 2000:
+                return int(data_ref.month), str(mes_ref_txt).upper()
+        except Exception:
+            pass
+
+    mes_atual = get_mes_atual_formatado()
+    data_atual = pd.Timestamp(mes_ano_para_data(mes_atual)).normalize()
+    return int(data_atual.month), str(mes_atual).upper()
+
+def gerar_intervalo_meses_retroativos(mes_final: str, qtd_meses: int = 13) -> list[str]:
+    """Retorna os últimos N meses até o mês de referência no formato mmm/aa."""
+    try:
+        data_final = pd.Timestamp(mes_ano_para_data(str(mes_final))).normalize()
+    except Exception:
+        return [str(mes_final).strip().lower()]
+
+    intervalo = []
+    for deslocamento in range(max(int(qtd_meses), 1) - 1, -1, -1):
+        data_ref = data_final - pd.DateOffset(months=deslocamento)
+        intervalo.append(_formatar_mes_ano_backlog(data_ref).lower())
+    return intervalo
+
+def obter_janela_meses_disponiveis(
+    mes_ref: str,
+    meses_disponiveis: list[str] | pd.Series,
+    qtd_meses: int = 13
+) -> list[str]:
+    """Retorna a janela cronológica dos últimos N meses existentes até o mês de referência."""
+    meses_validos = sorted(
+        list({
+            str(mes).strip().lower()
+            for mes in list(meses_disponiveis or [])
+            if re.match(r"^[a-z]{3}/\d{2}$", str(mes).strip(), flags=re.IGNORECASE)
+        }),
+        key=mes_ano_para_data
+    )
+    if not meses_validos:
+        return []
+
+    mes_ref_norm = str(mes_ref).strip().lower()
+    if mes_ref_norm not in meses_validos:
+        mes_ref_norm = meses_validos[-1]
+
+    janela = gerar_intervalo_meses_retroativos(mes_ref_norm, qtd_meses=qtd_meses)
+    meses_set = set(meses_validos)
+    return [mes for mes in janela if mes in meses_set]
+
+def _obter_cores_serie_mensal_produto(produto_ref: str) -> tuple[str, str, str, str]:
+    """Define a paleta do gráfico mensal conforme o produto selecionado."""
+    produto_norm = normalizar_rotulo_produto(produto_ref)
+    if produto_norm == 'FIXA':
+        return '#475569', '#64748B', '#334155', '#5A6268'
+    if produto_norm == 'CONTA':
+        return '#790E09', '#FF2800', '#790E09', '#5A6268'
+    return '#8D1A12', '#FF2800', '#790E09', '#5A6268'
 
 def obter_valor_serie_mensal_mes(
     mes_item: str,
@@ -11383,6 +10569,22 @@ def normalizar_rotulo_produto(valor) -> str:
     if re.fullmatch(r"\d+", base):
         return f"PRODUTO {base}"
     return base
+
+def create_bar_chart_data(df_mes_selecionado):
+    """Cria dados para gráfico de barras horizontais"""
+    df_plot = df_mes_selecionado.copy()
+    df_plot['CANAL_PLAN'] = df_plot['CANAL_PLAN'].astype(str).str.strip()
+    df_plot['COD_PLATAFORMA'] = df_plot['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
+    df_plot['QTDE'] = pd.to_numeric(df_plot['QTDE'], errors='coerce').fillna(0)
+    bar_data = df_plot.groupby(['CANAL_PLAN', 'COD_PLATAFORMA'], observed=True)['QTDE'].sum().reset_index()
+    canal_totals = bar_data.groupby('CANAL_PLAN', observed=True)['QTDE'].sum().sort_values(ascending=False)
+    canal_order = canal_totals.index
+    
+    bar_data['CANAL_PLAN'] = pd.Categorical(bar_data['CANAL_PLAN'], categories=canal_order, ordered=True)
+    bar_data = bar_data.sort_values('CANAL_PLAN', ascending=False)
+    bar_data['QTDE_Formatado'] = bar_data['QTDE'].apply(lambda x: formatar_numero_brasileiro(x, 0))
+    
+    return bar_data, canal_totals
 
 def contar_dias_restantes_semana(mes_ref: str, data_corte: date | None = None) -> dict[int, int]:
     """
@@ -13721,6 +12923,15 @@ def construir_tabela_resultado_canais(
         'Inside Sales'
     ]
 
+    def _norm_texto(valor) -> str:
+        if pd.isna(valor):
+            return ""
+        texto = unicodedata.normalize("NFKD", str(valor))
+        texto = texto.encode("ASCII", "ignore").decode("ASCII")
+        texto = texto.strip().upper()
+        texto = re.sub(r"[^A-Z0-9]+", " ", texto)
+        return re.sub(r"\s+", " ", texto).strip()
+
     mes_ref_norm = str(mes_ref).strip().lower()
     mes_m1 = get_mes_anterior(mes_ref_norm)
     mes_m2 = get_mes_anterior(mes_m1)
@@ -13761,12 +12972,29 @@ def construir_tabela_resultado_canais(
     df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work.get('DESAFIO_QTD', 0)).fillna(0.0)
     df_work['MES_NORM'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
     df_work['PLATAFORMA_NORM'] = df_work['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
-    df_work['INDICADOR_NORM'] = normalizar_texto_series(df_work['DSC_INDICADOR'])
-    df_work['CANAL_CANONICO'] = mapear_canal_canonico_series(df_work['CANAL_PLAN'])
+    df_work['INDICADOR_NORM'] = df_work['DSC_INDICADOR'].apply(_norm_texto)
+
+    def _canal_canonico(valor_canal: str) -> str:
+        texto = _norm_texto(valor_canal)
+        if 'TELEVENDAS ATIVO' in texto:
+            return 'Televendas Ativo'
+        if 'TELEVENDAS RECEPTIVO' in texto:
+            return 'Televendas Receptivo'
+        if 'S2S' in texto and 'DAC' in texto:
+            return 'S2S+DAC'
+        if 'E COMMERCE' in texto:
+            return 'E-Commerce'
+        if 'HOSPITALITY' in texto:
+            return 'Hospitality'
+        if 'INSIDE SALES' in texto:
+            return 'Inside Sales'
+        return ""
+
+    df_work['CANAL_CANONICO'] = df_work['CANAL_PLAN'].apply(_canal_canonico)
     df_work = df_work[
         (df_work['CANAL_CANONICO'] != "") &
         (df_work['PLATAFORMA_NORM'] == produto_norm)
-    ]
+    ].copy()
 
     def _agg_por_canal(coluna_valor: str, mes_alvo: str, indicador_alvo_norm: str) -> dict[str, float]:
         df_f = df_work[
@@ -14202,6 +13430,1731 @@ def validate_data(df):
 
 
 
+# ==============================
+# BLOCO ADICIONAL - FUNIL FIXA E-COMMERCE
+# ==============================
+FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
+    resolver_arquivo_preprocessado("funil_fixa_ecommerce.parquet"),
+    RAW_FUNIL_FIXA_FILE_PATH
+)
+
+TEND_FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
+    resolver_arquivo_preprocessado("tend_funil_fixa.parquet"),
+    RAW_TEND_FUNIL_FIXA_FILE_PATH
+)
+
+FUNIL_FIXA_INDICADORES_CONFIG = [
+    ("INVESTIMENTO", "INVESTIMENTO", 1),
+    ("SESSOES", "SESSÕES", 2),
+    ("PORTEIRA_CEP", "PORTEIRA CEP", 3),
+    ("DADOS_PESSOAIS", "DADOS PESSOAIS", 4),
+    ("ENDERECO", "ENDEREÇO", 5),
+    ("PAGAMENTO", "PAGAMENTO", 6),
+    ("PEDIDOS_TOTAL", "PEDIDOS_TOTAL", 7),
+    ("VENDA_BRUTA", "VENDA BRUTA", 8),
+    ("INSTALACAO", "INSTALAÇÃO", 9),
+]
+FUNIL_FIXA_INDICADOR_LABELS = {
+    chave: label for chave, label, _ in FUNIL_FIXA_INDICADORES_CONFIG
+}
+FUNIL_FIXA_INDICADOR_ORDENS = {
+    chave: ordem for chave, _, ordem in FUNIL_FIXA_INDICADORES_CONFIG
+}
+
+
+def _normalizar_chave_funil_fixa(valor) -> str:
+    if pd.isna(valor):
+        return ""
+    texto = unicodedata.normalize("NFKD", str(valor))
+    texto = texto.encode("ASCII", "ignore").decode("ASCII")
+    texto = texto.strip().upper()
+    texto = re.sub(r"[^A-Z0-9]+", "_", texto)
+    return re.sub(r"_+", "_", texto).strip("_")
+
+
+def _encontrar_coluna_funil_fixa(colunas, *aliases: str) -> str | None:
+    mapa = {}
+    # Normalizar entrada: garantir que podemos iterar sobre `colunas`.
+    # Evitar avaliar a truthiness de objetos como pandas.Index (causa ValueError).
+    if colunas is None:
+        iterable_colunas = []
+    else:
+        try:
+            iterable_colunas = list(colunas)
+        except Exception:
+            # Tentativa de recuperar via tolist (Index/array-like)
+            try:
+                iterable_colunas = list(colunas.tolist())
+            except Exception:
+                iterable_colunas = []
+
+    for coluna in iterable_colunas:
+        try:
+            chave = _normalizar_chave_funil_fixa(coluna)
+        except Exception:
+            chave = ""
+        if chave and chave not in mapa:
+            mapa[chave] = coluna
+    for alias in aliases:
+        chave_alias = _normalizar_chave_funil_fixa(alias)
+        if chave_alias in mapa:
+            return mapa[chave_alias]
+    return None
+
+
+def _formatar_mes_ano_funil_fixa(data_ref) -> str:
+    try:
+        ts = pd.Timestamp(data_ref)
+        if pd.isna(ts):
+            return ""
+        meses_pt = {
+            1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+            7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+        }
+        return f"{meses_pt.get(int(ts.month), 'jan')}/{str(int(ts.year))[-2:]}"
+    except Exception:
+        return ""
+
+
+def _normalizar_segmento_funil_fixa(valor) -> str:
+    chave = _normalizar_chave_funil_fixa(valor)
+    if chave == "RESIDENCIAL_CABO":
+        return "PF"
+    if chave == "PF":
+        return "PF"
+    if chave == "PME":
+        return "PME"
+    return str(valor).strip()
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
+def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    _ = file_mtime
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    if path_obj.suffix.lower() == ".parquet":
+        df_opt = _carregar_dataframe_preprocessado(
+            str(path_obj),
+            file_mtime,
+            required_cols={'SEGMENTO', 'INDICADOR', 'PERIODO_MES', 'QTDE', 'INDICADOR_CHAVE', 'INDICADOR_ORDEM', 'MES_ANO', 'MES_ANO_ORDEM'},
+            text_cols=['SEGMENTO', 'INDICADOR', 'INDICADOR_CHAVE', 'MES_ANO'],
+            numeric_cols=['QTDE', 'INDICADOR_ORDEM', 'MES_ANO_ORDEM'],
+            date_cols=['PERIODO_MES'],
+            category_cols=['SEGMENTO', 'INDICADOR', 'INDICADOR_CHAVE', 'MES_ANO']
+        )
+        if not df_opt.empty:
+            df_opt['MES_ANO_ORDEM'] = normalizar_numerico_serie(df_opt['MES_ANO_ORDEM']).fillna(0).astype(int)
+            return df_opt
+
+    df_raw = pd.read_excel(path_obj, engine='openpyxl')
+    if df_raw is None or df_raw.empty:
+        return pd.DataFrame()
+
+    col_segmento = _encontrar_coluna_funil_fixa(df_raw.columns, 'SEGMENTO')
+    col_indicador = _encontrar_coluna_funil_fixa(df_raw.columns, 'INDICADOR')
+    col_periodo = _encontrar_coluna_funil_fixa(df_raw.columns, 'PERIODO', 'PERIODO_MES', 'PERIODO MES')
+    col_qtde = _encontrar_coluna_funil_fixa(df_raw.columns, 'QTDE')
+    obrigatorias = [col_segmento, col_indicador, col_periodo, col_qtde]
+    if any(col is None for col in obrigatorias):
+        return pd.DataFrame()
+
+    df = df_raw.rename(columns={
+        col_segmento: 'SEGMENTO',
+        col_indicador: 'INDICADOR',
+        col_periodo: 'PERIODO_MES',
+        col_qtde: 'QTDE',
+    })[['SEGMENTO', 'INDICADOR', 'PERIODO_MES', 'QTDE']].copy()
+
+    df['SEGMENTO'] = df['SEGMENTO'].map(_normalizar_segmento_funil_fixa)
+    df['INDICADOR_CHAVE'] = df['INDICADOR'].map(_normalizar_chave_funil_fixa)
+    df = df[df['SEGMENTO'].isin(['PF', 'PME'])].copy()
+    df = df[df['INDICADOR_CHAVE'].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
+    df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(999.0)
+    df['PERIODO_MES'] = pd.to_datetime(
+        df['PERIODO_MES'],
+        format='mixed',
+        errors='coerce',
+        dayfirst=True
+    )
+    df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0.0)
+    df = df[df['PERIODO_MES'].notna()].copy()
+    df['MES_ANO'] = df['PERIODO_MES'].apply(_formatar_mes_ano_funil_fixa).astype(str).str.strip().str.lower()
+    df['MES_ANO_ORDEM'] = (df['PERIODO_MES'].dt.year * 100 + df['PERIODO_MES'].dt.month).astype(int)
+    return df
+
+
+def _calcular_pesos_origem_tend_funil_fixa(
+    df_base: pd.DataFrame,
+    segmento_ref: str,
+    indicador_ref: str,
+    mes_ref_ordem: int,
+    qtd_meses_hist: int = 3
+) -> pd.Series:
+    if df_base is None or df_base.empty:
+        return pd.Series(dtype=float)
+
+    base_ref = df_base[
+        df_base['SEGMENTO'].astype(str).eq(str(segmento_ref)) &
+        df_base['INDICADOR'].astype(str).eq(str(indicador_ref))
+    ].copy()
+    if base_ref.empty:
+        return pd.Series(dtype=float)
+
+    colunas_peso = ['ORIGEM_AGG']
+    if 'CANAL_ENTRADA' in base_ref.columns:
+        colunas_peso.append('CANAL_ENTRADA')
+
+    meses_hist = sorted(
+        base_ref.loc[
+            pd.to_numeric(base_ref['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).lt(int(mes_ref_ordem)),
+            'MES_ANO_ORDEM'
+        ].dropna().astype(int).unique().tolist()
+    )[-max(int(qtd_meses_hist), 1):]
+
+    base_hist = base_ref[base_ref['MES_ANO_ORDEM'].isin(meses_hist)].copy()
+    if not base_hist.empty:
+        tabela_hist = base_hist.pivot_table(
+            index=colunas_peso,
+            columns='MES_ANO_ORDEM',
+            values='QTDE',
+            aggfunc='sum',
+            fill_value=0.0
+        )
+        pesos = pd.to_numeric(tabela_hist.mean(axis=1), errors='coerce').fillna(0.0)
+        pesos = pesos[pesos.gt(0)]
+        if not pesos.empty and float(pesos.sum()) > 0:
+            return pesos / float(pesos.sum())
+
+    base_prev = base_ref[
+        pd.to_numeric(base_ref['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).lt(int(mes_ref_ordem))
+    ].copy()
+    if not base_prev.empty:
+        pesos = pd.to_numeric(
+            base_prev.groupby(colunas_peso, observed=True)['QTDE'].sum(),
+            errors='coerce'
+        ).fillna(0.0)
+        pesos = pesos[pesos.gt(0)]
+        if not pesos.empty and float(pesos.sum()) > 0:
+            return pesos / float(pesos.sum())
+
+    base_mes = base_ref[
+        pd.to_numeric(base_ref['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).eq(int(mes_ref_ordem))
+    ].copy()
+    if not base_mes.empty:
+        pesos = pd.to_numeric(
+            base_mes.groupby(colunas_peso, observed=True)['QTDE'].sum(),
+            errors='coerce'
+        ).fillna(0.0)
+        pesos = pesos[pesos.gt(0)]
+        if not pesos.empty and float(pesos.sum()) > 0:
+            return pesos / float(pesos.sum())
+
+    combos_hist = (
+        base_ref[colunas_peso]
+        .dropna()
+        .astype(str)
+        .apply(lambda col: col.str.strip())
+        .drop_duplicates()
+    )
+    if not combos_hist.empty:
+        peso_uniforme = 1.0 / float(len(combos_hist))
+        if len(colunas_peso) == 1:
+            return pd.Series(
+                {str(linha['ORIGEM_AGG']).strip(): peso_uniforme for _, linha in combos_hist.iterrows()},
+                dtype=float
+            )
+        return pd.Series(
+            {
+                (str(linha['ORIGEM_AGG']).strip(), str(linha['CANAL_ENTRADA']).strip()): peso_uniforme
+                for _, linha in combos_hist.iterrows()
+            },
+            dtype=float
+        )
+
+    return pd.Series({'DEMAIS': 1.0}, dtype=float)
+
+
+def _aplicar_tend_funil_fixa(df_funil: pd.DataFrame, df_tend: pd.DataFrame) -> pd.DataFrame:
+    if df_funil is None or df_funil.empty:
+        return pd.DataFrame()
+
+    base = df_funil.copy()
+    base['EH_TEND'] = pd.to_numeric(base.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
+    if df_tend is None or df_tend.empty:
+        return base
+
+    base_sem_tend = base.copy()
+    chaves_tend = (
+        df_tend[['SEGMENTO', 'INDICADOR', 'MES_ANO_ORDEM']]
+        .drop_duplicates()
+        .to_dict('records')
+    )
+    for chave in chaves_tend:
+        segmento_ref = str(chave['SEGMENTO']).strip()
+        indicador_ref = str(chave['INDICADOR']).strip()
+        mes_ref_ordem = int(chave['MES_ANO_ORDEM'])
+        base_sem_tend = base_sem_tend[
+            ~(
+                base_sem_tend['SEGMENTO'].astype(str).eq(segmento_ref) &
+                base_sem_tend['INDICADOR'].astype(str).eq(indicador_ref) &
+                pd.to_numeric(base_sem_tend['MES_ANO_ORDEM'], errors='coerce').fillna(0).astype(int).eq(mes_ref_ordem)
+            )
+        ].copy()
+
+    linhas_tend = []
+    for _, linha_tend in df_tend.iterrows():
+        segmento_ref = str(linha_tend.get('SEGMENTO', '')).strip()
+        indicador_ref = str(linha_tend.get('INDICADOR', '')).strip()
+        indicador_chave = str(linha_tend.get('INDICADOR_CHAVE', '')).strip()
+        indicador_ordem = float(pd.to_numeric(pd.Series([linha_tend.get('INDICADOR_ORDEM', 999.0)]), errors='coerce').fillna(999.0).iloc[0])
+        mes_ref_ordem = int(pd.to_numeric(pd.Series([linha_tend.get('MES_ANO_ORDEM', 0)]), errors='coerce').fillna(0).iloc[0])
+        qtde_tend = float(pd.to_numeric(pd.Series([linha_tend.get('QTDE', 0.0)]), errors='coerce').fillna(0.0).iloc[0])
+        if qtde_tend <= 0 or mes_ref_ordem <= 0:
+            continue
+
+        pesos_origem = _calcular_pesos_origem_tend_funil_fixa(
+            df_base=base,
+            segmento_ref=segmento_ref,
+            indicador_ref=indicador_ref,
+            mes_ref_ordem=mes_ref_ordem,
+            qtd_meses_hist=3
+        )
+        pesos_origem = pd.to_numeric(pesos_origem, errors='coerce').fillna(0.0)
+        pesos_origem = pesos_origem[pesos_origem.gt(0)]
+        if pesos_origem.empty:
+            continue
+        pesos_origem = pesos_origem / float(pesos_origem.sum())
+
+        chaves_peso = list(pesos_origem.index)
+        valores_alloc = [qtde_tend * float(pesos_origem.loc[chave_peso]) for chave_peso in chaves_peso]
+        if valores_alloc:
+            ajuste_final = qtde_tend - float(np.sum(valores_alloc))
+            idx_maior = int(np.argmax(valores_alloc))
+            valores_alloc[idx_maior] += ajuste_final
+
+        periodo_ref = pd.Timestamp(linha_tend.get('PERIODO_MES'))
+        mes_rotulo = str(linha_tend.get('MES_ANO', '')).strip().lower() or _formatar_mes_ano_funil_fixa(periodo_ref)
+        for chave_peso, qtde_alloc in zip(chaves_peso, valores_alloc):
+            if isinstance(chave_peso, tuple):
+                origem_ref = chave_peso[0] if len(chave_peso) > 0 else 'DEMAIS'
+                canal_entrada_ref = chave_peso[1] if len(chave_peso) > 1 else 'Não Informado'
+            else:
+                origem_ref = chave_peso
+                canal_entrada_ref = 'Não Informado'
+            linhas_tend.append({
+                'SEGMENTO': segmento_ref,
+                'ORIGEM_AGG': str(origem_ref).strip(),
+                'CANAL_ENTRADA': str(canal_entrada_ref).strip(),
+                'INDICADOR': indicador_ref,
+                'PERIODO_MES': periodo_ref,
+                'QTDE': float(qtde_alloc),
+                'INDICADOR_ORDEM': indicador_ordem,
+                'MES_ANO': mes_rotulo,
+                'MES_ANO_ORDEM': mes_ref_ordem,
+                'INDICADOR_CHAVE': indicador_chave,
+                'EH_TEND': 1,
+            })
+
+    if not linhas_tend:
+        return base
+
+    df_tend_alloc = pd.DataFrame(linhas_tend)
+    for coluna in base_sem_tend.columns:
+        if coluna not in df_tend_alloc.columns:
+            df_tend_alloc[coluna] = np.nan
+    df_tend_alloc = df_tend_alloc[base_sem_tend.columns.tolist()]
+
+    df_out = pd.concat([base_sem_tend, df_tend_alloc], ignore_index=True, sort=False)
+    df_out['QTDE'] = normalizar_numerico_serie(df_out['QTDE']).fillna(0.0)
+    df_out['MES_ANO_ORDEM'] = normalizar_numerico_serie(df_out['MES_ANO_ORDEM']).fillna(0).astype(int)
+    df_out['INDICADOR_ORDEM'] = normalizar_numerico_serie(df_out['INDICADOR_ORDEM']).fillna(999.0)
+    df_out['EH_TEND'] = pd.to_numeric(df_out.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
+    return df_out
+
+
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
+def load_funil_fixa_ecommerce_data(
+    path: str,
+    file_mtime: float | None = None,
+    tend_path: str | None = None,
+    tend_file_mtime: float | None = None
+) -> pd.DataFrame:
+    _ = file_mtime
+    _ = tend_file_mtime
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    if path_obj.suffix.lower() == ".parquet":
+        df_opt = _carregar_dataframe_preprocessado(
+            str(path_obj),
+            file_mtime,
+            required_cols={'SEGMENTO', 'ORIGEM_AGG', 'CANAL_ENTRADA', 'INDICADOR', 'PERIODO_MES', 'QTDE', 'INDICADOR_ORDEM', 'MES_ANO', 'MES_ANO_ORDEM'},
+            text_cols=['SEGMENTO', 'ORIGEM_AGG', 'CANAL_ENTRADA', 'INDICADOR', 'MES_ANO', 'INDICADOR_CHAVE'],
+            numeric_cols=['QTDE', 'INDICADOR_ORDEM', 'MES_ANO_ORDEM', 'EH_TEND'],
+            date_cols=['PERIODO_MES'],
+            category_cols=['SEGMENTO', 'ORIGEM_AGG', 'CANAL_ENTRADA', 'INDICADOR', 'MES_ANO', 'INDICADOR_CHAVE'],
+            default_values={'EH_TEND': 0, 'CANAL_ENTRADA': 'Não Informado'}
+        )
+        if not df_opt.empty:
+            df_opt['MES_ANO_ORDEM'] = normalizar_numerico_serie(df_opt['MES_ANO_ORDEM']).fillna(0).astype(int)
+            df_opt['EH_TEND'] = pd.to_numeric(df_opt.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
+
+            tend_path_obj = resolver_arquivo_dashboard(
+                Path(tend_path) if tend_path else TEND_FUNIL_FIXA_FILE_PATH,
+                TEND_FUNIL_FIXA_FILE_PATH,
+                path_obj.with_name('tend_funil_ecom.parquet'),
+                path_obj.with_name('tend_funil_ecom.xlsx'),
+                'tend_funil_ecom.parquet',
+                'tend_funil_ecom.xlsx'
+            )
+            tend_path_obj = tend_path_obj if Path(tend_path_obj).exists() else None
+            if tend_path_obj is not None:
+                df_tend = load_tend_funil_fixa_data(str(tend_path_obj), tend_file_mtime)
+                if not df_tend.empty:
+                    df_opt = _aplicar_tend_funil_fixa(df_opt, df_tend)
+            return df_opt
+
+    df_raw = pd.read_excel(path_obj, engine='openpyxl')
+    if df_raw is None or df_raw.empty:
+        return pd.DataFrame()
+
+    col_segmento = _encontrar_coluna_funil_fixa(df_raw.columns, 'SEGMENTO')
+    col_origem = _encontrar_coluna_funil_fixa(df_raw.columns, 'ORIGEM_AGG', 'ORIGEM AGG')
+    col_canal_entrada = _encontrar_coluna_funil_fixa(df_raw.columns, 'CANAL_ENTRADA', 'CANAL ENTRADA', 'CANAL DE ENTRADA')
+    col_indicador = _encontrar_coluna_funil_fixa(df_raw.columns, 'INDICADOR')
+    col_indicador_ordem = _encontrar_coluna_funil_fixa(df_raw.columns, 'INDICADOR_ORDEM', 'INDICADOR ORDEM')
+    col_periodo = _encontrar_coluna_funil_fixa(df_raw.columns, 'PERIODO_MES', 'PERIODO MES')
+    col_mes_ano = _encontrar_coluna_funil_fixa(df_raw.columns, 'MES_ANO', 'MÊS_ANO')
+    col_mes_ordem = _encontrar_coluna_funil_fixa(df_raw.columns, 'MES_ANO_ORDEM', 'MES ANO ORDEM')
+    col_qtde = _encontrar_coluna_funil_fixa(df_raw.columns, 'QTDE')
+
+    obrigatorias = [col_segmento, col_origem, col_indicador, col_periodo, col_qtde]
+    if any(col is None for col in obrigatorias):
+        return pd.DataFrame()
+
+    rename_map = {
+        col_segmento: 'SEGMENTO',
+        col_origem: 'ORIGEM_AGG',
+        col_indicador: 'INDICADOR',
+        col_periodo: 'PERIODO_MES',
+        col_qtde: 'QTDE',
+    }
+    if col_indicador_ordem:
+        rename_map[col_indicador_ordem] = 'INDICADOR_ORDEM'
+    if col_canal_entrada:
+        rename_map[col_canal_entrada] = 'CANAL_ENTRADA'
+    if col_mes_ano:
+        rename_map[col_mes_ano] = 'MES_ANO'
+    if col_mes_ordem:
+        rename_map[col_mes_ordem] = 'MES_ANO_ORDEM'
+
+    df = df_raw.rename(columns=rename_map)[list(rename_map.values())].copy()
+
+    if 'CANAL_ENTRADA' not in df.columns:
+        df['CANAL_ENTRADA'] = 'Não Informado'
+
+    for coluna_txt in ['SEGMENTO', 'ORIGEM_AGG', 'CANAL_ENTRADA', 'INDICADOR']:
+        df[coluna_txt] = df[coluna_txt].astype(str).str.strip()
+        df = df[df[coluna_txt].ne('')]
+
+    df['SEGMENTO'] = df['SEGMENTO'].map(_normalizar_segmento_funil_fixa)
+    df['INDICADOR_CHAVE'] = df['INDICADOR'].map(_normalizar_chave_funil_fixa)
+    df = df[df['SEGMENTO'].isin(['PF', 'PME'])].copy()
+    df = df[df['INDICADOR_CHAVE'].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
+    df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
+
+    df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0.0)
+    if 'INDICADOR_ORDEM' not in df.columns:
+        df['INDICADOR_ORDEM'] = 999.0
+    df['INDICADOR_ORDEM'] = normalizar_numerico_serie(df['INDICADOR_ORDEM']).fillna(999.0)
+    df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(df['INDICADOR_ORDEM'])
+
+    df['PERIODO_MES'] = pd.to_datetime(
+        df['PERIODO_MES'],
+        format='mixed',
+        errors='coerce',
+        dayfirst=True
+    )
+    if 'MES_ANO_ORDEM' in df.columns:
+        df['MES_ANO_ORDEM'] = normalizar_numerico_serie(df['MES_ANO_ORDEM'])
+    else:
+        df['MES_ANO_ORDEM'] = np.nan
+
+    if 'MES_ANO' not in df.columns:
+        df['MES_ANO'] = ''
+    df['MES_ANO'] = df['MES_ANO'].fillna('').astype(str).str.strip().str.lower()
+
+    mask_periodo = df['PERIODO_MES'].notna()
+    df.loc[mask_periodo, 'MES_ANO'] = df.loc[mask_periodo, 'PERIODO_MES'].apply(_formatar_mes_ano_funil_fixa)
+    df.loc[mask_periodo, 'MES_ANO_ORDEM'] = df.loc[mask_periodo, 'PERIODO_MES'].dt.year * 100 + df.loc[mask_periodo, 'PERIODO_MES'].dt.month
+
+    df['MES_ANO'] = df['MES_ANO'].astype(str).str.strip().str.lower()
+    df['MES_ANO_ORDEM'] = normalizar_numerico_serie(df['MES_ANO_ORDEM']).fillna(0).astype(int)
+    df = df[df['MES_ANO_ORDEM'] > 0].copy()
+    df['EH_TEND'] = 0
+
+    tend_path_obj = resolver_arquivo_dashboard(
+        Path(tend_path) if tend_path else TEND_FUNIL_FIXA_FILE_PATH,
+        TEND_FUNIL_FIXA_FILE_PATH,
+        path_obj.with_name('tend_funil_ecom.xlsx'),
+        'tend_funil_ecom.xlsx'
+    )
+    tend_path_obj = tend_path_obj if Path(tend_path_obj).exists() else None
+    if tend_path_obj is not None:
+        df_tend = load_tend_funil_fixa_data(str(tend_path_obj), tend_file_mtime)
+        if not df_tend.empty:
+            df = _aplicar_tend_funil_fixa(df, df_tend)
+
+    return df
+
+
+def _calcular_janela_meses_funil_fixa(
+    df_funil: pd.DataFrame,
+    qtd_meses: int = 13,
+    mes_foco_ordem: int | None = None
+) -> list[int]:
+    if df_funil is None or df_funil.empty or 'MES_ANO_ORDEM' not in df_funil.columns:
+        return []
+    meses = sorted(df_funil['MES_ANO_ORDEM'].dropna().astype(int).unique().tolist())
+    if mes_foco_ordem is not None:
+        meses = [mes for mes in meses if int(mes) <= int(mes_foco_ordem)]
+    if not meses:
+        return []
+    return meses[-max(int(qtd_meses), 1):]
+
+
+def _obter_mes_tend_funil_fixa(df_funil: pd.DataFrame) -> int | None:
+    if df_funil is None or df_funil.empty or 'EH_TEND' not in df_funil.columns:
+        return None
+    meses_tend = sorted(
+        df_funil.loc[
+            pd.to_numeric(df_funil.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int).gt(0),
+            'MES_ANO_ORDEM'
+        ].dropna().astype(int).unique().tolist()
+    )
+    return int(meses_tend[-1]) if meses_tend else None
+
+
+def _formatar_valor_funil_fixa(valor: float) -> str:
+    return formatar_numero_brasileiro(float(pd.to_numeric(pd.Series([valor]), errors='coerce').fillna(0.0).iloc[0]), 0)
+
+
+def _calcular_mom_funil_fixa(valor_atual: float, valor_anterior: float) -> float:
+    atual = float(valor_atual or 0.0)
+    anterior = float(valor_anterior or 0.0)
+    if anterior == 0:
+        return np.nan
+    return ((atual / anterior) - 1.0) * 100.0
+
+
+def _render_mom_badge_funil_fixa(valor_mom: float) -> str:
+    if pd.isna(valor_mom):
+        return '<span class="mom-pill mom-flat">• n/d</span>'
+    if valor_mom > 0:
+        classe = 'mom-up'
+        seta = '▲'
+    elif valor_mom < 0:
+        classe = 'mom-down'
+        seta = '▼'
+    else:
+        classe = 'mom-flat'
+        seta = '•'
+    texto = f"{seta} {valor_mom:+.1f}%".replace('.', ',')
+    return f'<span class="mom-pill {classe}">{texto}</span>'
+
+
+def montar_estrutura_funil_fixa_ecommerce(
+    df_funil: pd.DataFrame,
+    segmentos_sel: list[str] | None = None,
+    origens_sel: list[str] | None = None,
+    canais_entrada_sel: list[str] | None = None,
+    indicadores_sel: list[str] | None = None,
+    mes_ref_ordem: int | None = None,
+    qtd_meses: int = 13
+) -> dict:
+    estrutura_vazia = {
+        'meses_ordem': [],
+        'meses_rotulos': [],
+        'mes_atual_rotulo': '',
+        'meses_base_mm3': [],
+        'mes_tend_ordem': None,
+        'rows': [],
+        'observacao_mm3': ''
+    }
+    if df_funil is None or df_funil.empty:
+        return estrutura_vazia
+
+    base = df_funil.copy()
+    if segmentos_sel:
+        base = base[base['SEGMENTO'].isin(segmentos_sel)].copy()
+    if origens_sel:
+        base = base[base['ORIGEM_AGG'].isin(origens_sel)].copy()
+    if canais_entrada_sel and 'CANAL_ENTRADA' in base.columns:
+        base = base[base['CANAL_ENTRADA'].isin(canais_entrada_sel)].copy()
+    if indicadores_sel:
+        base = base[base['INDICADOR'].isin(indicadores_sel)].copy()
+    if base.empty:
+        return estrutura_vazia
+
+    mapa_meses = (
+        base[['MES_ANO_ORDEM', 'MES_ANO']]
+        .drop_duplicates()
+        .sort_values(['MES_ANO_ORDEM', 'MES_ANO'])
+        .drop_duplicates(subset=['MES_ANO_ORDEM'], keep='last')
+    )
+    mapa_ordem_rotulo = {int(linha['MES_ANO_ORDEM']): str(linha['MES_ANO']).strip().upper() for _, linha in mapa_meses.iterrows()}
+    mes_tend_ordem = _obter_mes_tend_funil_fixa(base)
+    meses_ordem = _calcular_janela_meses_funil_fixa(
+        base,
+        qtd_meses=qtd_meses,
+        mes_foco_ordem=mes_ref_ordem
+    )
+    if not meses_ordem:
+        return estrutura_vazia
+    meses_rotulos = [mapa_ordem_rotulo.get(ordem, str(ordem)) for ordem in meses_ordem]
+
+    agg = (
+        base.groupby(['INDICADOR', 'ORIGEM_AGG', 'INDICADOR_ORDEM', 'MES_ANO_ORDEM'], observed=True)['QTDE']
+        .sum()
+        .reset_index()
+    )
+    if agg.empty:
+        return estrutura_vazia
+
+    tabela_child = agg.pivot_table(
+        index=['INDICADOR', 'ORIGEM_AGG', 'INDICADOR_ORDEM'],
+        columns='MES_ANO_ORDEM',
+        values='QTDE',
+        aggfunc='sum',
+        fill_value=0.0
+    )
+    tabela_child = tabela_child.reindex(columns=meses_ordem, fill_value=0.0)
+
+    mes_atual_ordem = meses_ordem[-1]
+    mes_mais_recente_disponivel = max(mapa_ordem_rotulo.keys()) if mapa_ordem_rotulo else None
+    meses_mm3 = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
+    aplicar_mm3_mes_atual = bool(
+        meses_mm3 and
+        mes_mais_recente_disponivel is not None and
+        int(mes_atual_ordem) == int(mes_mais_recente_disponivel) and
+        (mes_tend_ordem is None or int(mes_atual_ordem) != int(mes_tend_ordem))
+    )
+    if aplicar_mm3_mes_atual:
+        tabela_child[mes_atual_ordem] = tabela_child[meses_mm3].mean(axis=1)
+
+    tabela_parent = tabela_child.groupby(level=['INDICADOR', 'INDICADOR_ORDEM']).sum()
+    tabela_child_reset = tabela_child.reset_index()
+
+    rows = []
+    indicadores_ordenados = sorted(
+        [(idx[0], float(idx[1] if not pd.isna(idx[1]) else 999.0)) for idx in tabela_parent.index],
+        key=lambda item: (item[1], str(item[0]).upper())
+    )
+
+    for idx_pai, (indicador, indicador_ordem) in enumerate(indicadores_ordenados, start=1):
+        serie_pai = tabela_parent.loc[(indicador, indicador_ordem)]
+        atual_pai = float(serie_pai.get(mes_atual_ordem, 0.0))
+        anterior_pai = float(serie_pai.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
+        row_id = f"funil-pai-{idx_pai}"
+        filhos = []
+
+        filhos_df = tabela_child_reset[
+            tabela_child_reset['INDICADOR'].astype(str).eq(str(indicador)) &
+            pd.to_numeric(tabela_child_reset['INDICADOR_ORDEM'], errors='coerce').fillna(999.0).eq(float(indicador_ordem))
+        ].copy()
+        filhos_df['_ordem_total'] = filhos_df[meses_ordem].sum(axis=1)
+        filhos_df['_ordem_mes_ref'] = pd.to_numeric(filhos_df[mes_atual_ordem], errors='coerce').fillna(0.0)
+        filhos_df = filhos_df.sort_values(
+            by=['_ordem_total', '_ordem_mes_ref', 'ORIGEM_AGG'],
+            ascending=[False, False, True],
+            na_position='last'
+        )
+
+        for idx_filho, (_, linha_filho) in enumerate(filhos_df.iterrows(), start=1):
+            origem = str(linha_filho.get('ORIGEM_AGG', '')).strip()
+            atual_filho = float(linha_filho.get(mes_atual_ordem, 0.0))
+            anterior_filho = float(linha_filho.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
+            raw_values_filho = [float(linha_filho.get(mes, 0.0)) for mes in meses_ordem]
+            filhos.append({
+                'id': f'{row_id}-filho-{idx_filho}',
+                'parent_id': row_id,
+                'label': str(origem),
+                'level': 1,
+                'values': [_formatar_valor_funil_fixa(valor) for valor in raw_values_filho],
+                'raw_values': raw_values_filho,
+                'sort_mes_ref': float(raw_values_filho[-1]) if raw_values_filho else 0.0,
+                'sort_total': float(sum(raw_values_filho)) if raw_values_filho else 0.0,
+                'sort_vector': [float(v) for v in raw_values_filho[::-1]],
+                'mom_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_filho, anterior_filho)),
+            })
+
+        filhos = sorted(
+            filhos,
+            key=lambda item: (
+                *tuple(-float(v) for v in item.get('sort_vector', [])),
+                -float(item.get('sort_total', 0.0)),
+                str(item.get('label', '')).upper(),
+            )
+        )
+
+        raw_values_pai = [float(serie_pai.get(mes, 0.0)) for mes in meses_ordem]
+        rows.append({
+            'id': row_id,
+            'label': str(indicador),
+            'level': 0,
+            'values': [_formatar_valor_funil_fixa(valor) for valor in raw_values_pai],
+            'raw_values': raw_values_pai,
+            'mom_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_pai, anterior_pai)),
+            'children': filhos,
+        })
+
+    observacao_mm3 = ''
+    if mes_tend_ordem is not None and int(mes_atual_ordem) == int(mes_tend_ordem):
+        meses_ref_tend = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
+        rotulos_ref_tend = ', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_ref_tend) if meses_ref_tend else ''
+        complemento = f" pela proporcao media dos ultimos 3 meses ({rotulos_ref_tend})." if rotulos_ref_tend else '.'
+        observacao_mm3 = (
+            f"O mes {mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem))} foi carregado pelo arquivo de tend"
+            f"{complemento}"
+        )
+    elif aplicar_mm3_mes_atual and meses_mm3:
+        observacao_mm3 = (
+            f"O mês {mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem))} foi preenchido com média móvel "
+            f"dos últimos {len(meses_mm3)} meses ({', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3)})."
+        )
+
+    return {
+        'meses_ordem': meses_ordem,
+        'meses_rotulos': meses_rotulos,
+        'mes_atual_rotulo': mapa_ordem_rotulo.get(mes_atual_ordem, str(mes_atual_ordem)),
+        'meses_base_mm3': [mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3] if aplicar_mm3_mes_atual else [],
+        'mes_tend_ordem': mes_tend_ordem,
+        'rows': rows,
+        'observacao_mm3': observacao_mm3,
+    }
+
+
+def criar_tabela_html_funil_fixa_ecommerce(
+    estrutura: dict,
+    table_id: str,
+    max_body_height: int = 760
+) -> str:
+    if not estrutura or not estrutura.get('rows'):
+        return ''
+
+    qtd_meses = max(len(estrutura.get('meses_rotulos', [])), 1)
+    largura_primeira_coluna = 148
+    largura_coluna_mom = 72
+    mes_tend_ordem = estrutura.get('mes_tend_ordem')
+    colgroup_html = (
+        '<colgroup>'
+        f'<col style="width:{largura_primeira_coluna}px;">'
+        + ''.join(
+            f'<col style="width:calc((100% - {largura_primeira_coluna + largura_coluna_mom}px) / {qtd_meses});">'
+            for _ in range(qtd_meses)
+        )
+        + f'<col style="width:{largura_coluna_mom}px;">'
+        + '</colgroup>'
+    )
+
+    def _render_databar_cell(valor_bruto: float, valor_formatado: str, max_coluna: float, eh_col_tend: bool = False) -> str:
+        valor_num = float(pd.to_numeric(pd.Series([valor_bruto]), errors='coerce').fillna(0.0).iloc[0])
+        max_ref = float(pd.to_numeric(pd.Series([max_coluna]), errors='coerce').fillna(0.0).iloc[0])
+        if max_ref <= 0 or valor_num <= 0:
+            largura = 0.0
+        else:
+            largura = max(8.0, min(100.0, (valor_num / max_ref) * 100.0))
+
+        return (
+            f'<td class="ff-data-cell{" ff-col-tend" if eh_col_tend else ""}">'
+            '<div class="ff-data-bar-wrap">'
+            f'<div class="ff-data-bar-fill" style="width:{largura:.1f}%;"></div>'
+            f'<span class="ff-data-bar-text">{escape(str(valor_formatado))}</span>'
+            '</div>'
+            '</td>'
+        )
+
+    cabecalhos_meses = ''.join(
+        f'<th class="ff-col-mes{" ff-col-tend" if estrutura.get("meses_ordem", [])[idx] == mes_tend_ordem else ""}">{escape(str(rotulo))}</th>'
+        for idx, rotulo in enumerate(estrutura.get('meses_rotulos', []))
+    )
+
+    linhas_html = []
+    for row in estrutura.get('rows', []):
+        possui_filhos = bool(row.get('children'))
+        btn_toggle = (
+            f'<button class="ff-toggle" data-target="{escape(str(row.get("id")), quote=True)}" aria-label="Expandir {escape(str(row.get("label")))}">+</button>'
+            if possui_filhos else '<span class="ff-toggle ff-toggle-placeholder"></span>'
+        )
+        valores_html = ''.join(
+            f'<td class="{"ff-col-tend" if estrutura.get("meses_ordem", [])[idx_coluna] == mes_tend_ordem else ""}">{escape(str(valor))}</td>'
+            for idx_coluna, valor in enumerate(row.get('values', []))
+        )
+        linhas_html.append(
+            f'<tr class="ff-row ff-row-parent" data-row-id="{escape(str(row.get("id")), quote=True)}">'
+            f'<td class="ff-sticky ff-row-label">{btn_toggle}<span class="ff-label-text">{escape(str(row.get("label")))}</span></td>'
+            f'{valores_html}'
+            f'<td class="ff-mom-cell">{row.get("mom_html", "")}</td>'
+            f'</tr>'
+        )
+        maximos_filhos = []
+        if row.get('children'):
+            qtd_colunas = len(row.get('values', []))
+            for idx_coluna in range(qtd_colunas):
+                max_coluna = max(
+                    [
+                        float(pd.to_numeric(pd.Series([child.get('raw_values', [0.0] * qtd_colunas)[idx_coluna]]), errors='coerce').fillna(0.0).iloc[0])
+                        for child in row.get('children', [])
+                    ] or [0.0]
+                )
+                maximos_filhos.append(max_coluna)
+        for child in row.get('children', []):
+            child_values_html = ''.join(
+                _render_databar_cell(
+                    valor_bruto=child.get('raw_values', [0.0] * len(child.get('values', [])))[idx_coluna],
+                    valor_formatado=child.get('values', [''])[idx_coluna],
+                    max_coluna=maximos_filhos[idx_coluna] if idx_coluna < len(maximos_filhos) else 0.0,
+                    eh_col_tend=estrutura.get("meses_ordem", [])[idx_coluna] == mes_tend_ordem
+                )
+                for idx_coluna in range(len(child.get('values', [])))
+            )
+            linhas_html.append(
+                f'<tr class="ff-row ff-row-child" data-parent-row="{escape(str(row.get("id")), quote=True)}" style="display:none;">'
+                f'<td class="ff-sticky ff-row-label ff-row-label-child"><span class="ff-child-indent"></span><span class="ff-label-text">{escape(str(child.get("label")))}</span></td>'
+                f'{child_values_html}'
+                f'<td class="ff-mom-cell">{child.get("mom_html", "")}</td>'
+                f'</tr>'
+            )
+
+    observacao = ''
+
+    return f'''
+    <div id="{escape(table_id, quote=True)}" class="ff-wrapper">
+      <style>
+        #{table_id}.ff-wrapper {{font-family:'Manrope','Segoe UI',sans-serif; color:#312B2A; margin-top:2px;}}
+        #{table_id} .ff-note {{margin:0 0 6px 2px; font-size:11px; color:#6B5C59;}}
+        #{table_id} .ff-table-box {{
+            position:relative;
+            border:1px solid rgba(121,14,9,0.70);
+            border-radius:6px;
+            overflow-y:auto;
+            overflow-x:hidden;
+            max-height:{int(max_body_height)}px;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,248,247,0.96) 100%);
+            box-shadow:
+                0 18px 40px rgba(90,10,6,0.14),
+                0 4px 14px rgba(15,23,42,0.07),
+                inset 0 0 0 1px rgba(255,255,255,0.92);
+        }}
+        #{table_id} .ff-table-box::before {{
+            content:none;
+            display:none;
+        }}
+        #{table_id} table {{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; margin-top:0; font-variant-numeric:tabular-nums; background:#FFFFFF;}}
+        #{table_id} thead th {{
+            position:sticky;
+            top:0;
+            z-index:3;
+            background:linear-gradient(180deg, #790E09 0%, #4E0805 100%);
+            color:#FFFFFF;
+            font-size:9.4px;
+            letter-spacing:0.24px;
+            text-transform:uppercase;
+            padding:8px 5px;
+            border-right:1px solid rgba(255,255,255,0.18);
+            border-bottom:1px solid rgba(61,7,4,0.92);
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            font-weight:800;
+        }}
+        #{table_id} thead th:first-child {{left:0; z-index:4; border-top-left-radius:5px; text-align:left; padding-left:12px; background:linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);}}
+        #{table_id} thead th:last-child {{border-top-right-radius:5px; background:linear-gradient(180deg, #4F5861 0%, #343B43 100%);}}
+        #{table_id} thead th.ff-col-tend {{background:linear-gradient(135deg, #B7443B 0%, #8F241D 100%); color:#FFFFFF;}}
+        #{table_id} tbody td {{
+            padding:7px 5px;
+            font-size:11.3px;
+            border-bottom:1px solid rgba(121,14,9,0.075);
+            border-right:1px solid rgba(121,14,9,0.045);
+            white-space:nowrap;
+            text-align:right;
+            color:#312B2A;
+            background:#FFFFFF;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            font-weight:520;
+        }}
+        #{table_id} tbody td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.075) 0%, rgba(183,68,59,0.030) 100%); color:#111827;}}
+        #{table_id} tbody tr.ff-row-parent td {{
+            background:linear-gradient(180deg, #FFF6F4 0%, #FFFFFF 100%);
+            font-weight:650;
+            color:#171717;
+            border-top:1px solid rgba(121,14,9,0.08);
+        }}
+        #{table_id} tbody tr.ff-row-parent td:not(.ff-sticky):not(.ff-mom-cell) {{
+            background:linear-gradient(180deg, #FFFDFC 0%, #FFFFFF 100%);
+            color:#111827;
+            letter-spacing:-0.02em;
+        }}
+        #{table_id} tbody tr.ff-row-parent td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.085) 0%, rgba(183,68,59,0.035) 100%); color:#111827;}}
+        #{table_id} tbody tr.ff-row-child td {{background:#FFFDFC; color:#3E454E; font-weight:510;}}
+        #{table_id} tbody tr.ff-row-child:nth-child(even) td {{background:#FFF8F7;}}
+        #{table_id} tbody tr.ff-row-child td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.070) 0%, rgba(183,68,59,0.028) 100%); color:#111827;}}
+        #{table_id} tbody tr:hover td {{background:linear-gradient(90deg, #FFF3F0 0%, #FFF8F7 100%) !important;}}
+        #{table_id} tbody tr:hover td.ff-col-tend {{background:linear-gradient(180deg, rgba(183,68,59,0.10) 0%, rgba(183,68,59,0.042) 100%) !important;}}
+        #{table_id} .ff-sticky {{
+            position:sticky;
+            left:0;
+            z-index:2;
+            text-align:left !important;
+            min-width:{largura_primeira_coluna}px;
+            max-width:{largura_primeira_coluna}px;
+            width:{largura_primeira_coluna}px;
+        }}
+        #{table_id} .ff-row-parent .ff-sticky {{z-index:3; color:#111827; background:linear-gradient(180deg, #FFF4F1 0%, #FFFDFC 100%);}}
+        #{table_id} .ff-row-label {{display:flex; align-items:center; gap:6px;}}
+        #{table_id} .ff-label-text {{overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.01em;}}
+        #{table_id} .ff-row-parent .ff-label-text {{text-transform:uppercase; font-size:11.2px; font-weight:650;}}
+        #{table_id} .ff-row-label-child {{padding-left:8px; color:#4B5563 !important;}}
+        #{table_id} .ff-child-indent {{display:inline-block; width:12px; height:1px; background:linear-gradient(90deg, rgba(121,14,9,0.42), rgba(121,14,9,0.08)); margin-right:1px;}}
+        #{table_id} .ff-toggle {{width:18px; height:18px; border-radius:3px; border:1px solid rgba(121,14,9,0.26); background:linear-gradient(180deg,#FFFFFF 0%,#FFEAE6 100%); color:#790E09; font-weight:900; line-height:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:12px; padding:0; flex:0 0 auto; box-shadow:0 1px 0 rgba(255,255,255,0.9), 0 4px 10px rgba(121,14,9,0.08);}}
+        #{table_id} .ff-toggle:hover {{background:linear-gradient(180deg,#FFFFFF 0%,#FFDCD5 100%); transform:translateY(-1px);}}
+        #{table_id} .ff-toggle-placeholder {{border-color:transparent; background:transparent; cursor:default; box-shadow:none;}}
+        #{table_id} .ff-col-mes {{min-width:0;}}
+        #{table_id} .ff-mom-cell {{text-align:center !important; width:{largura_coluna_mom}px; min-width:{largura_coluna_mom}px;}}
+        #{table_id} .ff-data-cell {{padding:4px 3px;}}
+        #{table_id} .ff-data-bar-wrap {{position:relative; width:100%; min-width:0; height:20px; border-radius:3px; background:linear-gradient(180deg, rgba(121,14,9,0.035) 0%, rgba(121,14,9,0.075) 100%); overflow:hidden; border:1px solid rgba(121,14,9,0.055); box-shadow:inset 0 1px 0 rgba(255,255,255,0.82);}}
+        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-wrap {{background:linear-gradient(180deg, rgba(183,68,59,0.045) 0%, rgba(183,68,59,0.085) 100%); border-color:rgba(183,68,59,0.10);}}
+        #{table_id} .ff-data-bar-fill {{position:absolute; inset:0 auto 0 0; background:linear-gradient(90deg, rgba(121,14,9,0.13) 0%, rgba(255,40,0,0.15) 100%); border-right:1px solid rgba(121,14,9,0.10);}}
+        #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-fill {{background:linear-gradient(90deg, rgba(183,68,59,0.16) 0%, rgba(183,68,59,0.08) 100%); border-right-color:rgba(183,68,59,0.12);}}
+        #{table_id} .ff-data-bar-text {{position:relative; z-index:1; display:flex; align-items:center; justify-content:flex-end; height:100%; padding:0 5px; font-size:10.7px; color:#2F3747; letter-spacing:-0.04em; font-weight:600; text-shadow:0 1px 0 rgba(255,255,255,0.75);}}
+        #{table_id} .mom-pill {{display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:2px 4px; border-radius:3px; font-size:10.7px; font-weight:650; letter-spacing:0.02em; border:1px solid rgba(100,116,139,0.14); background:rgba(255,255,255,0.70); box-shadow:inset 0 1px 0 rgba(255,255,255,0.88);}}
+        #{table_id} .mom-up {{color:#14532D; border-color:rgba(20,83,45,0.16); background:linear-gradient(180deg, rgba(240,253,244,0.90) 0%, rgba(255,255,255,0.70) 100%);}}
+        #{table_id} .mom-down {{color:#991B1B; border-color:rgba(153,27,27,0.16); background:linear-gradient(180deg, rgba(254,242,242,0.90) 0%, rgba(255,255,255,0.72) 100%);}}
+        #{table_id} .mom-flat {{color:#334155; border-color:rgba(100,116,139,0.16); background:linear-gradient(180deg, rgba(248,250,252,0.92) 0%, rgba(255,255,255,0.72) 100%);}}
+        #{table_id} ::-webkit-scrollbar {{height:10px; width:10px;}}
+        #{table_id} ::-webkit-scrollbar-thumb {{background:linear-gradient(180deg, rgba(121,14,9,0.34), rgba(121,14,9,0.20)); border-radius:999px; border:2px solid rgba(255,248,247,0.92);}}
+        #{table_id} ::-webkit-scrollbar-track {{background:rgba(121,14,9,0.04);}}
+      </style>
+      {observacao}
+      <div class="ff-table-box">
+        <table>
+          {colgroup_html}
+          <thead>
+            <tr>
+              <th class="ff-sticky">Indicador / Origem</th>
+              {cabecalhos_meses}
+              <th>MoM</th>
+            </tr>
+          </thead>
+          <tbody>
+            {''.join(linhas_html)}
+          </tbody>
+        </table>
+      </div>
+      <script>
+        (function() {{
+          const root = document.getElementById({table_id!r});
+          if (!root) return;
+          root.querySelectorAll('.ff-toggle[data-target]').forEach((btn) => {{
+            btn.addEventListener('click', () => {{
+              const target = btn.getAttribute('data-target');
+              const children = root.querySelectorAll(`[data-parent-row="${{target}}"]`);
+              const expanded = btn.getAttribute('data-expanded') === 'true';
+              children.forEach((row) => {{ row.style.display = expanded ? 'none' : ''; }});
+              btn.setAttribute('data-expanded', expanded ? 'false' : 'true');
+              btn.textContent = expanded ? '+' : '−';
+            }});
+          }});
+        }})();
+      </script>
+    </div>
+    '''
+
+
+def _preparar_base_mes_funil_segmentado_fixa(
+    df_funil: pd.DataFrame,
+    origens_sel: list[str] | None = None,
+    canais_entrada_sel: list[str] | None = None,
+    indicadores_sel: list[str] | None = None,
+    qtd_meses: int | None = None
+) -> tuple[pd.DataFrame, dict[int, str], int | None, list[int], int | None]:
+    base_vazia = (pd.DataFrame(), {}, None, [], None)
+    if df_funil is None or df_funil.empty:
+        return base_vazia
+
+    base = df_funil.copy()
+    if origens_sel:
+        base = base[base['ORIGEM_AGG'].isin(origens_sel)].copy()
+    if canais_entrada_sel and 'CANAL_ENTRADA' in base.columns:
+        base = base[base['CANAL_ENTRADA'].isin(canais_entrada_sel)].copy()
+    if indicadores_sel:
+        base = base[base['INDICADOR'].isin(indicadores_sel)].copy()
+    if base.empty:
+        return base_vazia
+
+    if qtd_meses is None:
+        meses_ordem = sorted(base['MES_ANO_ORDEM'].dropna().astype(int).unique().tolist())
+    else:
+        meses_ordem = _calcular_janela_meses_funil_fixa(base, qtd_meses=qtd_meses)
+    if not meses_ordem:
+        return base_vazia
+
+    mapa_meses = (
+        base[['MES_ANO_ORDEM', 'MES_ANO']]
+        .drop_duplicates()
+        .sort_values(['MES_ANO_ORDEM', 'MES_ANO'])
+        .drop_duplicates(subset=['MES_ANO_ORDEM'], keep='last')
+    )
+    mapa_ordem_rotulo = {
+        int(linha['MES_ANO_ORDEM']): str(linha['MES_ANO']).strip().upper()
+        for _, linha in mapa_meses.iterrows()
+    }
+    mes_tend_ordem = _obter_mes_tend_funil_fixa(base)
+
+    agg = (
+        base.groupby(['SEGMENTO', 'INDICADOR', 'INDICADOR_ORDEM', 'MES_ANO_ORDEM'], as_index=False, observed=True)['QTDE']
+        .sum()
+    )
+    if agg.empty:
+        return base_vazia
+
+    tabela = agg.pivot_table(
+        index=['SEGMENTO', 'INDICADOR', 'INDICADOR_ORDEM'],
+        columns='MES_ANO_ORDEM',
+        values='QTDE',
+        aggfunc='sum',
+        fill_value=0.0
+    )
+    tabela = tabela.reindex(columns=meses_ordem, fill_value=0.0)
+
+    mes_atual_ordem = meses_ordem[-1]
+    meses_mm3 = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
+    aplicar_mm3 = bool(meses_mm3 and (mes_tend_ordem is None or int(mes_atual_ordem) != int(mes_tend_ordem)))
+    if aplicar_mm3:
+        tabela[mes_atual_ordem] = tabela[meses_mm3].mean(axis=1)
+
+    base_mes = (
+        tabela.reset_index()
+        .melt(
+            id_vars=['SEGMENTO', 'INDICADOR', 'INDICADOR_ORDEM'],
+            value_vars=meses_ordem,
+            var_name='MES_ANO_ORDEM',
+            value_name='QTDE'
+        )
+    )
+    base_mes['MES_ANO_ORDEM'] = normalizar_numerico_serie(base_mes['MES_ANO_ORDEM']).fillna(0).astype(int)
+    base_mes['QTDE'] = normalizar_numerico_serie(base_mes['QTDE']).fillna(0.0)
+    return base_mes, mapa_ordem_rotulo, mes_atual_ordem, (meses_mm3 if aplicar_mm3 else []), mes_tend_ordem
+
+
+def _resolver_mes_ordem_funil_segmentado_fixa(
+    mapa_ordem_rotulo: dict[int, str],
+    mes_ref,
+    fallback_ordem: int | None = None
+) -> int | None:
+    if not mapa_ordem_rotulo:
+        return fallback_ordem
+
+    mes_norm = normalizar_chave_visual(str(mes_ref or ""))
+    for mes_ordem, rotulo in mapa_ordem_rotulo.items():
+        if normalizar_chave_visual(rotulo) == mes_norm:
+            return int(mes_ordem)
+
+    try:
+        mes_num = int(float(mes_ref))
+        if mes_num in mapa_ordem_rotulo:
+            return mes_num
+    except Exception:
+        pass
+
+    return fallback_ordem
+
+
+def _formatar_valor_real_funil_segmentado(indicador: str, valor: float) -> str:
+    valor_num = float(pd.to_numeric(pd.Series([valor]), errors='coerce').fillna(0.0).iloc[0])
+    if normalizar_chave_visual(indicador) == 'investimento':
+        return f"R$ {formatar_numero_brasileiro(valor_num, 0)}"
+    return formatar_numero_brasileiro(valor_num, 0)
+
+
+def _formatar_percentual_step_funil_segmentado(
+    valor_atual: float,
+    valor_anterior: float | None,
+    valor_base_primeiro_step: float | None = None
+) -> str:
+    atual = float(pd.to_numeric(pd.Series([valor_atual]), errors='coerce').fillna(0.0).iloc[0])
+    if valor_anterior is None:
+        if valor_base_primeiro_step is None:
+            return ''
+        base_primeiro = float(pd.to_numeric(pd.Series([valor_base_primeiro_step]), errors='coerce').fillna(0.0).iloc[0])
+        if base_primeiro <= 0:
+            return 'n/d'
+        percentual_primeiro = (atual / base_primeiro) * 100.0
+        return f"{formatar_numero_brasileiro(percentual_primeiro, 1)}%"
+
+    anterior = float(pd.to_numeric(pd.Series([valor_anterior]), errors='coerce').fillna(0.0).iloc[0])
+    if anterior <= 0:
+        return 'n/d'
+
+    percentual = (atual / anterior) * 100.0
+    return f"{formatar_numero_brasileiro(percentual, 1)}%"
+
+
+def _gerar_larguras_visuais_funil_segmentado(qtd_etapas: int) -> list[float]:
+    if qtd_etapas <= 0:
+        return []
+    if qtd_etapas == 1:
+        return [100.0]
+    return np.linspace(100.0, 40.0, qtd_etapas).tolist()
+
+
+def criar_grafico_funil_segmentado_fixa(
+    df_funil: pd.DataFrame,
+    mes_ref: str,
+    origens_sel: list[str] | None = None,
+    canais_entrada_sel: list[str] | None = None,
+    indicadores_sel: list[str] | None = None
+) -> tuple[go.Figure, str]:
+    figura_vazia = go.Figure()
+    if df_funil is None or df_funil.empty:
+        return figura_vazia, ''
+
+    indicadores_plot = [
+        label for _, label, _ in FUNIL_FIXA_INDICADORES_CONFIG
+        if (not indicadores_sel) or (label in indicadores_sel)
+    ]
+    if not indicadores_plot:
+        return figura_vazia, ''
+
+    base_mes, mapa_ordem_rotulo, mes_atual_ordem, meses_mm3, mes_tend_ordem = _preparar_base_mes_funil_segmentado_fixa(
+        df_funil=df_funil,
+        origens_sel=origens_sel,
+        canais_entrada_sel=canais_entrada_sel,
+        indicadores_sel=indicadores_sel,
+        qtd_meses=None
+    )
+    if base_mes.empty or not mapa_ordem_rotulo:
+        return figura_vazia, ''
+
+    mes_ref_ordem = _resolver_mes_ordem_funil_segmentado_fixa(
+        mapa_ordem_rotulo=mapa_ordem_rotulo,
+        mes_ref=mes_ref,
+        fallback_ordem=mes_atual_ordem
+    )
+    if mes_ref_ordem is None:
+        return figura_vazia, ''
+
+    base_mes = base_mes[base_mes['MES_ANO_ORDEM'].eq(int(mes_ref_ordem))].copy()
+    if base_mes.empty:
+        return figura_vazia, ''
+
+    base_mes['SEGMENTO'] = base_mes['SEGMENTO'].astype(str).str.strip()
+    base_mes['INDICADOR'] = base_mes['INDICADOR'].astype(str).str.strip()
+
+    base_skeleton = pd.MultiIndex.from_product(
+        [['PME', 'PF'], indicadores_plot],
+        names=['SEGMENTO', 'INDICADOR']
+    ).to_frame(index=False)
+    base_skeleton['INDICADOR_ORDEM'] = base_skeleton['INDICADOR'].map(
+        {label: ordem for _, label, ordem in FUNIL_FIXA_INDICADORES_CONFIG}
+    ).fillna(999.0)
+
+    base_plot = base_skeleton.merge(
+        base_mes[['SEGMENTO', 'INDICADOR', 'QTDE']],
+        on=['SEGMENTO', 'INDICADOR'],
+        how='left'
+    )
+    base_plot['QTDE'] = normalizar_numerico_serie(base_plot['QTDE']).fillna(0.0)
+    base_plot['INDICADOR_NORM'] = base_plot['INDICADOR'].apply(normalizar_chave_visual)
+    total_investimento_mes = float(
+        pd.to_numeric(
+            base_plot.loc[base_plot['INDICADOR_NORM'].eq('investimento'), 'QTDE'],
+            errors='coerce'
+        ).fillna(0.0).sum()
+    )
+
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        specs=[[{'type': 'funnel'}, {'type': 'funnel'}]],
+        horizontal_spacing=0.12,
+        subplot_titles=('PME', 'PF')
+    )
+
+    segmentos_plot = [
+        (1, 'PME', '#790E09', 'rgba(121,14,9,0.16)', '#FFFFFF'),
+        (2, 'PF', '#AEAFAF', 'rgba(174,175,175,0.28)', '#312B2A'),
+    ]
+
+    for coluna_ref, segmento_ref, cor_ref, cor_conector, cor_texto in segmentos_plot:
+        df_seg = (
+            base_plot[base_plot['SEGMENTO'].eq(segmento_ref)]
+            .sort_values(['INDICADOR_ORDEM', 'INDICADOR'])
+            .copy()
+        )
+        valores = []
+        textos = []
+        customdata = []
+        larguras_visuais = _gerar_larguras_visuais_funil_segmentado(len(df_seg))
+        valores_reais = df_seg['QTDE'].astype(float).tolist()
+        valor_anterior_real = None
+        etapa_anterior = ''
+
+        for idx_seg, (_, linha_seg) in enumerate(df_seg.iterrows()):
+            indicador_ref = str(linha_seg.get('INDICADOR', '')).strip()
+            valor_real = float(linha_seg.get('QTDE', 0.0))
+            valor_rotulo = _formatar_valor_real_funil_segmentado(indicador_ref, valor_real)
+            indicador_norm = normalizar_chave_visual(indicador_ref)
+            eh_primeiro_step_investimento = valor_anterior_real is None and indicador_norm == 'investimento'
+            percentual_step = _formatar_percentual_step_funil_segmentado(
+                valor_real,
+                valor_anterior_real,
+                valor_base_primeiro_step=total_investimento_mes if eh_primeiro_step_investimento else None
+            )
+
+            largura_plot = float(larguras_visuais[idx_seg]) if valor_real > 0 else 0.0
+            valores.append(largura_plot)
+            texto_label = valor_rotulo if not percentual_step else f"{valor_rotulo} | {percentual_step}"
+            if percentual_step:
+                if eh_primeiro_step_investimento:
+                    texto_hover_step = f"<br><b>% do investimento total do mês:</b> {percentual_step}"
+                elif etapa_anterior:
+                    texto_hover_step = f"<br><b>% vs etapa anterior ({etapa_anterior}):</b> {percentual_step}"
+                else:
+                    texto_hover_step = ""
+            else:
+                texto_hover_step = ""
+            textos.append(texto_label)
+            customdata.append([
+                segmento_ref,
+                valor_rotulo,
+                percentual_step,
+                etapa_anterior,
+                texto_hover_step,
+            ])
+
+            valor_anterior_real = valor_real
+            etapa_anterior = indicador_ref
+
+        fig.add_trace(go.Funnel(
+            name=segmento_ref,
+            y=df_seg['INDICADOR'].tolist(),
+            x=valores,
+            text=textos,
+            textinfo='text',
+            textposition='auto',
+            textfont=dict(size=14, color=cor_texto, family='Segoe UI'),
+            marker=dict(
+                color=cor_ref,
+                line=dict(color='rgba(255,255,255,0.96)', width=1.2)
+            ),
+            connector=dict(
+                line=dict(color=cor_conector, width=1.0)
+            ),
+            opacity=0.98,
+            customdata=customdata,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "<b>Etapa:</b> %{y}<br>"
+                "<b>Valor:</b> %{customdata[1]}%{customdata[4]}<extra></extra>"
+            )
+        ), row=1, col=coluna_ref)
+
+        if sum(valores_reais) <= 0:
+            x_pos = 0.22 if segmento_ref == 'PME' else 0.78
+            fig.add_annotation(
+                x=x_pos,
+                y=0.5,
+                xref='paper',
+                yref='paper',
+                text='Sem dados',
+                showarrow=False,
+                font=dict(size=12, color='#6B5C59', family='Segoe UI')
+            )
+
+    fig.update_layout(
+        paper_bgcolor='#FFFFFF',
+        plot_bgcolor='#FFFFFF',
+        margin=dict(l=16, r=16, t=58, b=14),
+        height=max(540, 56 * len(indicadores_plot)),
+        showlegend=False,
+        funnelgap=0.08,
+        funnelmode='overlay',
+        uniformtext=dict(minsize=12, mode='hide'),
+        hoverlabel=dict(
+            bgcolor='white',
+            bordercolor='#E2E8F0',
+            font_size=12,
+            font_family='Segoe UI',
+            font_color='#2F3747'
+        )
+    )
+    fig.update_yaxes(
+        tickfont=dict(size=14, color='#000000', family='Segoe UI'),
+        showticklabels=True
+    )
+    fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+    for anotacao in fig.layout.annotations:
+        texto_anotacao = normalizar_chave_visual(getattr(anotacao, 'text', ''))
+        if texto_anotacao == 'pme':
+            anotacao.font = dict(size=19, family='Sora', color='#201717')
+            anotacao.bgcolor = 'rgba(121,14,9,0.08)'
+            anotacao.bordercolor = 'rgba(121,14,9,0.18)'
+            anotacao.borderwidth = 1
+            anotacao.borderpad = 5
+            anotacao.yshift = 4
+        elif texto_anotacao == 'pf':
+            anotacao.font = dict(size=19, family='Sora', color='#201717')
+            anotacao.bgcolor = 'rgba(148,163,184,0.18)'
+            anotacao.bordercolor = 'rgba(107,114,128,0.22)'
+            anotacao.borderwidth = 1
+            anotacao.borderpad = 5
+            anotacao.yshift = 4
+        else:
+            anotacao.font = dict(size=15, family='Segoe UI', color='#312B2A')
+
+    observacao_mm3 = ''
+    if mes_tend_ordem is not None and int(mes_ref_ordem) == int(mes_tend_ordem):
+        meses_ref_tend = sorted(
+            [m for m in mapa_ordem_rotulo.keys() if int(m) < int(mes_tend_ordem)]
+        )[-3:]
+        meses_base = ', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_ref_tend) if meses_ref_tend else ''
+        complemento = f" pela proporcao media dos ultimos 3 meses ({meses_base})." if meses_base else '.'
+        observacao_mm3 = (
+            f"O mes {mapa_ordem_rotulo.get(int(mes_ref_ordem), str(mes_ref_ordem))} foi carregado pelo arquivo de tend"
+            f"{complemento}"
+        )
+    elif mes_atual_ordem is not None and int(mes_ref_ordem) == int(mes_atual_ordem) and meses_mm3:
+        meses_base = ', '.join(mapa_ordem_rotulo.get(m, str(m)) for m in meses_mm3)
+        observacao_mm3 = (
+            f"O mes {mapa_ordem_rotulo.get(int(mes_ref_ordem), str(mes_ref_ordem))} foi ajustado pela media "
+            f"movel dos ultimos {len(meses_mm3)} meses ({meses_base})."
+        )
+
+    return fig, observacao_mm3
+
+
+@fragmento_dashboard
+def render_visual_funil_fixa_ecommerce() -> None:
+    funil_path = resolver_arquivo_dashboard(
+        FUNIL_FIXA_FILE_PATH,
+        'base_funil_ecomm_fixa.xlsx',
+        DASHBOARD_LEGACY_MOBILITY_DIR / 'base_funil_ecomm_fixa.xlsx'
+    )
+    funil_path = funil_path if Path(funil_path).exists() else None
+    tend_path = resolver_arquivo_dashboard(
+        TEND_FUNIL_FIXA_FILE_PATH,
+        'tend_funil_ecom.xlsx',
+        DASHBOARD_LEGACY_MOBILITY_DIR / 'tend_funil_ecom.xlsx'
+    )
+    tend_path = tend_path if Path(tend_path).exists() else None
+
+    st.markdown(
+        build_visual_title_html(
+            'FUNIL DE VENDAS - E-COMMERCE',
+            'cart',
+            subtitle='Acompanhamento da jornada do cliente no e-commerce da Fixa.'
+        ),
+        unsafe_allow_html=True
+    )
+
+    if funil_path is None:
+        st.warning('Arquivo do FUNIL FIXA não encontrado no caminho configurado.')
+        st.code(str(FUNIL_FIXA_FILE_PATH))
+        return
+
+    funil_mtime = Path(funil_path).stat().st_mtime if Path(funil_path).exists() else None
+    tend_mtime = Path(tend_path).stat().st_mtime if tend_path is not None and Path(tend_path).exists() else None
+    df_funil = load_funil_fixa_ecommerce_data(
+        str(funil_path),
+        funil_mtime,
+        str(tend_path) if tend_path is not None else None,
+        tend_mtime
+    )
+    if df_funil.empty:
+        st.warning('Não foi possível carregar dados válidos do funil FIXA/E-Commerce.')
+        return
+
+    segmentos_disp = [
+        segmento for segmento in ['PF', 'PME']
+        if segmento in set(df_funil['SEGMENTO'].dropna().astype(str).str.strip().unique().tolist())
+    ]
+    opcoes_segmento = ['Todos'] + segmentos_disp
+    indice_padrao_segmento = opcoes_segmento.index('PME') if 'PME' in opcoes_segmento else 0
+    meses_funil_disp = (
+        df_funil[['MES_ANO_ORDEM', 'MES_ANO']]
+        .drop_duplicates()
+        .sort_values(['MES_ANO_ORDEM', 'MES_ANO'])
+        .drop_duplicates(subset=['MES_ANO_ORDEM'], keep='last')
+    )
+    meses_funil_labels = meses_funil_disp['MES_ANO'].astype(str).str.strip().str.lower().tolist()
+    mapa_mes_funil_ordem = {
+        str(linha['MES_ANO']).strip().lower(): int(linha['MES_ANO_ORDEM'])
+        for _, linha in meses_funil_disp.iterrows()
+    }
+    mes_funil_default = meses_funil_labels[-1] if meses_funil_labels else get_mes_atual_formatado().strip().lower()
+
+    col_f1, col_f2, col_f3, col_f4 = st.columns([0.9, 1.05, 1.2, 0.95], gap="medium")
+
+    with col_f1:
+        render_filter_label('Segmento')
+        segmento_sel = st.selectbox(
+            'Filtro de segmento do funil fixa',
+            options=opcoes_segmento,
+            index=indice_padrao_segmento,
+            key='funil_fixa_segmento_v2',
+            label_visibility='collapsed'
+        )
+
+    base_origem_ref = (
+        df_funil.copy()
+        if segmento_sel == 'Todos'
+        else df_funil[df_funil['SEGMENTO'].astype(str).eq(str(segmento_sel))].copy()
+    )
+    origens_disp = sorted(base_origem_ref['ORIGEM_AGG'].dropna().astype(str).str.strip().unique().tolist())
+    opcoes_origem = ['Todos'] + origens_disp
+    with col_f2:
+        render_filter_label('Origem')
+        origem_sel = st.selectbox(
+            'Filtro de origem do funil fixa',
+            options=opcoes_origem,
+            index=0,
+            key='funil_fixa_origem_v2',
+            label_visibility='collapsed'
+        )
+
+    base_canal_entrada_ref = (
+        base_origem_ref.copy()
+        if origem_sel == 'Todos'
+        else base_origem_ref[base_origem_ref['ORIGEM_AGG'].astype(str).eq(str(origem_sel))].copy()
+    )
+    canais_entrada_disp = (
+        sorted(base_canal_entrada_ref['CANAL_ENTRADA'].dropna().astype(str).str.strip().unique().tolist())
+        if 'CANAL_ENTRADA' in base_canal_entrada_ref.columns
+        else []
+    )
+    opcoes_canal_entrada = ['Todos'] + canais_entrada_disp
+    with col_f3:
+        render_filter_label('CANAL DE ENTRADA')
+        canal_entrada_sel = st.selectbox(
+            'Filtro de canal de entrada do funil fixa',
+            options=opcoes_canal_entrada,
+            index=0,
+            key='funil_fixa_canal_entrada_v1',
+            label_visibility='collapsed'
+        )
+    with col_f4:
+        render_filter_label('Mês do gráfico')
+        mes_grafico_sel = st.selectbox(
+            'Filtro de mês do gráfico do funil fixa',
+            options=meses_funil_labels,
+            index=meses_funil_labels.index(mes_funil_default) if mes_funil_default in meses_funil_labels else 0,
+            key='funil_fixa_mes_grafico_v1',
+            label_visibility='collapsed'
+        )
+
+    segmentos_sel = None if segmento_sel == 'Todos' else [segmento_sel]
+    origens_sel = None if origem_sel == 'Todos' else [origem_sel]
+    canais_entrada_sel = None if canal_entrada_sel == 'Todos' else [canal_entrada_sel]
+    indicadores_sel = None
+    mes_ref_ordem_sel = mapa_mes_funil_ordem.get(str(mes_grafico_sel).strip().lower())
+
+    estrutura = montar_estrutura_funil_fixa_ecommerce(
+        df_funil=df_funil,
+        segmentos_sel=segmentos_sel,
+        origens_sel=origens_sel,
+        canais_entrada_sel=canais_entrada_sel,
+        indicadores_sel=indicadores_sel,
+        mes_ref_ordem=mes_ref_ordem_sel,
+        qtd_meses=13
+    )
+
+    if not estrutura.get('rows'):
+        st.info('Sem dados para os filtros selecionados.')
+        return
+
+    altura_tabela = max(520, 118 + 36 * len(estrutura.get('rows', [])))
+    altura_corpo_tabela = min(max(altura_tabela - 84, 360), 840)
+    html_tabela = criar_tabela_html_funil_fixa_ecommerce(
+        estrutura,
+        table_id='funil-fixa-ecommerce',
+        max_body_height=altura_corpo_tabela
+    )
+    components.html(
+        html_tabela,
+        height=min(altura_corpo_tabela + 52, 900),
+        scrolling=False
+    )
+
+    st.markdown(
+        build_visual_title_html(
+            'FUNIL POR SEGMENTO - PME X PF',
+            'cart',
+            'subsection-title',
+            subtitle=f"MÊS: {str(mes_grafico_sel).upper()}",
+            extra_style='margin-top:-10px;'
+        ),
+        unsafe_allow_html=True
+    )
+    fig_funil_segmentado, observacao_funil_segmentado = criar_grafico_funil_segmentado_fixa(
+        df_funil=df_funil,
+        mes_ref=mes_grafico_sel,
+        origens_sel=origens_sel,
+        canais_entrada_sel=canais_entrada_sel,
+        indicadores_sel=indicadores_sel
+    )
+    if not fig_funil_segmentado.data:
+        st.info('Sem dados disponíveis para montar o gráfico do funil no mês selecionado.')
+    else:
+        st.plotly_chart(
+            fig_funil_segmentado,
+            width='stretch',
+            config={'displayModeBar': False, 'displaylogo': False}
+        )
+
+
+@fragmento_dashboard
+def render_bloco_backlog_fixa_pme() -> None:
+    st.markdown(
+        build_visual_title_html(
+            "BACKLOG FIXA PME - CONTRATOS POR CANAL E MÊS",
+            "grid",
+            "subsection-title",
+            extra_style="margin-top:18px;"
+        ),
+        unsafe_allow_html=True
+    )
+
+    backlog_path = resolver_arquivo_dashboard(
+        BACKLOG_CONSOLIDADO_FILE_PATH,
+        "backlog_consolidado.csv",
+        DASHBOARD_APP_DIR / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
+    )
+    backlog_path = backlog_path if Path(backlog_path).exists() else None
+
+    if backlog_path is None:
+        st.info("Arquivo `backlog_consolidado.csv` não encontrado no caminho configurado.")
+        return
+
+    backlog_mtime = Path(backlog_path).stat().st_mtime if Path(backlog_path).exists() else None
+    df_backlog_consolidado = load_backlog_consolidado_data(str(backlog_path), backlog_mtime)
+    tabela_backlog_fmt, tabela_backlog_num = montar_tabela_backlog_canais(df_backlog_consolidado)
+
+    if tabela_backlog_fmt.empty:
+        st.info("Sem dados disponíveis para montar a tabela de backlog.")
+    else:
+        st.markdown(
+            criar_tabela_html_backlog_canais(
+                df_formatado=tabela_backlog_fmt,
+                df_numerico=tabela_backlog_num,
+                table_id="tabela-funil-fixa-backlog-fixa-pme"
+            ),
+            unsafe_allow_html=True
+        )
+
+    if "NOME_OS_TIPO_STATUS_AGENDA" not in df_backlog_consolidado.columns:
+        return
+
+    st.markdown(
+        build_visual_title_html(
+            "BACKLOG - STATUS DE AGENDA",
+            "trend",
+            "subsection-title",
+            extra_style="margin-top:18px;"
+        ),
+        unsafe_allow_html=True
+    )
+
+    meses_backlog_status = sorted(
+        df_backlog_consolidado["MES_ANO"].dropna().astype(str).str.strip().str.lower().unique().tolist(),
+        key=mes_ano_para_data
+    )
+    canais_backlog_status = sorted(
+        df_backlog_consolidado["NM_CANAL_VENDA_SUBGRUPO"].dropna().astype(str).str.strip().unique().tolist()
+    )
+    regionais_backlog_status = sorted(
+        df_backlog_consolidado["NM_REGIONAL"].dropna().astype(str).str.strip().unique().tolist()
+    )
+    mes_backlog_status_default = (
+        get_mes_atual_formatado().strip().lower()
+        if get_mes_atual_formatado().strip().lower() in meses_backlog_status
+        else (meses_backlog_status[-1] if meses_backlog_status else get_mes_atual_formatado().strip().lower())
+    )
+
+    col_backlog_status_mes, col_backlog_status_canal, col_backlog_status_regional = st.columns([0.85, 1.25, 1.35], gap="medium")
+    with col_backlog_status_mes:
+        render_filter_label("MÊS")
+        mes_backlog_status_sel = st.selectbox(
+            "Selecione o mês do backlog por status",
+            options=meses_backlog_status or [mes_backlog_status_default],
+            index=(meses_backlog_status.index(mes_backlog_status_default) if mes_backlog_status_default in meses_backlog_status else 0),
+            key="backlog_status_mes",
+            label_visibility="collapsed"
+        )
+    with col_backlog_status_canal:
+        render_filter_label("CANAL")
+        canal_backlog_status_sel = st.selectbox(
+            "Selecione o canal do backlog por status",
+            options=["Todos", *canais_backlog_status],
+            index=0,
+            key="backlog_status_canal",
+            label_visibility="collapsed"
+        )
+    with col_backlog_status_regional:
+        render_filter_label("REGIONAL")
+        regional_backlog_status_sel = st.selectbox(
+            "Selecione a regional do backlog por status",
+            options=["Todos", *regionais_backlog_status],
+            index=0,
+            key="backlog_status_regional",
+            label_visibility="collapsed"
+        )
+
+    fig_backlog_status = criar_grafico_cascata_backlog_status(
+        df_backlog=df_backlog_consolidado,
+        mes_ref=mes_backlog_status_sel,
+        canal_ref=canal_backlog_status_sel,
+        regional_ref=regional_backlog_status_sel
+    )
+    if not fig_backlog_status.data:
+        st.info("Sem dados disponíveis para montar o gráfico de status de agenda.")
+    else:
+        st.plotly_chart(
+            fig_backlog_status,
+            width='stretch',
+            config={'displayModeBar': 'hover', 'displaylogo': False}
+        )
+
+
+@fragmento_dashboard
+def render_bloco_migracoes_pme() -> None:
+    st.markdown(
+        build_visual_title_html(
+            "MIGRAÇÕES PME - QTDE POR REGIONAL E MÊS",
+            "grid",
+            "subsection-title",
+            extra_style="margin-top:18px;"
+        ),
+        unsafe_allow_html=True
+    )
+
+    migracoes_path = resolver_arquivo_dashboard(
+        ANALITICO_MIGRACOES_FILE_PATH,
+        "ANALITICO_MIGRACOES_fev26.xlsx"
+    )
+    migracoes_path = migracoes_path if Path(migracoes_path).exists() else None
+
+    if migracoes_path is None:
+        st.info("Arquivo `ANALITICO_MIGRACOES_fev26.xlsx` não encontrado no caminho configurado.")
+        return
+
+    migracoes_mtime = Path(migracoes_path).stat().st_mtime if Path(migracoes_path).exists() else None
+    df_migracoes_pme = load_migracoes_pme_data(str(migracoes_path), migracoes_mtime)
+
+    if df_migracoes_pme.empty:
+        st.info("Sem dados disponíveis para montar a tabela de Migrações PME.")
+        return
+
+    opcoes_mes_mom_migracoes, mes_tend_migracoes = obter_meses_mom_migracoes(df_migracoes_pme)
+    if not opcoes_mes_mom_migracoes:
+        st.info("Sem meses disponíveis para montar a tabela de Migrações PME.")
+        tabela_migracoes_fmt, tabela_migracoes_num = pd.DataFrame(), pd.DataFrame()
+    else:
+        col_mig_mes_mom, col_mig_mes_spacer = st.columns([0.85, 2.65], gap="medium")
+        with col_mig_mes_mom:
+            render_filter_label("Mês MoM")
+            mes_migracoes_mom_ref = st.selectbox(
+                "Selecione o mês de referência do MoM de Migrações PME",
+                options=opcoes_mes_mom_migracoes,
+                index=max(len(opcoes_mes_mom_migracoes) - 1, 0),
+                key="funil_movel_migracoes_pme_mes_mom",
+                label_visibility="collapsed",
+                format_func=lambda mes: (
+                    f"{str(mes).upper()} (TEND.)"
+                    if str(mes).strip().lower() == str(mes_tend_migracoes).strip().lower()
+                    else str(mes).upper()
+                )
+            )
+        with col_mig_mes_spacer:
+            st.empty()
+
+        tabela_migracoes_fmt, tabela_migracoes_num = montar_tabela_migracoes_pme_regionais(
+            df_migracoes_pme,
+            mes_mom_ref=mes_migracoes_mom_ref
+        )
+
+    if tabela_migracoes_fmt.empty:
+        st.info("Sem dados disponíveis para montar a tabela de Migrações PME.")
+    else:
+        st.markdown(
+            criar_tabela_html_migracoes_regionais(
+                df_formatado=tabela_migracoes_fmt,
+                df_numerico=tabela_migracoes_num,
+                table_id="tabela-analitico-migracoes-pme"
+            ),
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        build_visual_title_html(
+            "MIGRAÇÕES PME - EVOLUÇÃO MENSAL",
+            "trend",
+            "subsection-title",
+            extra_style="margin-top:14px;"
+        ),
+        unsafe_allow_html=True
+    )
+
+    if tabela_migracoes_num.empty:
+        st.info("Sem dados disponíveis para montar o gráfico mensal de Migrações PME.")
+        return
+
+    regionais_migracoes_disp = [
+        regional for regional in tabela_migracoes_num["REGIONAL"].astype(str).tolist()
+        if str(regional).strip().upper() != "TOTAL"
+    ]
+    opcoes_regional_migracoes = ["Todos"] + regionais_migracoes_disp
+
+    col_mig_filtro, col_mig_spacer = st.columns([0.95, 2.55], gap="medium")
+    with col_mig_filtro:
+        render_filter_label("Regional")
+        regional_migracoes_ref = st.selectbox(
+            "Selecione a regional de Migrações PME",
+            options=opcoes_regional_migracoes,
+            index=0,
+            key="funil_movel_migracoes_pme_regional",
+            label_visibility="collapsed"
+        )
+    with col_mig_spacer:
+        st.empty()
+
+    serie_grafico_migracoes = montar_serie_grafico_migracoes_pme(
+        tabela_migracoes_num,
+        regional_ref=regional_migracoes_ref
+    )
+    if serie_grafico_migracoes.empty:
+        st.info("Sem dados disponíveis para montar o gráfico mensal de Migrações PME.")
+    else:
+        fig_migracoes_mensal = criar_grafico_migracoes_pme_mensal(
+            serie_grafico_migracoes,
+            regional_ref=regional_migracoes_ref
+        )
+        st.plotly_chart(
+            fig_migracoes_mensal,
+            width="stretch",
+            config={"displayModeBar": False, "displaylogo": False}
+        )
+
+
 @fragmento_dashboard
 def render_bloco_cotacoes_funil_movel() -> None:
     cotacoes_path = resolver_arquivo_dashboard(
@@ -14224,7 +15177,6 @@ def render_bloco_cotacoes_funil_movel() -> None:
         cotacoes_mtime,
         COTACOES_CACHE_VERSION
     )
-    st.session_state["df_cotacoes_base"] = df_cotacoes_base_movel
 
     if df_cotacoes_tabela_movel is not None and not getattr(df_cotacoes_tabela_movel, "empty", True):
         st.markdown(
@@ -14236,7 +15188,7 @@ def render_bloco_cotacoes_funil_movel() -> None:
             st.info("Sem dados disponíveis para montar a tabela mensal de COTAÇÕES.")
         else:
             st.markdown(
-                criar_tabela_html_tabela_mensal_canais(
+                criar_tabela_html_backlog_canais(
                     df_formatado=tabela_cotacoes_fmt,
                     df_numerico=tabela_cotacoes_num,
                     table_id="tabela-funil-movel-cotacoes-valor-mensal"
@@ -14245,9 +15197,18 @@ def render_bloco_cotacoes_funil_movel() -> None:
             )
             st.caption("Tabela consolidada por canal e mês, sem aplicar o filtro de regional.")
 
-    base_funil_cotacoes = st.session_state.get("base_funil_cotacoes")
+    base_funil_cotacoes = globals().get("df_perf_base", pd.DataFrame())
     if base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True):
-        base_funil_cotacoes = st.session_state.get("df_perf_base", pd.DataFrame())
+        perf_path_obj = Path(BASE_PERFORMANCE_FILE_PATH)
+        perf_mtime = perf_path_obj.stat().st_mtime if perf_path_obj.exists() else None
+        base_funil_cotacoes = load_base_performance_data(str(BASE_PERFORMANCE_FILE_PATH), perf_mtime)
+    if (base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True)) and "preparar_base_performance" in globals():
+        try:
+            df_origem_principal = globals().get("df", pd.DataFrame())
+            if df_origem_principal is not None and not getattr(df_origem_principal, "empty", True):
+                base_funil_cotacoes = preparar_base_performance(df_origem_principal)
+        except Exception:
+            base_funil_cotacoes = pd.DataFrame()
 
     if (
         base_funil_cotacoes is None or getattr(base_funil_cotacoes, "empty", True) or
@@ -14344,10 +15305,9 @@ def render_bloco_cotacoes_funil_movel() -> None:
             unsafe_allow_html=True
         )
 
-file_path = str(RAW_PRIMARY_BASE_FILE_PATH)
+file_path = str(PRIMARY_BASE_FILE_PATH)
 file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
 df = load_data(file_path, file_mtime)
-st.session_state["df_base_principal"] = df
 
 validate_data(df)
 
@@ -14429,55 +15389,64 @@ def aplicar_filtros_globais(
         mask &= df_base['DSC_INDICADOR'].isin(set(indicadores)).to_numpy()
     return df_base.loc[mask]
 
-def obter_payload_filtros_globais_session(
-    df_base: pd.DataFrame,
+def aplicar_filtros_globais_cached(
+    _df_base: pd.DataFrame,
     file_mtime_ref: float | None,
     regionais: tuple[str, ...],
     canais: tuple[str, ...],
     periodos: tuple[str, ...],
     indicadores: tuple[str, ...],
-) -> dict[str, pd.DataFrame]:
-    """Mantém um único payload filtrado da sidebar em sessão para reutilização nas abas."""
+    incluir_periodo: bool = True
+) -> pd.DataFrame:
+    """Memoiza filtros globais por sessão sem serializar o DataFrame inteiro."""
     cache_key = (
         file_mtime_ref,
         tuple(regionais),
         tuple(canais),
         tuple(periodos),
         tuple(indicadores),
+        bool(incluir_periodo),
     )
-    estado = st.session_state.get("_dashboard_global_filter_payload")
-    if isinstance(estado, dict) and estado.get("key") == cache_key:
-        return estado
+    cache = st.session_state.setdefault("_dashboard_filtros_globais_cache", OrderedDict())
+    if not isinstance(cache, OrderedDict):
+        cache = OrderedDict(cache)
 
-    payload = {
-        "key": cache_key,
-        "df_filtrado": aplicar_filtros_globais(
-            df_base,
-            list(regionais),
-            list(canais),
-            list(periodos),
-            list(indicadores),
-            incluir_periodo=True,
-        ),
-        "df_filtrado_sem_periodo": aplicar_filtros_globais(
-            df_base,
-            list(regionais),
-            list(canais),
-            list(periodos),
-            list(indicadores),
-            incluir_periodo=False,
-        ),
-        "df_cards_base_global": aplicar_filtros_globais(
-            df_base,
-            list(regionais),
-            list(canais),
-            list(periodos),
-            [],
-            incluir_periodo=False,
-        ),
-    }
-    st.session_state["_dashboard_global_filter_payload"] = payload
-    return payload
+    if cache_key in cache:
+        resultado_cache = cache.pop(cache_key)
+        cache[cache_key] = resultado_cache
+        st.session_state["_dashboard_filtros_globais_cache"] = cache
+        return resultado_cache.copy(deep=False)
+
+    resultado = aplicar_filtros_globais(
+        _df_base,
+        list(regionais),
+        list(canais),
+        list(periodos),
+        list(indicadores),
+        incluir_periodo=incluir_periodo
+    )
+
+    memoria_resultado = 0
+    try:
+        memoria_resultado = int(resultado.memory_usage(index=True, deep=False).sum())
+    except Exception:
+        memoria_resultado = 0
+
+    reter_em_cache = (
+        resultado.empty or (
+            len(resultado) <= 75_000 and
+            memoria_resultado <= 12 * 1024 * 1024 and
+            (len(_df_base) == 0 or len(resultado) < int(len(_df_base) * 0.70))
+        )
+    )
+
+    if reter_em_cache:
+        cache[cache_key] = resultado
+        while len(cache) > CACHE_MAX_ENTRIES_FILTERS:
+            cache.popitem(last=False)
+        st.session_state["_dashboard_filtros_globais_cache"] = cache
+
+    return resultado.copy(deep=False)
 
 region_filter_key = tuple(str(item) for item in region_filter)
 canal_filter_key = tuple(str(item) for item in canal_filter)
@@ -14687,6 +15656,7 @@ st.markdown(
 st.markdown(
     """
     <style>
+    body .tabela-analitico-migracoes-pme-container,
     body .tabela-funil-movel-cotacoes-valor-mensal-container,
     body #tabela-funil-conta-cotacoes-ativacao.tabela-container-funil-cotacoes {
         border: 1px solid rgba(121, 14, 9, 0.18) !important;
@@ -14700,12 +15670,14 @@ st.markdown(
         display: none !important;
     }
 
+    body table.tabela-analitico-migracoes-pme,
     body table.tabela-funil-movel-cotacoes-valor-mensal,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes {
         background: #FFFFFF !important;
         box-shadow: none !important;
     }
 
+    body table.tabela-analitico-migracoes-pme th,
     body table.tabela-funil-movel-cotacoes-valor-mensal th,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th {
         background: #790E09 !important;
@@ -14714,12 +15686,15 @@ st.markdown(
         border-bottom: 1px solid rgba(61, 7, 4, 0.72) !important;
     }
 
+    body table.tabela-analitico-migracoes-pme th.col-tend,
+    body table.tabela-analitico-migracoes-pme th.col-mom,
     body table.tabela-funil-movel-cotacoes-valor-mensal th.col-total-mes,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th.col-var,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th.col-tend {
         background: #8E241D !important;
     }
 
+    body table.tabela-analitico-migracoes-pme td,
     body table.tabela-funil-movel-cotacoes-valor-mensal td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td {
         border-bottom: 1px solid #E6E6E6 !important;
@@ -14729,29 +15704,35 @@ st.markdown(
         text-shadow: none !important;
     }
 
+    body table.tabela-analitico-migracoes-pme th,
     body table.tabela-funil-movel-cotacoes-valor-mensal th,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes th,
+    body table.tabela-analitico-migracoes-pme td,
     body table.tabela-funil-movel-cotacoes-valor-mensal td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td {
         padding: 6px 5px !important;
     }
 
+    body table.tabela-analitico-migracoes-pme td,
     body table.tabela-funil-movel-cotacoes-valor-mensal td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td {
         font-size: clamp(10.5px, 0.72vw, 11.2px) !important;
         font-weight: 600 !important;
     }
 
+    body table.tabela-analitico-migracoes-pme tbody tr:nth-child(even) td,
     body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(even) td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr:nth-child(even) td {
         background: #FAFAFA !important;
     }
 
+    body table.tabela-analitico-migracoes-pme tbody tr:hover td,
     body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:hover td,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tbody tr:hover td {
         background: #FFF8F7 !important;
     }
 
+    body table.tabela-analitico-migracoes-pme td.col-regional,
     body table.tabela-funil-movel-cotacoes-valor-mensal td.col-canal,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td.col-etapa {
         box-shadow: none !important;
@@ -14759,6 +15740,7 @@ st.markdown(
         font-weight: 700 !important;
     }
 
+    body table.tabela-analitico-migracoes-pme .mom-chip-migracoes,
     body #tabela-funil-conta-cotacoes-ativacao .mom-chip-funil {
         background: transparent !important;
         border: none !important;
@@ -14768,10 +15750,12 @@ st.markdown(
         border-radius: 0 !important;
     }
 
+    body table.tabela-analitico-migracoes-pme td.col-valor::before,
     body table.tabela-funil-movel-cotacoes-valor-mensal td.col-valor::before {
         display: none !important;
     }
 
+    body table.tabela-analitico-migracoes-pme td.col-tend,
     body table.tabela-funil-movel-cotacoes-valor-mensal td.col-total-mes,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes td.col-tend {
         background: #F5F5F5 !important;
@@ -14779,11 +15763,13 @@ st.markdown(
         font-weight: 700 !important;
     }
 
+    body table.tabela-analitico-migracoes-pme tr.linha-total,
     body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total,
     body #tabela-funil-conta-cotacoes-ativacao .tabela-funil-cotacoes tr.linha-conversao-funil {
         border-top: 1px solid #D9D9D9 !important;
     }
 
+    body table.tabela-analitico-migracoes-pme tr.linha-total td,
     body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total td {
         background: linear-gradient(180deg, #790E09 0%, #4E0805 100%) !important;
         color: #FFFFFF !important;
@@ -14815,17 +15801,40 @@ with tab1:
             unsafe_allow_html=True
         )
 
-        filtros_globais_payload = obter_payload_filtros_globais_session(
+        ativados_path_obj = Path(ATIVADOS_FILE_PATH)
+        ativados_mtime = ativados_path_obj.stat().st_mtime if ativados_path_obj.exists() else None
+        df_ativados_source = load_ativados_dashboard_data(str(ATIVADOS_FILE_PATH), ativados_mtime)
+        if df_ativados_source.empty:
+            df_ativados_source = df
+        ativados_cache_ref = ativados_mtime if ativados_mtime is not None else file_mtime
+
+        df_filtered = aplicar_filtros_globais_cached(
             df,
             file_mtime,
             region_filter_key,
             canal_filter_key,
             data_filter_key,
             indicador_filter_key,
+            incluir_periodo=True
         )
-        df_filtered = filtros_globais_payload["df_filtrado"]
-        df_filtered_sem_periodo = filtros_globais_payload["df_filtrado_sem_periodo"]
-        df_cards_base_global = filtros_globais_payload["df_cards_base_global"]
+        df_filtered_sem_periodo = aplicar_filtros_globais_cached(
+            df,
+            file_mtime,
+            region_filter_key,
+            canal_filter_key,
+            data_filter_key,
+            indicador_filter_key,
+            incluir_periodo=False
+        )
+        df_cards_base_global = aplicar_filtros_globais_cached(
+            df,
+            file_mtime,
+            region_filter_key,
+            canal_filter_key,
+            data_filter_key,
+            tuple(),
+            incluir_periodo=False
+        )
 
         with st.container():
             meses_disponiveis_cards = df_filtered['dat_tratada'].unique()
@@ -15580,6 +16589,185 @@ with tab1:
     
         mes_selecionado = mes_selecionado_cards
     
+        df_mes_selecionado = df_filtered[df_filtered['dat_tratada'] == mes_selecionado]
+    
+        if False and not df_mes_selecionado.empty:
+            bar_data, canal_totals = create_bar_chart_data(df_mes_selecionado)
+        
+            produtos_disponiveis = sorted(bar_data['COD_PLATAFORMA'].dropna().unique().tolist())
+            produtos_prioridade = ['CONTA', 'FIXA']
+            produtos_ordenados = [p for p in produtos_prioridade if p in produtos_disponiveis] + [
+                p for p in produtos_disponiveis if p not in produtos_prioridade
+            ]
+
+            color_map = {
+                'CONTA': '#790E09',
+                'FIXA': '#475569',
+                'CLICK TO CALL': '#0F766E',
+                'N/D': '#9CA3AF'
+            }
+            cores_adicionais = ['#A23B36', '#7F1D1D', '#64748B', '#0F766E', '#9A3412']
+            for i, produto in enumerate(produtos_ordenados):
+                if produto not in color_map:
+                    color_map[produto] = cores_adicionais[i % len(cores_adicionais)]
+
+            df_stack = (
+                bar_data.pivot_table(
+                    index='CANAL_PLAN',
+                    columns='COD_PLATAFORMA',
+                    values='QTDE',
+                    aggfunc='sum',
+                    observed=True
+                )
+                .reindex(canal_totals.index)
+                .fillna(0)
+            )
+            canais_plot = df_stack.index.tolist()
+            max_total_canal = float(canal_totals.max()) if not canal_totals.empty else 0.0
+            limite_texto_segmento = max_total_canal * 0.12 if max_total_canal > 0 else 0
+
+            fig_bar = go.Figure()
+            for produto in produtos_ordenados:
+                if produto not in df_stack.columns:
+                    continue
+
+                valores_x = df_stack[produto].astype(float).tolist()
+                textos_segmento = []
+                customdata = []
+                for canal_nome, valor_seg in zip(canais_plot, valores_x):
+                    total_canal = float(canal_totals.get(canal_nome, 0) or 0)
+                    part_canal = (valor_seg / total_canal * 100) if total_canal > 0 else 0
+                    customdata.append([total_canal, part_canal])
+                    textos_segmento.append(
+                        formatar_numero_brasileiro(valor_seg, 0) if valor_seg >= limite_texto_segmento else ''
+                    )
+
+                fig_bar.add_trace(go.Bar(
+                    y=canais_plot,
+                    x=valores_x,
+                    name=produto,
+                    orientation='h',
+                    marker=dict(
+                        color=color_map.get(produto, '#6C757D'),
+                        line=dict(color='rgba(255,255,255,0.95)', width=1.2)
+                    ),
+                    text=textos_segmento,
+                    textposition='inside',
+                    insidetextanchor='middle',
+                    textfont=dict(size=11, color='white'),
+                    customdata=customdata,
+                    hovertemplate=(
+                        "<b>Canal:</b> %{y}<br>"
+                        f"<b>Produto:</b> {produto}<br>"
+                        "<b>Volume:</b> %{x:,.0f}<br>"
+                        "<b>Participação no canal:</b> %{customdata[1]:.1f}%<br>"
+                        "<extra></extra>"
+                    )
+                ))
+
+            total_geral = float(canal_totals.sum())
+            deslocamento_rotulo = max_total_canal * 0.025 if max_total_canal > 0 else 1
+            for canal_nome in canais_plot:
+                total_canal = float(canal_totals.get(canal_nome, 0) or 0)
+                percentual = (total_canal / total_geral * 100) if total_geral > 0 else 0
+                fig_bar.add_annotation(
+                    x=total_canal + deslocamento_rotulo,
+                    y=canal_nome,
+                    text=(
+                        f"<b>{formatar_numero_brasileiro(total_canal, 0)}</b>"
+                        f"<br><span style='font-size:11px;color:#6B7280;'>({percentual:.1f}%)</span>"
+                    ),
+                    showarrow=False,
+                    xanchor='left',
+                    yanchor='middle',
+                    align='left',
+                    font=dict(size=12, color='#2F3747')
+                )
+
+            eixo_x_max = max_total_canal * 1.24 if max_total_canal > 0 else 1
+            altura_base_bar = max(470, 66 * len(canais_plot) + 110)
+            altura_bar_reduzida = max(400, int(altura_base_bar * 0.85))
+            fig_bar.update_layout(
+                barmode='stack',
+                plot_bgcolor='#FFFFFF',
+                paper_bgcolor='#FFFFFF',
+                font=dict(family='Manrope', size=13, color='#2F3747'),
+                margin=dict(l=22, r=220, t=72, b=32),
+                height=altura_bar_reduzida,
+                xaxis=dict(
+                    title='',
+                    showgrid=False,
+                    showline=True,
+                    linecolor='#E9ECEF',
+                    linewidth=1.4,
+                    zeroline=False,
+                    showticklabels=False,
+                    range=[0, eixo_x_max]
+                ),
+                yaxis=dict(
+                    title='',
+                    showgrid=False,
+                    tickfont=dict(size=12, color='#4B5563'),
+                    ticksuffix='  ',
+                    categoryorder='array',
+                    categoryarray=canais_plot[::-1]
+                ),
+                legend=dict(
+                    title=dict(text='<b>PRODUTOS</b>', font=dict(size=12, color='#2F3747')),
+                    orientation='v',
+                    yanchor='top',
+                    y=1.0,
+                    xanchor='left',
+                    x=1.01,
+                    bgcolor='rgba(255,255,255,0.92)',
+                    bordercolor='#E9ECEF',
+                    borderwidth=1,
+                    font=dict(size=11, color='#2F3747'),
+                    traceorder='normal'
+                ),
+                title=dict(
+                    text=f"<b>DISTRIBUIÇÃO POR CANAL</b><br><span style='font-size:13px;color:#6B7280;'>Análise de {mes_selecionado}</span>",
+                    x=0.01,
+                    xanchor='left',
+                    y=0.97,
+                    yanchor='top'
+                ),
+                hovermode='y unified',
+                hoverlabel=dict(
+                    bgcolor='white',
+                    bordercolor='#E9ECEF',
+                    font_size=12,
+                    font_family='Segoe UI',
+                    font_color='#2F3747'
+                ),
+                bargap=0.36,
+                bargroupgap=0.08,
+                uniformtext_minsize=10,
+                uniformtext_mode='hide'
+            )
+
+            fig_bar.add_annotation(
+                xref='paper',
+                yref='paper',
+                x=1.0,
+                y=1.13,
+                xanchor='right',
+                yanchor='top',
+                text=(
+                    "<span style='font-size:10px;color:#6B7280;'>TOTAL GERAL</span><br>"
+                    f"<span style='font-size:22px;color:#790E09;'><b>{formatar_numero_brasileiro(total_geral, 0)}</b></span>"
+                ),
+                showarrow=False,
+                align='right',
+                bgcolor='rgba(248,249,250,0.92)',
+                bordercolor='#E9ECEF',
+                borderwidth=1,
+                borderpad=6
+            )
+        
+            apply_standard_title_style(fig_bar)
+            st.plotly_chart(fig_bar, width='stretch', config={'displayModeBar': 'hover', 'displaylogo': False})
+
         st.markdown(
             build_visual_title_html("CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL", "grid"),
             unsafe_allow_html=True
@@ -15776,9 +16964,8 @@ with tab1:
             return valor
     
         def formatar_percentual(valor):
-            valor_num = pd.to_numeric(pd.Series([valor]), errors='coerce').iloc[0]
-            if pd.notna(valor_num):
-                return f'{float(valor_num):+.1f}%'.replace('.', ',')
+            if isinstance(valor, (int, float)):
+                return f'{valor:+.1f}%'.replace('.', ',')
             return valor
     
         df_exibicao = df_final.copy()
@@ -16213,9 +17400,9 @@ with tab1:
                     classe = "col-tend"
                 elif 'Orç' in col and col != 'TEND vs ORÇ':
                     classe = "col-meta"
-                elif 'Alcance' in col or col == 'TEND vs ORÇ':
+                elif 'Alcance' in col:
                     classe = "col-alcance"
-                elif 'Var' in col or col == 'MOM':
+                elif 'Var' in col or col in {'MOM', 'TEND vs ORÇ'}:
                     classe = "col-variacao"
         
                 html += f'<th class="{classe}">{col}</th>'
@@ -16246,9 +17433,9 @@ with tab1:
                             classe_celula = "col-tend"
                         elif 'Orç' in col and col != 'TEND vs ORÇ':
                             classe_celula = "col-meta"
-                        elif 'Alcance' in col or col == 'TEND vs ORÇ':
+                        elif 'Alcance' in col:
                             classe_celula = "col-alcance"
-                        elif 'Var' in col or col == 'MOM':
+                        elif 'Var' in col or col in {'MOM', 'TEND vs ORÇ'}:
                             classe_celula = "col-variacao"
                     else:
                         if col == 'Regional':
@@ -16271,7 +17458,7 @@ with tab1:
                                 num_valor = float(valor_limpo)
                         
                                 if num_valor > 0:
-                                    if 'Alcance' in col or col == 'TEND vs ORÇ':
+                                    if 'Alcance' in col:
                                         classe_celula = "col-alcance percentual-positivo"
                                     else:
                                         classe_celula = "col-variacao percentual-positivo"
@@ -16279,7 +17466,7 @@ with tab1:
                                     if num_valor > 50:
                                         classe_celula += " performance-excelente"
                                 elif num_valor < 0:
-                                    if 'Alcance' in col or col == 'TEND vs ORÇ':
+                                    if 'Alcance' in col:
                                         classe_celula = "col-alcance percentual-negativo"
                                     else:
                                         classe_celula = "col-variacao percentual-negativo"
@@ -16287,12 +17474,12 @@ with tab1:
                                     if num_valor < -30:
                                         classe_celula += " performance-critica"
                                 else:
-                                    if 'Alcance' in col or col == 'TEND vs ORÇ':
+                                    if 'Alcance' in col:
                                         classe_celula = "col-alcance percentual-neutro"
                                     else:
                                         classe_celula = "col-variacao percentual-neutro"
                             except:
-                                if 'Alcance' in col or col == 'TEND vs ORÇ':
+                                if 'Alcance' in col:
                                     classe_celula = "col-alcance"
                                 else:
                                     classe_celula = "col-variacao"
@@ -16494,6 +17681,12 @@ with tab2:
         def load_desativados_data():
             """Carrega dados de desativados com tratamento especial"""
             try:
+                file_path = str(DESATIVADOS_FILE_PATH)
+                file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
+                df_desativados_pre = load_desativados_base_data(file_path, file_mtime)
+                if not df_desativados_pre.empty:
+                    return df_desativados_pre
+
                 file_path = str(CHURN_FILE_PATH)
                 file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else None
                 header_df = load_excel_cached(file_path, file_mtime, nrows=0)
@@ -16566,6 +17759,7 @@ with tab2:
                     ['COD_PLATAFORMA', 'REGIONAL', 'CANAL_PLAN', 'INADIMPLENTE', 'mes_ano']
                 )
                 del header_df, colunas_disponiveis, colunas_leitura
+                gc.collect()
              
                 return df_desativados
             
@@ -17713,59 +18907,63 @@ with tab3:
             unsafe_allow_html=True
         )
     
-        df_pedidos_base = df
+        pedidos_path_obj = Path(PEDIDOS_FILE_PATH)
+        pedidos_mtime = pedidos_path_obj.stat().st_mtime if pedidos_path_obj.exists() else None
+        df_pedidos = load_pedidos_dashboard_data(str(PEDIDOS_FILE_PATH), pedidos_mtime)
 
-        coluna_canal = 'CANAL_PLAN' if 'CANAL_PLAN' in df_pedidos_base.columns else ('DSC_CANAL' if 'DSC_CANAL' in df_pedidos_base.columns else None)
+        if df_pedidos.empty:
+            df_pedidos_base = df
+            coluna_canal = 'CANAL_PLAN' if 'CANAL_PLAN' in df_pedidos_base.columns else ('DSC_CANAL' if 'DSC_CANAL' in df_pedidos_base.columns else None)
 
-        if 'DSC_INDICADOR' not in df_pedidos_base.columns or coluna_canal is None:
-            st.error("❌ Base de pedidos sem colunas obrigatórias (DSC_INDICADOR/CANAL).")
-            df_pedidos = pd.DataFrame()
-        else:
-            indicador_norm = df_pedidos_base['DSC_INDICADOR'].astype(str).str.strip().str.upper()
-            canal_norm = df_pedidos_base[coluna_canal].astype(str).str.strip().str.upper()
-
-            mask_indicador = indicador_norm == 'PEDIDOS'
-            mask_canal = canal_norm == 'E-COMMERCE'
-
-            df_pedidos = df_pedidos_base.loc[mask_indicador & mask_canal].copy()
-
-            if 'REGIONAL' not in df_pedidos.columns and 'DSC_REGIONAL_CMV' in df_pedidos.columns:
-                df_pedidos['REGIONAL'] = df_pedidos['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
-            elif 'REGIONAL' in df_pedidos.columns:
-                df_pedidos['REGIONAL'] = df_pedidos['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
-
-        if not df_pedidos.empty:
-            if 'DAT_MOVIMENTO2' in df_pedidos.columns:
-                if not pd.api.types.is_datetime64_any_dtype(df_pedidos['DAT_MOVIMENTO2']):
-                    df_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_pedidos['DAT_MOVIMENTO2'], errors='coerce')
-            elif 'PERIODO' in df_pedidos.columns:
-                df_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_pedidos['PERIODO'], errors='coerce')
+            if 'DSC_INDICADOR' not in df_pedidos_base.columns or coluna_canal is None:
+                st.error("❌ Base de pedidos sem colunas obrigatórias (DSC_INDICADOR/CANAL).")
+                df_pedidos = pd.DataFrame()
             else:
-                df_pedidos['DAT_MOVIMENTO2'] = pd.NaT
+                indicador_norm = df_pedidos_base['DSC_INDICADOR'].astype(str).str.strip().str.upper()
+                canal_norm = df_pedidos_base[coluna_canal].astype(str).str.strip().str.upper()
 
-            meses_pt = {
-                1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
-                7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
-            }
+                mask_indicador = indicador_norm == 'PEDIDOS'
+                mask_canal = canal_norm == 'E-COMMERCE'
 
-            def _fmt_mes_ano_pedidos(dt):
-                if pd.isna(dt):
-                    return None
-                return f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
+                df_pedidos = df_pedidos_base.loc[mask_indicador & mask_canal].copy()
 
-            df_pedidos['dat_tratada'] = df_pedidos['DAT_MOVIMENTO2'].apply(_fmt_mes_ano_pedidos)
-            df_pedidos = df_pedidos[df_pedidos['dat_tratada'].notna()].copy()
+                if 'REGIONAL' not in df_pedidos.columns and 'DSC_REGIONAL_CMV' in df_pedidos.columns:
+                    df_pedidos['REGIONAL'] = df_pedidos['DSC_REGIONAL_CMV'].astype(str).str.strip().str[:3].str.upper()
+                elif 'REGIONAL' in df_pedidos.columns:
+                    df_pedidos['REGIONAL'] = df_pedidos['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
 
-            if 'QTDE' not in df_pedidos.columns and 'QTDE_AJUSTADA' in df_pedidos.columns:
-                df_pedidos['QTDE'] = pd.to_numeric(df_pedidos['QTDE_AJUSTADA'], errors='coerce')
-            else:
-                df_pedidos['QTDE'] = pd.to_numeric(df_pedidos.get('QTDE', 0), errors='coerce')
+            if not df_pedidos.empty:
+                if 'DAT_MOVIMENTO2' in df_pedidos.columns:
+                    if not pd.api.types.is_datetime64_any_dtype(df_pedidos['DAT_MOVIMENTO2']):
+                        df_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_pedidos['DAT_MOVIMENTO2'], errors='coerce')
+                elif 'PERIODO' in df_pedidos.columns:
+                    df_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_pedidos['PERIODO'], errors='coerce')
+                else:
+                    df_pedidos['DAT_MOVIMENTO2'] = pd.NaT
 
-            df_pedidos['DESAFIO_QTD'] = pd.to_numeric(df_pedidos.get('DESAFIO_QTD', 0), errors='coerce')
-            df_pedidos['TEND_QTD'] = normalizar_numerico_serie(df_pedidos.get('TEND_QTD', df_pedidos['QTDE']))
-            df_pedidos['QTDE'] = df_pedidos['QTDE'].fillna(0)
-            df_pedidos['DESAFIO_QTD'] = df_pedidos['DESAFIO_QTD'].fillna(0)
-            df_pedidos['TEND_QTD'] = df_pedidos['TEND_QTD'].fillna(0)
+                meses_pt = {
+                    1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+                    7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+                }
+
+                def _fmt_mes_ano_pedidos(dt):
+                    if pd.isna(dt):
+                        return None
+                    return f"{meses_pt.get(dt.month, 'jan')}/{dt.strftime('%y')}"
+
+                df_pedidos['dat_tratada'] = df_pedidos['DAT_MOVIMENTO2'].apply(_fmt_mes_ano_pedidos)
+                df_pedidos = df_pedidos[df_pedidos['dat_tratada'].notna()].copy()
+
+                if 'QTDE' not in df_pedidos.columns and 'QTDE_AJUSTADA' in df_pedidos.columns:
+                    df_pedidos['QTDE'] = pd.to_numeric(df_pedidos['QTDE_AJUSTADA'], errors='coerce')
+                else:
+                    df_pedidos['QTDE'] = pd.to_numeric(df_pedidos.get('QTDE', 0), errors='coerce')
+
+                df_pedidos['DESAFIO_QTD'] = pd.to_numeric(df_pedidos.get('DESAFIO_QTD', 0), errors='coerce')
+                df_pedidos['TEND_QTD'] = normalizar_numerico_serie(df_pedidos.get('TEND_QTD', df_pedidos['QTDE']))
+                df_pedidos['QTDE'] = df_pedidos['QTDE'].fillna(0)
+                df_pedidos['DESAFIO_QTD'] = df_pedidos['DESAFIO_QTD'].fillna(0)
+                df_pedidos['TEND_QTD'] = df_pedidos['TEND_QTD'].fillna(0)
     
         if df_pedidos.empty:
             st.warning("⚠️ Não há dados de pedidos disponíveis para E-Commerce com os filtros atuais.")
@@ -18413,7 +19611,7 @@ with tab3:
                 )
 
             render_visual_funil_fixa_ecommerce()
-
+        
             container_evolucao_pedidos = st.container()
             st.markdown(build_visual_title_html("PEDIDOS POR REGIONAL", "grid"), unsafe_allow_html=True)
         
@@ -19709,7 +20907,6 @@ with tab4:
         with st.spinner('📥 Carregando dados REAIS de ligações...'):
             ligacoes_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
             df_lig = load_ligacoes_base(ligacoes_mtime)
-            st.session_state["df_lig"] = df_lig
     
         if df_lig.empty:
             st.error("""
@@ -19724,7 +20921,6 @@ with tab4:
     
         with st.spinner('🎯 Carregando ORÇAMENTOS de ligações...'):
             df_metas_lig = load_metas_ligacoes()
-            st.session_state["df_metas_lig"] = df_metas_lig
     
 
         def preparar_agregados_ligacoes_mensais(df_ligacoes: pd.DataFrame) -> pd.DataFrame:
@@ -19773,7 +20969,16 @@ with tab4:
             compactar_colunas_categoricas(df_saida, ['REGIONAL', 'mes_ano'])
             return df_saida
 
-        df_lig_agregado = preparar_agregados_ligacoes_mensais(df_lig)
+        ligacoes_agregado_path_obj = Path(LIGACOES_MENSAL_AGREGADO_FILE_PATH)
+        ligacoes_agregado_mtime = (
+            ligacoes_agregado_path_obj.stat().st_mtime if ligacoes_agregado_path_obj.exists() else None
+        )
+        df_lig_agregado = load_ligacoes_mensal_agregado_data(
+            str(LIGACOES_MENSAL_AGREGADO_FILE_PATH),
+            ligacoes_agregado_mtime
+        )
+        if df_lig_agregado.empty:
+            df_lig_agregado = preparar_agregados_ligacoes_mensais(df_lig)
     
         def calcular_total_ligacoes(df, mes, regional_filtro=None):
             """Calcula total de ligações para um mês específico"""
@@ -21394,9 +22599,8 @@ with tab4:
                         st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
 
 with tab5:
-    tab_funil_movel_contexto = True
-    if tab_funil_movel_contexto or tab_inicio_ativa:
-        if tab_funil_movel_contexto:
+    if tab_funil_movel_ativa or tab_inicio_ativa:
+        if tab_funil_movel_ativa:
             st.markdown(
                 build_visual_title_html(
                     "FUNIL MÓVEL",
@@ -21440,7 +22644,7 @@ with tab5:
             st.session_state[key] = valor
             return valor
 
-        if tab_funil_movel_contexto:
+        if tab_funil_movel_ativa:
             st.markdown(
                 """
                 <style>
@@ -21562,17 +22766,12 @@ with tab5:
             except Exception:
                 return mes_ref
 
-        @st.cache_data(ttl=1800, show_spinner=False, max_entries=2)
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
         def preparar_base_analitica(df_in: pd.DataFrame) -> pd.DataFrame:
             """Normaliza campos de uso recorrente para acelerar filtros/consultas no analítico."""
             if df_in is None or df_in.empty:
                 return pd.DataFrame()
-            colunas_base = [
-                'dat_tratada', 'DSC_INDICADOR', 'REGIONAL', 'CANAL_PLAN',
-                'COD_PLATAFORMA', 'DAT_MOVIMENTO2', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
-            ]
-            colunas_existentes = [col for col in colunas_base if col in df_in.columns]
-            df_work = df_in.loc[:, colunas_existentes].copy()
+            df_work = df_in.copy()
             for coluna in ['dat_tratada', 'DSC_INDICADOR', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']:
                 if coluna in df_work.columns:
                     df_work[coluna] = df_work[coluna].astype(str).str.strip()
@@ -21587,18 +22786,17 @@ with tab5:
                     df_work[coluna_num] = pd.to_numeric(df_work[coluna_num], errors='coerce').fillna(0.0)
                 else:
                     df_work[coluna_num] = 0.0
-            df_work['DSC_IND_NORM'] = (
-                normalizar_texto_series(df_work['DSC_INDICADOR'])
-                if 'DSC_INDICADOR' in df_work.columns
-                else ""
-            )
+            df_work['DSC_IND_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave) if 'DSC_INDICADOR' in df_work.columns else ""
             compactar_colunas_categoricas(
                 df_work,
                 ['dat_tratada', 'DSC_INDICADOR', 'DSC_IND_NORM', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']
             )
-            return df_work
+            df_saida = df_work
+            del df_in
+            gc.collect()
+            return df_saida
 
-        @st.cache_data(ttl=1800, show_spinner=False, max_entries=2)
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
         def preparar_base_necessidade_diaria(df_in: pd.DataFrame) -> pd.DataFrame:
             """Materializa apenas os campos usados na tabela de necessidade diária."""
             colunas_base = [
@@ -21630,25 +22828,20 @@ with tab5:
             )
             return df_work
 
-        @st.cache_data(ttl=1800, show_spinner=False, max_entries=2)
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
         def preparar_contexto_evolucao_semanal_analitico(df_base: pd.DataFrame):
             """Prepara a base e os metadados recorrentes usados na evolução semanal/resumo."""
             if df_base is None or df_base.empty:
                 return pd.DataFrame(), [], ["Todos"], ['CONTA', 'FIXA'], ["Todas"]
 
-            colunas_semanais = [
-                'dat_tratada', 'DAT_MOVIMENTO2', 'DSC_INDICADOR', 'DSC_IND_NORM',
-                'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
-            ]
-            colunas_existentes = [col for col in colunas_semanais if col in df_base.columns]
-            df_sem_base = df_base.loc[:, colunas_existentes].copy()
+            df_sem_base = df_base.copy()
             if 'DAT_MOVIMENTO2' in df_sem_base.columns and not pd.api.types.is_datetime64_any_dtype(df_sem_base['DAT_MOVIMENTO2']):
                 df_sem_base['DAT_MOVIMENTO2'] = pd.to_datetime(df_sem_base['DAT_MOVIMENTO2'], errors='coerce')
             elif 'DAT_MOVIMENTO2' not in df_sem_base.columns:
                 df_sem_base['DAT_MOVIMENTO2'] = pd.NaT
 
             if 'DSC_IND_NORM' not in df_sem_base.columns:
-                df_sem_base['DSC_IND_NORM'] = normalizar_texto_series(df_sem_base['DSC_INDICADOR'])
+                df_sem_base['DSC_IND_NORM'] = df_sem_base['DSC_INDICADOR'].apply(normalizar_texto_chave)
 
             df_sem_base['COD_PLATAFORMA'] = df_sem_base['COD_PLATAFORMA'].apply(normalizar_rotulo_produto)
             df_sem_base['QTDE'] = pd.to_numeric(df_sem_base.get('QTDE', 0), errors='coerce').fillna(0.0)
@@ -21668,9 +22861,10 @@ with tab5:
                 df_sem_base,
                 ['dat_tratada', 'DSC_INDICADOR', 'DSC_IND_NORM', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA']
             )
+            gc.collect()
             return df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem
 
-        @st.cache_data(ttl=1800, show_spinner=False, max_entries=2)
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
         def load_ligacoes_para_performance(ligacoes_mtime: float | None = None):
             colunas_saida = [
                 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
@@ -21684,18 +22878,8 @@ with tab5:
                 mask_fixa = df_lig['FLAG_FIXA'].astype(bool)
                 mask_conta = df_lig['TIPO_CHAMADA'].eq('DEMAIS')
 
-                colunas_base_lig = ['REGIONAL', 'CANAL_PLAN', 'DSC_INDICADOR', 'dat_tratada', 'QTDE', 'DESAFIO_QTD']
-                colunas_base_lig = [col for col in colunas_base_lig if col in df_lig.columns]
-                df_lig_fixa = df_lig.loc[mask_fixa, colunas_base_lig].copy()
-                df_lig_conta = df_lig.loc[mask_conta, colunas_base_lig].copy()
-                df_lig_fixa['COD_PLATAFORMA'] = 'FIXA'
-                df_lig_conta['COD_PLATAFORMA'] = 'CONTA'
-                df_lig_fixa['TEND_QTD'] = df_lig_fixa['QTDE']
-                df_lig_conta['TEND_QTD'] = df_lig_conta['QTDE']
-                if 'DESAFIO_QTD' not in df_lig_fixa.columns:
-                    df_lig_fixa['DESAFIO_QTD'] = 0.0
-                if 'DESAFIO_QTD' not in df_lig_conta.columns:
-                    df_lig_conta['DESAFIO_QTD'] = 0.0
+                df_lig_fixa = df_lig.loc[mask_fixa].assign(COD_PLATAFORMA='FIXA', TEND_QTD=lambda x: x['QTDE'])
+                df_lig_conta = df_lig.loc[mask_conta].assign(COD_PLATAFORMA='CONTA', TEND_QTD=lambda x: x['QTDE'])
 
                 df_lig_saida = pd.concat([df_lig_fixa, df_lig_conta], ignore_index=True, copy=False)[colunas_saida]
                 compactar_colunas_categoricas(
@@ -21703,11 +22887,12 @@ with tab5:
                     ['REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR', 'dat_tratada']
                 )
                 del df_lig, df_lig_fixa, df_lig_conta
+                gc.collect()
                 return df_lig_saida
             except Exception:
                 return pd.DataFrame(columns=colunas_saida)
 
-        @st.cache_data(ttl=1800, show_spinner=False, max_entries=2)
+        @st.cache_data(ttl=1800, show_spinner=False, max_entries=CACHE_MAX_ENTRIES_MEDIUM)
         def preparar_base_performance(df_base):
             colunas_saida = [
                 'REGIONAL', 'CANAL_PLAN', 'CANAL_NORM', 'COD_PLATAFORMA', 'PLATAFORMA_NORM',
@@ -21721,20 +22906,13 @@ with tab5:
             if not colunas_minimas.issubset(set(df_base.columns)):
                 return pd.DataFrame(columns=colunas_saida)
 
-            colunas_base_perf = [
-                'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA', 'DSC_INDICADOR',
-                'dat_tratada', 'QTDE', 'DESAFIO_QTD', 'TEND_QTD'
-            ]
-            colunas_existentes = [col for col in colunas_base_perf if col in df_base.columns]
-            df_work = df_base.loc[:, colunas_existentes].copy()
+            df_work = df_base.copy()
             df_work['REGIONAL'] = df_work['REGIONAL'].astype(str).str.strip().str[:3].str.upper()
             df_work['CANAL_PLAN'] = df_work['CANAL_PLAN'].astype(str).str.strip()
             df_work['COD_PLATAFORMA'] = df_work['COD_PLATAFORMA'].astype(str).str.strip().str.upper()
             df_work['DSC_INDICADOR'] = df_work['DSC_INDICADOR'].astype(str).str.strip()
             df_work['dat_tratada'] = df_work['dat_tratada'].astype(str).str.strip().str.lower()
-            df_work = df_work.loc[
-                df_work['dat_tratada'].str.match(r'^[a-z]{3}/\d{2}$', na=False)
-            ].reset_index(drop=True)
+            df_work = df_work[df_work['dat_tratada'].str.match(r'^[a-z]{3}/\d{2}$', na=False)].copy()
 
             if 'DESAFIO_QTD' not in df_work.columns:
                 df_work['DESAFIO_QTD'] = 0
@@ -21745,9 +22923,9 @@ with tab5:
             df_work['DESAFIO_QTD'] = normalizar_numerico_serie(df_work['DESAFIO_QTD']).fillna(0)
             df_work['TEND_QTD'] = normalizar_numerico_serie(df_work['TEND_QTD']).fillna(0)
 
-            df_work['CANAL_NORM'] = normalizar_texto_series(df_work['CANAL_PLAN'])
-            df_work['PLATAFORMA_NORM'] = normalizar_plataforma_series(df_work['COD_PLATAFORMA'])
-            df_work['INDICADOR_NORM'] = normalizar_texto_series(df_work['DSC_INDICADOR'])
+            df_work['CANAL_NORM'] = df_work['CANAL_PLAN'].apply(normalizar_texto_chave)
+            df_work['PLATAFORMA_NORM'] = df_work['COD_PLATAFORMA'].apply(normalizar_plataforma_chave)
+            df_work['INDICADOR_NORM'] = df_work['DSC_INDICADOR'].apply(normalizar_texto_chave)
             df_work['INDICADOR_CANONICO'] = df_work['INDICADOR_NORM'].apply(mapear_indicador_canonico)
             df_work['ANO_REF'] = df_work['dat_tratada'].str.split('/').str[1].fillna("")
 
@@ -21770,6 +22948,7 @@ with tab5:
                  'DSC_INDICADOR', 'INDICADOR_NORM', 'INDICADOR_CANONICO', 'dat_tratada', 'ANO_REF']
             )
             del df_work
+            gc.collect()
             return df_saida
 
         ligacoes_tend_override = {}
@@ -22532,10 +23711,20 @@ with tab5:
             partes.append("</div>")
             return "".join(partes)
 
-        df_perf_base = preparar_base_performance(df)
+        perf_base_path_obj = Path(BASE_PERFORMANCE_FILE_PATH)
+        perf_base_mtime = perf_base_path_obj.stat().st_mtime if perf_base_path_obj.exists() else None
+        df_perf_base = load_base_performance_data(str(BASE_PERFORMANCE_FILE_PATH), perf_base_mtime)
+        if df_perf_base.empty:
+            df_perf_base = preparar_base_performance(df)
         ligacoes_perf_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
-        df_lig_raw = load_ligacoes_para_performance(ligacoes_perf_mtime)
-        df_lig_perf = preparar_base_performance(df_lig_raw)
+        lig_perf_path_obj = Path(LIGACOES_PERFORMANCE_FILE_PATH)
+        lig_perf_mtime = lig_perf_path_obj.stat().st_mtime if lig_perf_path_obj.exists() else None
+        df_lig_perf = load_ligacoes_performance_data(str(LIGACOES_PERFORMANCE_FILE_PATH), lig_perf_mtime)
+        if df_lig_perf.empty:
+            df_lig_raw = load_ligacoes_para_performance(ligacoes_perf_mtime)
+            df_lig_perf = preparar_base_performance(df_lig_raw)
+        else:
+            df_lig_raw = pd.DataFrame()
 
         if not df_lig_perf.empty:
             base_ligacoes_origem = df_perf_base[
@@ -22607,158 +23796,152 @@ with tab5:
                 (df_perf_base['CANAL_NORM'] == 'TELEVENDAS RECEPTIVO')
             )
             df_perf_base = pd.concat([df_perf_base[~mask_remove_lig], df_lig_perf], ignore_index=True)
-        st.session_state["df_perf_base"] = df_perf_base
-        st.session_state["base_funil_cotacoes"] = df_perf_base
 
-        base_analitica = pd.DataFrame()
-        meses_analitico = []
-        regionais_analitico = ["Todas"]
-        canais_analitico = ["Todos"]
-        tem_meses_analitico = False
-        idx_mes_analitico = 0
-
-        if tab_inicio_ativa:
+        analitica_path_obj = Path(ANALITICA_DIARIA_FILE_PATH)
+        analitica_mtime = analitica_path_obj.stat().st_mtime if analitica_path_obj.exists() else None
+        base_analitica = load_analitica_diaria_data(str(ANALITICA_DIARIA_FILE_PATH), analitica_mtime)
+        if base_analitica.empty:
             base_analitica = preparar_base_analitica(df)
 
-            meses_analitico = sorted(
-                base_analitica['dat_tratada'].dropna().unique().tolist(),
-                key=mes_ano_para_data
-            )
-            regionais_analitico = ["Todas"] + sorted(base_analitica['REGIONAL'].dropna().unique().tolist())
-            canais_analitico = ["Todos"] + sorted(
-                base_analitica['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist()
-            )
-            st.session_state["meses_analitico"] = meses_analitico
-            st.session_state["regionais_analitico"] = regionais_analitico
-            st.session_state["canais_analitico"] = canais_analitico
+        meses_analitico = sorted(
+            base_analitica['dat_tratada'].dropna().unique().tolist(),
+            key=mes_ano_para_data
+        )
+        regionais_analitico = ["Todas"] + sorted(base_analitica['REGIONAL'].dropna().unique().tolist())
+        canais_analitico = ["Todos"] + sorted(
+            base_analitica['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist()
+        )
 
-            tem_meses_analitico = bool(meses_analitico)
-            if tem_meses_analitico:
-                mes_corrente_ref = get_mes_atual_formatado()
-                idx_mes_analitico = meses_analitico.index(mes_corrente_ref) if mes_corrente_ref in meses_analitico else len(meses_analitico) - 1
+        tem_meses_analitico = bool(meses_analitico)
+        if tem_meses_analitico:
+            mes_corrente_ref = get_mes_atual_formatado()
+            idx_mes_analitico = meses_analitico.index(mes_corrente_ref) if mes_corrente_ref in meses_analitico else len(meses_analitico) - 1
 
-            if not tem_meses_analitico:
-                if render_blocos_home_only_no_funil_movel:
-                    st.warning("Não há meses disponíveis para montar a tabela analítica.")
+        else:
+            idx_mes_analitico = 0
+
+        if not tem_meses_analitico:
+            if render_blocos_home_only_no_funil_movel:
+                st.warning("Não há meses disponíveis para montar a tabela analítica.")
+        else:
+            mes_resultado_default = meses_analitico[idx_mes_analitico]
+            regional_resultado_default = regionais_analitico[0]
+            if render_blocos_home_only_no_funil_movel:
+                st.markdown(
+                    build_visual_title_html("RESULTADO DOS CANAIS", "grid", "subsection-title", extra_style="margin-top:18px;"),
+                    unsafe_allow_html=True
+                )
+                col_res_a1, col_res_a2 = st.columns([1.1, 1.1])
+                with col_res_a1:
+                    render_filter_label("SELECIONE O MÊS")
+                    mes_resultado = st.selectbox(
+                        "Mês de referência",
+                        options=meses_analitico,
+                        index=idx_mes_analitico,
+                        key="analitico_resultado_mes_ref",
+                        label_visibility="collapsed"
+                    )
+                with col_res_a2:
+                    render_filter_label("REGIONAL")
+                    regional_resultado = st.selectbox(
+                        "Regional",
+                        options=regionais_analitico,
+                        index=0,
+                        key="analitico_resultado_regional_ref",
+                        label_visibility="collapsed"
+                    )
             else:
-                mes_resultado_default = meses_analitico[idx_mes_analitico]
-                regional_resultado_default = regionais_analitico[0]
+                mes_resultado = obter_valor_filtro_estado(
+                    "analitico_resultado_mes_ref",
+                    meses_analitico,
+                    mes_resultado_default
+                )
+                regional_resultado = obter_valor_filtro_estado(
+                    "analitico_resultado_regional_ref",
+                    regionais_analitico,
+                    regional_resultado_default
+                )
+
+            mes_resultado_m1 = get_mes_anterior(mes_resultado)
+            mes_resultado_m2 = get_mes_anterior(mes_resultado_m1)
+            base_resultado = base_analitica
+            if str(regional_resultado).strip() != "Todas":
+                regional_resultado_norm3 = str(regional_resultado).strip().upper()[:3]
+                base_resultado = base_resultado[
+                    base_resultado['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_resultado_norm3)
+                ]
+
+            if base_resultado.empty:
                 if render_blocos_home_only_no_funil_movel:
-                    st.markdown(
-                        build_visual_title_html("RESULTADO DOS CANAIS", "grid", "subsection-title", extra_style="margin-top:18px;"),
-                        unsafe_allow_html=True
-                    )
-                    col_res_a1, col_res_a2 = st.columns([1.1, 1.1])
-                    with col_res_a1:
-                        render_filter_label("SELECIONE O MÊS")
-                        mes_resultado = st.selectbox(
-                            "Mês de referência",
-                            options=meses_analitico,
-                            index=idx_mes_analitico,
-                            key="analitico_resultado_mes_ref",
-                            label_visibility="collapsed"
+                    st.warning("Sem dados para os filtros selecionados em RESULTADO DOS CANAIS.")
+            else:
+                def _montar_ctx_resultado_canais_home():
+                    resultados_html_local: dict[str, str] = {}
+                    for produto_resultado, table_id_resultado in [
+                        ('CONTA', 'tabela-analitico-resultado-canais-conta'),
+                        ('FIXA', 'tabela-analitico-resultado-canais-fixa')
+                    ]:
+                        tabela_resultado_canais = construir_tabela_resultado_canais(
+                            df_base=base_resultado,
+                            mes_ref=mes_resultado,
+                            produto_ref=produto_resultado
                         )
-                    with col_res_a2:
-                        render_filter_label("REGIONAL")
-                        regional_resultado = st.selectbox(
-                            "Regional",
-                            options=regionais_analitico,
-                            index=0,
-                            key="analitico_resultado_regional_ref",
-                            label_visibility="collapsed"
+                        tabela_resultado_canais_fmt = formatar_tabela_resultado_canais(
+                            df_tabela=tabela_resultado_canais,
+                            mes_ref=mes_resultado,
+                            mes_m1=mes_resultado_m1,
+                            mes_m2=mes_resultado_m2,
+                            produto_ref=produto_resultado,
+                            incluir_total=True
                         )
-                else:
-                    mes_resultado = obter_valor_filtro_estado(
-                        "analitico_resultado_mes_ref",
-                        meses_analitico,
-                        mes_resultado_default
-                    )
-                    regional_resultado = obter_valor_filtro_estado(
-                        "analitico_resultado_regional_ref",
-                        regionais_analitico,
-                        regional_resultado_default
-                    )
+                        tabela_resultado_canais_num = montar_tabela_resultado_canais_exibicao_numerica(
+                            df_tabela=tabela_resultado_canais,
+                            mes_ref=mes_resultado,
+                            mes_m1=mes_resultado_m1,
+                            mes_m2=mes_resultado_m2,
+                            produto_ref=produto_resultado,
+                            incluir_total=True
+                        )
+                        resultados_html_local[produto_resultado] = criar_tabela_html_resultado_canais(
+                            df_formatado=tabela_resultado_canais_fmt,
+                            df_numerico=tabela_resultado_canais_num,
+                            table_id=table_id_resultado
+                        )
+                    return resultados_html_local
 
-                mes_resultado_m1 = get_mes_anterior(mes_resultado)
-                mes_resultado_m2 = get_mes_anterior(mes_resultado_m1)
-                base_resultado = base_analitica
-                if str(regional_resultado).strip() != "Todas":
-                    regional_resultado_norm3 = str(regional_resultado).strip().upper()[:3]
-                    base_resultado = base_resultado[
-                        base_resultado['REGIONAL'].astype(str).str.strip().str.upper().str[:3].eq(regional_resultado_norm3)
-                    ]
+                resultados_html = obter_cache_session_dashboard(
+                    "home_resultado_canais_html_v2",
+                    (
+                        "resultado_canais",
+                        file_mtime,
+                        str(mes_resultado).strip().lower(),
+                        str(regional_resultado).strip().upper(),
+                    ),
+                    _montar_ctx_resultado_canais_home
+                )
+                home_inicio_ctx["resultado_conta"] = resultados_html.get("CONTA", "")
+                home_inicio_ctx["resultado_fixa"] = resultados_html.get("FIXA", "")
 
-                if base_resultado.empty:
-                    if render_blocos_home_only_no_funil_movel:
-                        st.warning("Sem dados para os filtros selecionados em RESULTADO DOS CANAIS.")
-                else:
-                    def _montar_ctx_resultado_canais_home():
-                        resultados_html_local: dict[str, str] = {}
-                        for produto_resultado, table_id_resultado in [
-                            ('CONTA', 'tabela-analitico-resultado-canais-conta'),
-                            ('FIXA', 'tabela-analitico-resultado-canais-fixa')
-                        ]:
-                            tabela_resultado_canais = construir_tabela_resultado_canais(
-                                df_base=base_resultado,
-                                mes_ref=mes_resultado,
-                                produto_ref=produto_resultado
+                if render_blocos_home_only_no_funil_movel:
+                    col_res_t1, col_res_t2 = st.columns(2, gap="medium")
+                    for col_ref, produto_resultado in [
+                        (col_res_t1, 'CONTA'),
+                        (col_res_t2, 'FIXA')
+                    ]:
+                        with col_ref:
+                            st.markdown(
+                                build_visual_title_html(
+                                    produto_resultado,
+                                    produto_resultado,
+                                    "subsection-title",
+                                    extra_style="margin-top:8px;"
+                                ),
+                                unsafe_allow_html=True
                             )
-                            tabela_resultado_canais_fmt = formatar_tabela_resultado_canais(
-                                df_tabela=tabela_resultado_canais,
-                                mes_ref=mes_resultado,
-                                mes_m1=mes_resultado_m1,
-                                mes_m2=mes_resultado_m2,
-                                produto_ref=produto_resultado,
-                                incluir_total=True
+                            st.markdown(
+                                resultados_html.get(produto_resultado, ""),
+                                unsafe_allow_html=True
                             )
-                            tabela_resultado_canais_num = montar_tabela_resultado_canais_exibicao_numerica(
-                                df_tabela=tabela_resultado_canais,
-                                mes_ref=mes_resultado,
-                                mes_m1=mes_resultado_m1,
-                                mes_m2=mes_resultado_m2,
-                                produto_ref=produto_resultado,
-                                incluir_total=True
-                            )
-                            resultados_html_local[produto_resultado] = criar_tabela_html_resultado_canais(
-                                df_formatado=tabela_resultado_canais_fmt,
-                                df_numerico=tabela_resultado_canais_num,
-                                table_id=table_id_resultado
-                            )
-                        return resultados_html_local
-
-                    resultados_html = obter_cache_session_dashboard(
-                        "home_resultado_canais_html_v2",
-                        (
-                            "resultado_canais",
-                            file_mtime,
-                            str(mes_resultado).strip().lower(),
-                            str(regional_resultado).strip().upper(),
-                        ),
-                        _montar_ctx_resultado_canais_home
-                    )
-                    home_inicio_ctx["resultado_conta"] = resultados_html.get("CONTA", "")
-                    home_inicio_ctx["resultado_fixa"] = resultados_html.get("FIXA", "")
-
-                    if render_blocos_home_only_no_funil_movel:
-                        col_res_t1, col_res_t2 = st.columns(2, gap="medium")
-                        for col_ref, produto_resultado in [
-                            (col_res_t1, 'CONTA'),
-                            (col_res_t2, 'FIXA')
-                        ]:
-                            with col_ref:
-                                st.markdown(
-                                    build_visual_title_html(
-                                        produto_resultado,
-                                        produto_resultado,
-                                        "subsection-title",
-                                        extra_style="margin-top:8px;"
-                                    ),
-                                    unsafe_allow_html=True
-                                )
-                                st.markdown(
-                                    resultados_html.get(produto_resultado, ""),
-                                    unsafe_allow_html=True
-                                )
             st.markdown(
                 build_visual_title_html(
                     "ATIVAÇÃO CONTA - MOTIVO DOS ATIVADOS",
@@ -22769,9 +23952,12 @@ with tab5:
                 unsafe_allow_html=True
             )
 
-            df_gross_motivo = preparar_base_gross_motivo_status(df)
+            df_gross_motivo = preparar_base_gross_motivo_status(
+                globals().get("df_ativados_source", df)
+            ) if tab_funil_movel_ativa else pd.DataFrame()
             if df_gross_motivo.empty:
-                st.info("Sem dados disponiveis para montar os graficos de ativacao por motivo.")
+                if tab_funil_movel_ativa:
+                    st.info("Sem dados disponiveis para montar os graficos de ativacao por motivo.")
             else:
                 meses_gross_motivo = sorted(
                     df_gross_motivo["dat_tratada"].dropna().astype(str).str.strip().unique().tolist(),
@@ -23091,8 +24277,9 @@ with tab5:
                                 config={"displayModeBar": False, "displaylogo": False}
                             )
 
-            render_bloco_migracoes_pme()
-            render_visual_funil_fixa_ecommerce()
+            if tab_funil_movel_ativa:
+                render_bloco_migracoes_pme()
+
 
         if not tab_inicio_ativa:
             pass
@@ -23100,10 +24287,6 @@ with tab5:
             st.info("Nao ha dados para montar a evolucao semanal.")
         else:
             df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica)
-            st.session_state["meses_disp_sem"] = meses_disp_sem
-            st.session_state["canais_disp_sem"] = canais_disp_sem
-            st.session_state["produtos_disp_sem"] = produtos_disp_sem
-            st.session_state["regionais_disp_sem"] = regionais_disp_sem
 
             if not meses_disp_sem:
                 if render_blocos_home_only_no_funil_movel:
@@ -23532,7 +24715,7 @@ with tab5:
                             def fallback_real_ligacoes_mes(mes_ref: str, produto_ref_local: str) -> float:
                                 try:
                                     produto_norm = normalizar_rotulo_produto(produto_ref_local)
-                                    df_lig_base = st.session_state.get('df_lig', pd.DataFrame())
+                                    df_lig_base = globals().get('df_lig', pd.DataFrame())
                                     if df_lig_base is None or getattr(df_lig_base, 'empty', True):
                                         return 0.0
                                     regional_ref = None if str(regional_sem_sel).strip() == 'Todas' else regional_sem_norm3
@@ -23549,7 +24732,7 @@ with tab5:
                                 meta_val = 0.0
                                 try:
                                     produto_norm = normalizar_rotulo_produto(produto_ref_local)
-                                    df_metas_base = st.session_state.get('df_metas_lig', pd.DataFrame())
+                                    df_metas_base = globals().get('df_metas_lig', pd.DataFrame())
                                     if df_metas_base is not None and not getattr(df_metas_base, 'empty', True):
                                         df_aux = df_metas_base.copy()
                                         if 'mes_ano' in df_aux.columns:
@@ -24576,8 +25759,6 @@ with tab5:
                 key=mes_ano_para_data
             )
             canal_disp_reg = ["Todos"] + sorted(df_reg_base['CANAL_PLAN'].dropna().unique().tolist())
-            st.session_state["meses_disp_reg"] = meses_disp_reg
-            st.session_state["canal_disp_reg"] = canal_disp_reg
 
             mes_reg_default = get_mes_atual_formatado() if get_mes_atual_formatado() in meses_disp_reg else (meses_disp_reg[-1] if meses_disp_reg else "")
             if render_blocos_home_only_no_funil_movel:
@@ -24633,7 +25814,7 @@ with tab5:
             def obter_meta_ligacoes_produto(mes_ref: str, regional_ref: str, produto_ref_local: str) -> float:
                 """Busca ORÇ de ligações por mês/regional/produto usando a base oficial de metas de ligações."""
                 try:
-                    df_meta_lig = st.session_state.get('df_metas_lig', pd.DataFrame())
+                    df_meta_lig = globals().get('df_metas_lig', pd.DataFrame())
                     if df_meta_lig is None or df_meta_lig.empty:
                         return 0.0
 
@@ -24677,7 +25858,7 @@ with tab5:
             def obter_tend_ligacoes_produto(mes_ref: str, regional_ref: str, produto_ref_local: str) -> float:
                 """Busca TEND de ligações por mês/regional/produto usando a base oficial de metas de ligações."""
                 try:
-                    df_meta_lig = st.session_state.get('df_metas_lig', pd.DataFrame())
+                    df_meta_lig = globals().get('df_metas_lig', pd.DataFrame())
                     if df_meta_lig is None or df_meta_lig.empty:
                         return 0.0
 
@@ -25290,7 +26471,54 @@ with tab5:
                 )
 
 with tab5:
-    render_bloco_cotacoes_funil_movel()
+    if tab_funil_movel_ativa:
+        render_bloco_cotacoes_funil_movel()
+
+    def build_home_source_filters_html(info_text: object, titulo: str = "Filtros de Origem") -> str:
+        partes = [
+            str(parte).strip()
+            for parte in str(info_text or "").split("|")
+            if str(parte).strip()
+        ]
+        if not partes:
+            return ""
+
+        chips = "".join(
+            f"""
+            <span style="
+                display:inline-flex;
+                align-items:center;
+                padding:0.34rem 0.72rem;
+                border-radius:999px;
+                border:1px solid rgba(121,14,9,0.16);
+                background:linear-gradient(135deg, rgba(121,14,9,0.09), rgba(121,14,9,0.03));
+                color:#6D201A;
+                font-size:12px;
+                font-weight:600;
+                line-height:1.1;
+                white-space:nowrap;
+            ">{escape(parte)}</span>
+            """
+            for parte in partes
+        )
+        return f"""
+        <div style="
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:8px;
+            margin:0.15rem 0 0.8rem 0;
+        ">
+            <span style="
+                font-size:11px;
+                font-weight:700;
+                text-transform:uppercase;
+                letter-spacing:0.08em;
+                color:#790E09;
+            ">{escape(str(titulo))}</span>
+            {chips}
+        </div>
+        """
 
     def render_home_synced_selectbox(
         filter_label_text: str,
@@ -25349,8 +26577,8 @@ with tab0:
             build_visual_title_html("RESULTADO DOS CANAIS", "grid", "subsection-title"),
             unsafe_allow_html=True
         )
-        meses_analitico_home = list(st.session_state.get("meses_analitico", []) or [])
-        regionais_analitico_home = list(st.session_state.get("regionais_analitico", []) or [])
+        meses_analitico_home = list(globals().get("meses_analitico", []) or [])
+        regionais_analitico_home = list(globals().get("regionais_analitico", []) or [])
         if meses_analitico_home and regionais_analitico_home:
             resultado_mes_default = st.session_state.get(
                 "analitico_resultado_mes_ref",
@@ -25400,10 +26628,10 @@ with tab0:
             build_visual_title_html("EVOLUÇÃO SEMANAL", "trend", "subsection-title", extra_style="margin-top:14px;"),
             unsafe_allow_html=True
         )
-        meses_sem_home = list(st.session_state.get("meses_disp_sem", []) or [])
-        canais_sem_home = list(st.session_state.get("canais_disp_sem", []) or [])
-        produtos_sem_home = list(st.session_state.get("produtos_disp_sem", []) or [])
-        regionais_sem_home = list(st.session_state.get("regionais_disp_sem", []) or [])
+        meses_sem_home = list(globals().get("meses_disp_sem", []) or [])
+        canais_sem_home = list(globals().get("canais_disp_sem", []) or [])
+        produtos_sem_home = list(globals().get("produtos_disp_sem", []) or [])
+        regionais_sem_home = list(globals().get("regionais_disp_sem", []) or [])
         if meses_sem_home and canais_sem_home and produtos_sem_home and regionais_sem_home:
             mes_sem_home_default = st.session_state.get("analitico_evolucao_semanal_mes", meses_sem_home[-1])
             canal_home_default = st.session_state.get(
@@ -25571,8 +26799,8 @@ with tab0:
             build_visual_title_html("PERFORMANCE POR REGIONAL - RESUMO DE INDICADORES", "grid", "subsection-title", extra_style="margin-top:14px;"),
             unsafe_allow_html=True
         )
-        meses_reg_home = list(st.session_state.get("meses_disp_reg", []) or [])
-        canais_reg_home = list(st.session_state.get("canal_disp_reg", []) or [])
+        meses_reg_home = list(globals().get("meses_disp_reg", []) or [])
+        canais_reg_home = list(globals().get("canal_disp_reg", []) or [])
         if meses_reg_home and canais_reg_home:
             canal_reg_home_default = st.session_state.get(
                 "reg_viz_canal",
@@ -25622,7 +26850,7 @@ with tab0:
             build_visual_title_html("NECESSIDADE DIÁRIA POR CANAL/PRODUTO", "target", "subsection-title", extra_style="margin-top:14px;"),
             unsafe_allow_html=True
         )
-        canais_analitico_home = list(st.session_state.get("canais_analitico", []) or [])
+        canais_analitico_home = list(globals().get("canais_analitico", []) or [])
         if meses_analitico_home and regionais_analitico_home and canais_analitico_home:
             canal_need_home_default = st.session_state.get(
                 "analitico_canal_ref",
@@ -25664,4 +26892,5 @@ with tab0:
             renderizar_html_otimizado(html_need_fixa_home)
         if not html_need_conta_home and not html_need_fixa_home:
             st.info("Os dados de NECESSIDADE DIÁRIA não estão disponíveis para a capa.")
+
 
