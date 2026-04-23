@@ -343,6 +343,16 @@ def compactar_colunas_categoricas(
             total = int(len(serie))
             nunique = int(serie.nunique(dropna=False))
             if total > 0 and nunique <= max(64, int(total * 0.50)):
+                # Evita atribuição direta de tipo categórico sobre colunas com
+                # StringDtype (pandas extension). Em versões recentes do pandas
+                # isso dispara um FutureWarning e será erro no futuro.
+                # Solução: garantir que a coluna alvo seja do tipo compatível
+                # (object) antes de atribuir a série categórica.
+                try:
+                    if pd.api.types.is_string_dtype(df[coluna]) and not isinstance(df[coluna].dtype, pd.CategoricalDtype):
+                        df[coluna] = df[coluna].astype(object)
+                except Exception:
+                    pass
                 df.loc[:, coluna] = serie.astype("category")
         except Exception:
             continue
@@ -4958,7 +4968,7 @@ def _carregar_dataframe_preprocessado(
     return df
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_ativados_dashboard_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     df = _carregar_dataframe_preprocessado(
         path,
@@ -4975,7 +4985,7 @@ def load_ativados_dashboard_data(path: str, file_mtime: float | None = None) -> 
     return df
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_base_performance_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -4997,7 +5007,7 @@ def load_base_performance_data(path: str, file_mtime: float | None = None) -> pd
     )
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -5019,7 +5029,7 @@ def load_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd
     )
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_ligacoes_mensal_agregado_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -5031,12 +5041,12 @@ def load_ligacoes_mensal_agregado_data(path: str, file_mtime: float | None = Non
     )
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_ligacoes_performance_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return load_base_performance_data(path, file_mtime)
 
 
-@st.cache_data(ttl=3600, show_spinner=False, max_entries=2, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_desativados_base_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     df = _carregar_dataframe_preprocessado(
         path,
@@ -16971,7 +16981,12 @@ with tab1:
         df_exibicao = df_final.copy()
         colunas_tend_arredondar = {col_atual_exib} if usar_coluna_tend else set()
         for col in df_exibicao.columns:
-            if col in colunas_tend_arredondar or str(col).strip().lower().startswith('tend '):
+            col_txt = str(col).strip()
+            col_txt_lower = col_txt.lower()
+            # 'Tend <mes>' deve ser formatado como número inteiro (ex.: 'Tend abr/26'),
+            # mas a coluna 'TEND vs ORÇ' contém percentuais (ex.: +12,3%) e não deve
+            # entrar na mesma regra. Excluímos qualquer coluna que contenha 'vs'.
+            if col in colunas_tend_arredondar or (col_txt_lower.startswith('tend ') and 'vs' not in col_txt_lower):
                 df_exibicao[col] = df_exibicao[col].apply(formatar_numero_inteiro)
             elif col not in ['Regional', 'MOM', 'TEND vs ORÇ']:
                 df_exibicao[col] = df_exibicao[col].apply(formatar_numero)
