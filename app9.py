@@ -187,6 +187,54 @@ def _desempacotar_item_cache_session(item):
         return item.get("value"), None
     return item, None
 
+
+_RUNTIME_CLEANUP_KEEP = {
+    "df",
+    "home_inicio_ctx",
+    "opcoes_filtros_globais",
+}
+
+
+def limpar_objetos_runtime_dashboard(*preservar_extra: str) -> None:
+    """Remove referências globais pesadas criadas durante o rerun.
+
+    Em scripts Streamlit, variáveis de topo continuam referenciadas após o
+    término do rerun. Limpar DataFrames e figuras já renderizados reduz o
+    crescimento de memória sem alterar a camada visual.
+    """
+    preservar = _RUNTIME_CLEANUP_KEEP.union(str(item) for item in preservar_extra)
+    removidos = 0
+    globais_ref = globals()
+
+    for nome, valor in list(globais_ref.items()):
+        if nome in preservar or nome.startswith("__"):
+            continue
+
+        remover = isinstance(valor, (pd.DataFrame, pd.Series, pd.Index, go.Figure))
+        if not remover and isinstance(valor, np.ndarray):
+            remover = bool(getattr(valor, "nbytes", 0) >= 64 * 1024)
+        if not remover and isinstance(valor, str):
+            nome_lower = nome.lower()
+            remover = (
+                len(valor) > SESSION_CACHE_MAX_TEXT_CHARS and
+                (
+                    nome_lower.startswith("html") or
+                    nome_lower.endswith("_html") or
+                    "tabela_html" in nome_lower
+                )
+            )
+
+        if remover:
+            try:
+                del globais_ref[nome]
+                removidos += 1
+            except Exception:
+                pass
+
+    if removidos:
+        gc.collect()
+
+
 def fragmento_dashboard(func=None, **fragment_kwargs):
     """Usa st.fragment quando disponível, mantendo fallback seguro para versões antigas."""
     decorator_fragmento = getattr(st, "fragment", None)
@@ -5126,7 +5174,7 @@ def load_ligacoes_performance_data(path: str, file_mtime: float | None = None) -
 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_evolucao_mensal_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
-    return _carregar_dataframe_preprocessado(
+    df_evolucao = _carregar_dataframe_preprocessado(
         path,
         file_mtime,
         required_cols={'Ano', 'Mês', 'Mês_Num', 'Valor', 'Tipo', 'Produto', 'Regional', 'Canal', 'Indicador'},
@@ -5134,6 +5182,30 @@ def load_evolucao_mensal_data(path: str, file_mtime: float | None = None) -> pd.
         numeric_cols=['Ano', 'Mês_Num', 'Valor'],
         category_cols=['Mês', 'Tipo', 'Produto', 'Regional', 'Canal', 'Indicador', 'Tipo_Chamada', 'Periodo']
     )
+    if df_evolucao.empty:
+        return df_evolucao
+
+    df_evolucao['Produto'] = df_evolucao['Produto'].astype(str).str.strip().apply(normalizar_rotulo_produto)
+    df_evolucao['Regional'] = df_evolucao['Regional'].astype(str).str.strip().str[:3].str.upper()
+    df_evolucao['Canal'] = df_evolucao['Canal'].astype(str).str.strip()
+    df_evolucao['Indicador'] = df_evolucao['Indicador'].astype(str).str.strip()
+    df_evolucao['Indicador_Chave'] = df_evolucao['Indicador'].map(normalizar_texto_chave).astype('string')
+    df_evolucao['Tipo'] = df_evolucao['Tipo'].astype(str).str.strip()
+    if 'Periodo' in df_evolucao.columns:
+        df_evolucao['Periodo'] = df_evolucao['Periodo'].astype(str).str.strip().str.lower()
+    else:
+        df_evolucao['Periodo'] = (
+            df_evolucao['Mês'].astype(str).str.strip().str.lower() + "/" +
+            df_evolucao['Ano'].astype(str).str[-2:]
+        )
+    if 'Tipo_Chamada' in df_evolucao.columns:
+        df_evolucao['Tipo_Chamada'] = df_evolucao['Tipo_Chamada'].astype(str).str.strip()
+
+    compactar_colunas_categoricas(
+        df_evolucao,
+        ['Mês', 'Tipo', 'Produto', 'Regional', 'Canal', 'Indicador', 'Indicador_Chave', 'Tipo_Chamada', 'Periodo']
+    )
+    return df_evolucao
 
 
 @st.cache_data(show_spinner=False, max_entries=6, persist="disk")
@@ -5151,41 +5223,33 @@ def load_evolucao_mensal(
     if df.empty:
         return df
 
-    df = df.copy()
-    df['Produto'] = df['Produto'].astype(str).str.strip().apply(normalizar_rotulo_produto)
-    df['Regional'] = df['Regional'].astype(str).str.strip().str[:3].str.upper()
-    df['Canal'] = df['Canal'].astype(str).str.strip()
-    df['Indicador'] = df['Indicador'].astype(str).str.strip()
-    df['Tipo'] = df['Tipo'].astype(str).str.strip()
-    if 'Periodo' in df.columns:
-        df['Periodo'] = df['Periodo'].astype(str).str.strip().str.lower()
-    else:
-        df['Periodo'] = df['Mês'].astype(str).str.strip().str.lower() + "/" + df['Ano'].astype(str).str[-2:]
-
-    if 'Tipo_Chamada' in df.columns:
-        df['Tipo_Chamada'] = df['Tipo_Chamada'].astype(str).str.strip()
+    mask = np.ones(len(df), dtype=bool)
 
     if produto != "Todas":
-        df = df[df['Produto'].eq(normalizar_rotulo_produto(produto))]
+        mask &= df['Produto'].eq(normalizar_rotulo_produto(produto)).to_numpy()
     if regional != "Todas":
-        df = df[df['Regional'].eq(str(regional).strip().upper()[:3])]
+        mask &= df['Regional'].eq(str(regional).strip().upper()[:3]).to_numpy()
     if canal != "Todos":
-        df = df[df['Canal'].eq(str(canal).strip())]
+        mask &= df['Canal'].eq(str(canal).strip()).to_numpy()
     if indicadores:
         indicadores_validos = {
             normalizar_texto_chave(item) for item in indicadores if str(item).strip()
         }
         if indicadores_validos:
-            df = df[df['Indicador'].map(normalizar_texto_chave).isin(indicadores_validos)]
+            coluna_indicador_chave = 'Indicador_Chave' if 'Indicador_Chave' in df.columns else 'Indicador'
+            if coluna_indicador_chave == 'Indicador_Chave':
+                mask &= df[coluna_indicador_chave].astype(str).isin(indicadores_validos).to_numpy()
+            else:
+                mask &= df[coluna_indicador_chave].map(normalizar_texto_chave).isin(indicadores_validos).to_numpy()
     if periodos:
         periodos_validos = {str(item).strip().lower() for item in periodos if str(item).strip()}
         if periodos_validos:
-            df = df[df['Periodo'].isin(periodos_validos)]
+            mask &= df['Periodo'].isin(periodos_validos).to_numpy()
     if tipo_chamada != "Todos" and 'Tipo_Chamada' in df.columns:
         tipo_ref = str(tipo_chamada).strip()
-        df = df[(df['Tipo'] != 'Real') | df['Tipo_Chamada'].eq(tipo_ref)]
+        mask &= ((df['Tipo'] != 'Real') | df['Tipo_Chamada'].eq(tipo_ref)).to_numpy()
 
-    return df
+    return df.loc[mask].copy(deep=False)
 
 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
@@ -15643,10 +15707,17 @@ validate_data(df)
 
 def obter_opcoes_filtros_globais_cached(_df_base: pd.DataFrame, file_mtime_ref: float | None) -> dict[str, list]:
     """Memoiza opções dos filtros gerais sem serializar a base."""
-    cache = st.session_state.setdefault("_dashboard_opcoes_filtros_cache", {})
+    agora = time.time()
+    cache = st.session_state.setdefault("_dashboard_opcoes_filtros_cache", OrderedDict())
+    if not isinstance(cache, OrderedDict):
+        cache = OrderedDict(cache)
     cache_key = file_mtime_ref
     if cache_key in cache:
-        return cache[cache_key]
+        opcoes_cache, ts_cache = _desempacotar_item_cache_session(cache.pop(cache_key))
+        if ts_cache is None or (agora - ts_cache) <= SESSION_CACHE_TTL_SECONDS:
+            cache[cache_key] = (opcoes_cache, agora)
+            st.session_state["_dashboard_opcoes_filtros_cache"] = cache
+            return opcoes_cache
 
     opcoes = {
         "regionais": _df_base["REGIONAL"].unique().tolist(),
@@ -15655,7 +15726,8 @@ def obter_opcoes_filtros_globais_cached(_df_base: pd.DataFrame, file_mtime_ref: 
         "indicadores": _df_base["DSC_INDICADOR"].unique().tolist(),
     }
     cache.clear()
-    cache[cache_key] = opcoes
+    cache[cache_key] = (opcoes, agora)
+    st.session_state["_dashboard_opcoes_filtros_cache"] = cache
     return opcoes
 
 opcoes_filtros_globais = obter_opcoes_filtros_globais_cached(df, file_mtime)
@@ -15748,11 +15820,14 @@ def aplicar_filtros_globais_cached(
             cache.pop(chave_existente, None)
 
     if cache_key in cache:
-        resultado_cache, ts_cache = _desempacotar_item_cache_session(cache.pop(cache_key))
+        indice_cache, ts_cache = _desempacotar_item_cache_session(cache.pop(cache_key))
         if ts_cache is None or (agora - ts_cache) <= SESSION_CACHE_TTL_SECONDS:
-            cache[cache_key] = (resultado_cache, agora)
+            cache[cache_key] = (indice_cache, agora)
             st.session_state["_dashboard_filtros_globais_cache"] = cache
-            return resultado_cache.copy(deep=False)
+            try:
+                return _df_base.loc[indice_cache].copy(deep=False)
+            except Exception:
+                pass
 
     resultado = aplicar_filtros_globais(
         _df_base,
@@ -15778,7 +15853,7 @@ def aplicar_filtros_globais_cached(
     )
 
     if reter_em_cache:
-        cache[cache_key] = (resultado, agora)
+        cache[cache_key] = (resultado.index.copy(), agora)
         while len(cache) > CACHE_MAX_ENTRIES_FILTERS:
             cache.popitem(last=False)
         st.session_state["_dashboard_filtros_globais_cache"] = cache
@@ -17661,7 +17736,13 @@ with tab1:
             return html
 
         if not df_exibicao.empty:
-            st.markdown(criar_tabela_html(df_exibicao), unsafe_allow_html=True)
+            html_tabela_ativados = obter_cache_session_dashboard(
+                "html_tabela_ativados_regional",
+                serializar_dataframe_cache(df_exibicao),
+                lambda: criar_tabela_html(df_exibicao),
+                max_variacoes=1
+            )
+            st.markdown(html_tabela_ativados, unsafe_allow_html=True)
         
             st.caption(f"""
             **Resumo:** {len(pivot_data)} Regionais | 
@@ -17845,7 +17926,7 @@ with tab1:
         else:
             st.warning("Não há dados disponíveis para exibir a tabela dinâmica com os filtros atuais.")
 
-gc.collect()
+limpar_objetos_runtime_dashboard()
 
 with tab2:
     if tab_desativacoes_ativa:
@@ -19065,9 +19146,15 @@ with tab2:
                 html += "</tbody></table></div>"
                 return html
         
-            st.markdown(criar_tabela_html_desativados(df_exibicao), unsafe_allow_html=True)
+            html_tabela_desativados = obter_cache_session_dashboard(
+                "html_tabela_desativados_regional",
+                serializar_dataframe_cache(df_exibicao),
+                lambda: criar_tabela_html_desativados(df_exibicao),
+                max_variacoes=1
+            )
+            st.markdown(html_tabela_desativados, unsafe_allow_html=True)
         
-gc.collect()
+limpar_objetos_runtime_dashboard()
 
 with tab3:
     if tab_pedidos_ativa:
@@ -20602,7 +20689,12 @@ with tab3:
                     html += "</tbody></table></div>"
                     return html
             
-                html_tabela_pedidos = criar_tabela_html_pedidos(df_exibicao_pedidos)
+                html_tabela_pedidos = obter_cache_session_dashboard(
+                    "html_tabela_pedidos_regional",
+                    serializar_dataframe_cache(df_exibicao_pedidos),
+                    lambda: criar_tabela_html_pedidos(df_exibicao_pedidos),
+                    max_variacoes=1
+                )
                 altura_tabela_pedidos = min(560, max(340, 118 + (len(df_exibicao_pedidos) * 26)))
                 components.html(html_tabela_pedidos, height=altura_tabela_pedidos, scrolling=True)
             
@@ -20935,7 +21027,7 @@ with tab3:
                                 config={'displayModeBar': 'hover', 'displaylogo': False}
                             )
 
-gc.collect()
+limpar_objetos_runtime_dashboard()
 
 with tab4:
     if tab_ligacoes_ativa:
@@ -22776,7 +22868,7 @@ with tab4:
                         st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                         st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
 
-gc.collect()
+limpar_objetos_runtime_dashboard()
 
 with tab5:
     if tab_funil_movel_ativa or tab_inicio_ativa:
@@ -26650,13 +26742,16 @@ with tab5:
                     unsafe_allow_html=True
                 )
 
-gc.collect()
+if tab_inicio_ativa:
+    limpar_objetos_runtime_dashboard()
+else:
+    gc.collect()
 
 with tab5:
     if tab_funil_movel_ativa:
         render_bloco_cotacoes_funil_movel()
         render_bloco_backlog_fixa_pme()
-        gc.collect()
+        limpar_objetos_runtime_dashboard()
 
     def build_home_source_filters_html(info_text: object, titulo: str = "Filtros de Origem") -> str:
         partes = [
@@ -27080,3 +27175,5 @@ with tab0:
             st.info("Os dados de NECESSIDADE DIÁRIA não estão disponíveis para a capa.")
 
 
+home_inicio_ctx.clear()
+limpar_objetos_runtime_dashboard()
