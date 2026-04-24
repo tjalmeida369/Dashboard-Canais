@@ -10,12 +10,15 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from collections import OrderedDict
+import json
 import locale
 import re
 import shutil
 import tempfile
 import gc
+import time
 import unicodedata
+from io import StringIO
 from html import escape
 from textwrap import dedent
 base_template = go.layout.Template(
@@ -99,6 +102,30 @@ def normalizar_chave_visual(texto: str) -> str:
     base = re.sub(r'[^a-z0-9]+', ' ', base).strip()
     return base
 
+
+def normalizar_texto_chave(valor) -> str:
+    """Normaliza textos de regra de negócio para comparações estáveis."""
+    if pd.isna(valor):
+        return ""
+    texto = unicodedata.normalize("NFKD", str(valor))
+    texto = texto.encode("ASCII", "ignore").decode("ASCII")
+    texto = texto.strip().upper()
+    texto = re.sub(r"[^A-Z0-9]+", " ", texto)
+    return re.sub(r"\s+", " ", texto).strip()
+
+
+CANAL_CONSULTIVO_REMOTO = "Consultivo Remoto"
+CANAL_CONSULTIVO_REMOTO_ALIASES = {"INSIDE SALES", "CONSULTIVO REMOTO", "CONSULTIVO REMOVO"}
+
+
+def normalizar_canal_plan(valor) -> str:
+    """Canonicaliza o canal Consultivo Remoto, preservando aliases historicos."""
+    texto = normalizar_texto_chave(valor)
+    if texto in CANAL_CONSULTIVO_REMOTO_ALIASES:
+        return CANAL_CONSULTIVO_REMOTO
+    return str(valor).strip()
+
+
 def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
     """Localiza uma coluna por alias, ignorando acentos e pequenas variacoes de nome."""
     mapa_colunas: dict[str, str] = {}
@@ -120,6 +147,7 @@ CACHE_MAX_ENTRIES_FILTERS = 4
 CACHE_SESSION_VARIATIONS = 2
 SESSION_CACHE_MAX_TEXT_CHARS = 550_000
 SESSION_CACHE_MAX_CONTAINER_ITEMS = 12
+SESSION_CACHE_TTL_SECONDS = 1800
 COTACOES_CACHE_VERSION = "2026-04-02-cotacoes-otimizadas-v7"
 ALLOWED_CANAIS_VENDA_COTACOES = {
     normalizar_chave_visual("CORPPME"),
@@ -128,6 +156,34 @@ ALLOWED_CANAIS_VENDA_COTACOES = {
 }
 HTML_STYLE_BLOCK_RE = re.compile(r"<style[^>]*>.*?</style>", re.IGNORECASE | re.DOTALL)
 _RUN_CSS_RENDERED: set[str] = set()
+
+
+def serializar_dataframe_cache(df: pd.DataFrame | None) -> str:
+    """Serializa DataFrame de forma estável para uso em chaves de cache."""
+    if df is None or df.empty:
+        return pd.DataFrame().to_json(date_format="iso", orient="split")
+    return df.to_json(date_format="iso", orient="split")
+
+
+def desserializar_dataframe_cache(df_json: str) -> pd.DataFrame:
+    """Desserializa DataFrame previamente convertido para JSON orient=split."""
+    if not df_json:
+        return pd.DataFrame()
+    return pd.read_json(StringIO(df_json), orient="split")
+
+
+def _desempacotar_item_cache_session(item):
+    """Compatibiliza itens legados do cache com a nova tupla (valor, timestamp)."""
+    if isinstance(item, tuple) and len(item) == 2:
+        valor, ts = item
+        if isinstance(ts, (int, float)):
+            return valor, float(ts)
+    if isinstance(item, dict) and "value" in item:
+        ts = item.get("ts")
+        if isinstance(ts, (int, float)):
+            return item.get("value"), float(ts)
+        return item.get("value"), None
+    return item, None
 
 def fragmento_dashboard(func=None, **fragment_kwargs):
     """Usa st.fragment quando disponível, mantendo fallback seguro para versões antigas."""
@@ -198,6 +254,7 @@ def obter_cache_session_dashboard(
     max_variacoes: int = CACHE_SESSION_VARIATIONS
 ):
     """Memoiza resultados pesados por chave simples, preservando poucas variações recentes por bloco."""
+    agora = time.time()
     cache_raiz = st.session_state.setdefault("_dashboard_session_result_cache", OrderedDict())
     if not isinstance(cache_raiz, OrderedDict):
         cache_raiz = OrderedDict(cache_raiz)
@@ -209,20 +266,31 @@ def obter_cache_session_dashboard(
     elif not isinstance(bucket, OrderedDict):
         bucket = OrderedDict(bucket) if isinstance(bucket, dict) else OrderedDict()
 
+    expiradas = []
+    for chave_bucket, item_bucket in list(bucket.items()):
+        _, ts_bucket = _desempacotar_item_cache_session(item_bucket)
+        if ts_bucket is not None and (agora - ts_bucket) > SESSION_CACHE_TTL_SECONDS:
+            expiradas.append(chave_bucket)
+    for chave_expirada in expiradas:
+        bucket.pop(chave_expirada, None)
+
     if chave_normalizada in bucket:
-        valor = bucket.pop(chave_normalizada)
-        bucket[chave_normalizada] = valor
+        valor, ts = _desempacotar_item_cache_session(bucket.pop(chave_normalizada))
+        if ts is None or (agora - ts) <= SESSION_CACHE_TTL_SECONDS:
+            bucket[chave_normalizada] = (valor, agora)
+            cache_raiz.move_to_end(cache_id)
+            cache_raiz[cache_id] = bucket
+            st.session_state["_dashboard_session_result_cache"] = cache_raiz
+            return valor
+
+    valor = calcular_fn()
+    if not _valor_cacheavel_session(valor):
         cache_raiz.move_to_end(cache_id)
         cache_raiz[cache_id] = bucket
         st.session_state["_dashboard_session_result_cache"] = cache_raiz
         return valor
 
-    valor = calcular_fn()
-    if not _valor_cacheavel_session(valor):
-        st.session_state["_dashboard_session_result_cache"] = cache_raiz
-        return valor
-
-    bucket[chave_normalizada] = valor
+    bucket[chave_normalizada] = (valor, agora)
     while len(bucket) > max(1, int(max_variacoes or 1)):
         bucket.popitem(last=False)
 
@@ -4806,6 +4874,8 @@ def load_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
                 df[col] = df[col].str.strip()
             else:
                 df[col] = df[col].astype('string').str.strip()
+    if 'CANAL_PLAN' in df.columns:
+        df['CANAL_PLAN'] = df['CANAL_PLAN'].map(normalizar_canal_plan).astype('string')
 
     if 'DAT_MOVIMENTO2' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['DAT_MOVIMENTO2']):
         df['DAT_MOVIMENTO2'] = pd.to_datetime(df['DAT_MOVIMENTO2'], errors='coerce')
@@ -4903,7 +4973,6 @@ def load_tabular_cached(
 PRIMARY_BASE_FILE_PATH = resolver_arquivo_preprocessado("base_principal.parquet", RAW_PRIMARY_BASE_FILE_PATH)
 ATIVADOS_FILE_PATH = resolver_arquivo_preprocessado(
     "ativados_base.parquet",
-    "evolucao_mensal_agregado.parquet",
     PRIMARY_BASE_FILE_PATH,
     RAW_PRIMARY_BASE_FILE_PATH
 )
@@ -4913,6 +4982,7 @@ PEDIDOS_FILE_PATH = resolver_arquivo_preprocessado("pedidos_ecommerce.parquet", 
 LIGACOES_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_receptivo.parquet", RAW_LIGACOES_FILE_PATH)
 LIGACOES_MENSAL_AGREGADO_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_mensal_agregado.parquet")
 LIGACOES_PERFORMANCE_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_performance_mensal.parquet")
+EVOLUCAO_MENSAL_FILE_PATH = resolver_arquivo_preprocessado("evolucao_mensal.parquet", "evolucao_mensal_agregado.parquet")
 COTACOES_FILE_PATH = resolver_arquivo_preprocessado("cotacoes_agregado.parquet", RAW_COTACOES_FILE_PATH)
 BACKLOG_CONSOLIDADO_FILE_PATH = resolver_arquivo_preprocessado(
     "backlog_consolidado_limpo.parquet",
@@ -4959,6 +5029,12 @@ def _carregar_dataframe_preprocessado(
     for coluna in (text_cols or []):
         if coluna in df.columns:
             df[coluna] = df[coluna].astype('string').str.strip()
+
+    for coluna_canal in ('CANAL_PLAN', 'Canal', 'NM_CANAL_VENDA_SUBGRUPO', 'DSC_CANAL_AJUSTADO'):
+        if coluna_canal in df.columns:
+            df[coluna_canal] = df[coluna_canal].map(normalizar_canal_plan).astype('string')
+    if 'CANAL_PLAN' in df.columns and 'CANAL_NORM' in df.columns:
+        df['CANAL_NORM'] = df['CANAL_PLAN'].map(normalizar_texto_chave).astype('string')
 
     for coluna in (numeric_cols or []):
         if coluna in df.columns:
@@ -5046,6 +5122,70 @@ def load_ligacoes_performance_data(path: str, file_mtime: float | None = None) -
     return load_base_performance_data(path, file_mtime)
 
 
+@st.cache_data(show_spinner=False, max_entries=4, persist="disk", ttl=3600)
+def load_evolucao_mensal_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={'Ano', 'Mês', 'Mês_Num', 'Valor', 'Tipo', 'Produto', 'Regional', 'Canal', 'Indicador'},
+        text_cols=['Mês', 'Tipo', 'Produto', 'Regional', 'Canal', 'Indicador', 'Tipo_Chamada', 'Periodo'],
+        numeric_cols=['Ano', 'Mês_Num', 'Valor'],
+        category_cols=['Mês', 'Tipo', 'Produto', 'Regional', 'Canal', 'Indicador', 'Tipo_Chamada', 'Periodo']
+    )
+
+
+@st.cache_data(show_spinner=False, max_entries=12, persist="disk", ttl=3600)
+def load_evolucao_mensal(
+    path: str,
+    file_mtime: float | None,
+    produto: str = "Todas",
+    regional: str = "Todas",
+    canal: str = "Todos",
+    indicadores: tuple[str, ...] = tuple(),
+    periodos: tuple[str, ...] = tuple(),
+    tipo_chamada: str = "Todos"
+) -> pd.DataFrame:
+    df = load_evolucao_mensal_data(path, file_mtime)
+    if df.empty:
+        return df
+
+    df = df.copy()
+    df['Produto'] = df['Produto'].astype(str).str.strip().apply(normalizar_rotulo_produto)
+    df['Regional'] = df['Regional'].astype(str).str.strip().str[:3].str.upper()
+    df['Canal'] = df['Canal'].astype(str).str.strip()
+    df['Indicador'] = df['Indicador'].astype(str).str.strip()
+    df['Tipo'] = df['Tipo'].astype(str).str.strip()
+    if 'Periodo' in df.columns:
+        df['Periodo'] = df['Periodo'].astype(str).str.strip().str.lower()
+    else:
+        df['Periodo'] = df['Mês'].astype(str).str.strip().str.lower() + "/" + df['Ano'].astype(str).str[-2:]
+
+    if 'Tipo_Chamada' in df.columns:
+        df['Tipo_Chamada'] = df['Tipo_Chamada'].astype(str).str.strip()
+
+    if produto != "Todas":
+        df = df[df['Produto'].eq(normalizar_rotulo_produto(produto))]
+    if regional != "Todas":
+        df = df[df['Regional'].eq(str(regional).strip().upper()[:3])]
+    if canal != "Todos":
+        df = df[df['Canal'].eq(str(canal).strip())]
+    if indicadores:
+        indicadores_validos = {
+            normalizar_texto_chave(item) for item in indicadores if str(item).strip()
+        }
+        if indicadores_validos:
+            df = df[df['Indicador'].map(normalizar_texto_chave).isin(indicadores_validos)]
+    if periodos:
+        periodos_validos = {str(item).strip().lower() for item in periodos if str(item).strip()}
+        if periodos_validos:
+            df = df[df['Periodo'].isin(periodos_validos)]
+    if tipo_chamada != "Todos" and 'Tipo_Chamada' in df.columns:
+        tipo_ref = str(tipo_chamada).strip()
+        df = df[(df['Tipo'] != 'Real') | df['Tipo_Chamada'].eq(tipo_ref)]
+
+    return df
+
+
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_desativados_base_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     df = _carregar_dataframe_preprocessado(
@@ -5072,6 +5212,8 @@ BACKLOG_CANAIS_PERMITIDOS = [
     "Ativo Rentabilizacao Indireto",
     "Receptivo",
     "Receptivo Rentabilizacao Exclusivo",
+    "Inside Sales",
+    "Consultivo Remoto",
 ]
 BACKLOG_MAPEAMENTO_CANAIS_NORM = {
     normalizar_chave_visual("DAC"): "S2S+DAC",
@@ -5083,14 +5225,16 @@ BACKLOG_MAPEAMENTO_CANAIS_NORM = {
     normalizar_chave_visual("Ativo Rentabilizacao Indireto"): "Televendas Ativo",
     normalizar_chave_visual("Receptivo"): "Televendas Receptivo",
     normalizar_chave_visual("Receptivo Rentabilizacao Exclusivo"): "Televendas Receptivo",
+    normalizar_chave_visual("Inside Sales"): "Consultivo Remoto",
+    normalizar_chave_visual("Consultivo Remoto"): "Consultivo Remoto",
 }
-MIGRACOES_PME_CANAIS = ["E-Commerce", "Inside Sales", "Televendas"]
+MIGRACOES_PME_CANAIS = ["E-Commerce", "Consultivo Remoto", "Televendas"]
 COTACOES_ORDEM_CANAIS = [
     "Televendas Ativo",
     "Televendas Receptivo",
     "S2S+DAC",
     "E-Commerce",
-    "Inside Sales",
+    "Consultivo Remoto",
     "Hospitality"
 ]
 
@@ -6034,8 +6178,8 @@ def _mapear_canal_funil_cotacoes(valor_canal) -> str:
         return "S2S+DAC"
     if "E COMMERCE" in texto:
         return "E-Commerce"
-    if "INSIDE SALES" in texto:
-        return "Inside Sales"
+    if texto in CANAL_CONSULTIVO_REMOTO_ALIASES:
+        return "Consultivo Remoto"
     if "HOSPITALITY" in texto:
         return "Hospitality"
     return ""
@@ -9113,8 +9257,84 @@ def get_data_realizado_max_formatada(df_base: pd.DataFrame) -> str:
                 return data_max.strftime('%d/%m/%Y')
     return "N/D"
 
+
+def construir_linhas_evolucao_mensal_preagregada(
+    df_grafico: pd.DataFrame,
+    usar_tendencia: bool = True
+) -> pd.DataFrame:
+    """Converte base mensal preagregada em séries prontas para o gráfico comparativo anual."""
+    meses_abreviados = {
+        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+    }
+    colunas_saida = ['Ano', 'Mês', 'Mês_Num', 'Valor', 'Tipo', 'Mês_Ord', 'Valor_Formatado']
+    if df_grafico is None or df_grafico.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_work = df_grafico.copy()
+    df_work['Ano'] = pd.to_numeric(df_work.get('Ano', 0), errors='coerce').fillna(0).astype(int)
+    df_work['Mês_Num'] = pd.to_numeric(df_work.get('Mês_Num', 0), errors='coerce').fillna(0).astype(int)
+    df_work['Valor'] = pd.to_numeric(df_work.get('Valor', 0), errors='coerce').fillna(0.0)
+    df_work['Tipo'] = df_work.get('Tipo', '').astype(str).str.strip().str.title()
+    df_work = df_work[df_work['Mês_Num'].between(1, 12)].copy()
+
+    if df_work.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    serie_valores = (
+        df_work.groupby(['Ano', 'Mês_Num', 'Tipo'], observed=True, dropna=False)['Valor']
+        .sum()
+        .to_dict()
+    )
+    mes_corrente = int(pd.Timestamp.today().month)
+    ano_corrente = int(pd.Timestamp.today().year)
+    dados_grafico: list[dict[str, object]] = []
+
+    for mes_num in range(1, 13):
+        dados_grafico.append({
+            'Ano': '2025',
+            'Mês': meses_abreviados[mes_num],
+            'Mês_Num': mes_num,
+            'Valor': float(serie_valores.get((2025, mes_num, 'Real'), 0.0)),
+            'Tipo': 'Real'
+        })
+
+    for mes_num in range(1, 13):
+        valor_real = float(serie_valores.get((2026, mes_num, 'Real'), 0.0))
+        valor_tend = float(serie_valores.get((2026, mes_num, 'Tend'), 0.0))
+        usar_tend_mes = usar_tendencia and (ano_corrente == 2026) and (mes_num == mes_corrente) and (valor_tend > 0)
+        dados_grafico.append({
+            'Ano': '2026 Real/Tend',
+            'Mês': meses_abreviados[mes_num],
+            'Mês_Num': mes_num,
+            'Valor': valor_tend if usar_tend_mes else valor_real,
+            'Tipo': 'Real/Tend'
+        })
+
+    for mes_num in range(1, 13):
+        dados_grafico.append({
+            'Ano': '2026',
+            'Mês': meses_abreviados[mes_num],
+            'Mês_Num': mes_num,
+            'Valor': float(serie_valores.get((2026, mes_num, 'Orç'), 0.0)),
+            'Tipo': 'Orç'
+        })
+
+    df_linhas = pd.DataFrame(dados_grafico)
+    ordem_anos = ['2025', '2026 Real/Tend', '2026']
+    df_linhas['Ano'] = pd.Categorical(df_linhas['Ano'], categories=ordem_anos, ordered=True)
+    df_linhas['Mês_Ord'] = df_linhas['Mês_Num']
+    df_linhas = df_linhas.sort_values(['Ano', 'Mês_Ord'])
+    df_linhas['Valor_Formatado'] = df_linhas['Valor'].apply(lambda x: formatar_numero_brasileiro(x, 0))
+    return df_linhas
+
+
 def create_line_chart_data(df_grafico):
     """Cria dados para gráfico de linhas temporal"""
+    colunas_preagregadas = {'Ano', 'Mês', 'Mês_Num', 'Valor', 'Tipo'}
+    if colunas_preagregadas.issubset(set(df_grafico.columns)):
+        return construir_linhas_evolucao_mensal_preagregada(df_grafico, usar_tendencia=True)
+
     if 'ANO' not in df_grafico.columns or 'DAT_MÊS' not in df_grafico.columns:
         if not pd.api.types.is_datetime64_any_dtype(df_grafico['DAT_MOVIMENTO2']):
             df_grafico['DAT_MOVIMENTO2'] = pd.to_datetime(df_grafico['DAT_MOVIMENTO2'], errors='coerce')
@@ -10319,7 +10539,14 @@ def montar_ctx_plotly_evolucao_semanal(
         altura=460,
         comparacoes=[{'origem': 0, 'destino': 1}, {'origem': 2, 'destino': 1}]
     )
-    return {"fig_principal_json": fig_semanal.to_json(), "fig_resumo_json": fig_totais_sem.to_json(), "mes": str(mes_sem_sel).upper()}
+    payload = {
+        "fig_principal_json": fig_semanal.to_json(),
+        "fig_resumo_json": fig_totais_sem.to_json(),
+        "mes": str(mes_sem_sel).upper()
+    }
+    del fig_semanal, fig_totais_sem
+    gc.collect()
+    return payload
 
 def criar_grafico_barras_resumo_evolucao_mensal(
     df_linhas_base: pd.DataFrame,
@@ -10579,6 +10806,63 @@ def normalizar_rotulo_produto(valor) -> str:
     if re.fullmatch(r"\d+", base):
         return f"PRODUTO {base}"
     return base
+
+
+@st.cache_data(show_spinner=False, max_entries=8, persist="disk")
+def cached_fig_linhas_json(
+    df_json: str,
+    altura: int,
+    mes_referencia: str,
+    titulo_eixo: str,
+    valor_label: str
+) -> str:
+    df = desserializar_dataframe_cache(df_json)
+    if df.empty:
+        return go.Figure().to_json()
+
+    cores_personalizadas = {
+        '2025': '#790E09',
+        '2026 Real/Tend': '#FF2800',
+        '2026': '#5A6268'
+    }
+    fig = px.line(
+        df,
+        x='Mês',
+        y='Valor',
+        color='Ano',
+        title='',
+        labels={'Valor': titulo_eixo, 'Mês': ''},
+        markers=True,
+        line_shape='spline',
+        color_discrete_map=cores_personalizadas
+    )
+    apply_standard_line_layout(fig, titulo_eixo, height=altura)
+    apply_standard_line_traces(fig, cores_personalizadas, valor_label=valor_label, meta_year='2026')
+    ocultar_rotulo_orc_sobreposto(fig)
+    aplicar_estilo_visual_evolucao_mensal(
+        fig,
+        altura=altura,
+        mes_referencia=mes_referencia
+    )
+    return fig.to_json()
+
+
+@st.cache_data(show_spinner=False, max_entries=8, persist="disk")
+def cached_fig_bar_resumo_json(
+    df_json: str,
+    altura: int,
+    mes_ref_num: int,
+    rotulo_mes_ref: str
+) -> str:
+    df = desserializar_dataframe_cache(df_json)
+    fig = criar_grafico_barras_resumo_evolucao_mensal(
+        df,
+        altura=altura,
+        mes_ref_num=mes_ref_num,
+        rotulo_mes_ref=rotulo_mes_ref
+    )
+    compactar_resumo_evolucao_mensal(fig, altura)
+    return fig.to_json()
 
 def create_bar_chart_data(df_mes_selecionado):
     """Cria dados para gráfico de barras horizontais"""
@@ -12930,7 +13214,7 @@ def construir_tabela_resultado_canais(
         'S2S+DAC',
         'E-Commerce',
         'Hospitality',
-        'Inside Sales'
+        'Consultivo Remoto'
     ]
 
     def _norm_texto(valor) -> str:
@@ -12996,8 +13280,8 @@ def construir_tabela_resultado_canais(
             return 'E-Commerce'
         if 'HOSPITALITY' in texto:
             return 'Hospitality'
-        if 'INSIDE SALES' in texto:
-            return 'Inside Sales'
+        if texto in CANAL_CONSULTIVO_REMOTO_ALIASES:
+            return 'Consultivo Remoto'
         return ""
 
     df_work['CANAL_CANONICO'] = df_work['CANAL_PLAN'].apply(_canal_canonico)
@@ -13420,6 +13704,33 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
 
     html += "</tbody></table></div>"
     return html
+
+
+@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+def cached_tabela_html_funil_cotacoes(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
+    return criar_tabela_html_funil_cotacoes(
+        desserializar_dataframe_cache(df_fmt_json),
+        desserializar_dataframe_cache(df_num_json),
+        table_id
+    )
+
+
+@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+def cached_tabela_html_analitica(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
+    return criar_tabela_html_analitica(
+        desserializar_dataframe_cache(df_fmt_json),
+        desserializar_dataframe_cache(df_num_json),
+        table_id
+    )
+
+
+@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+def cached_tabela_html_resultado_canais(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
+    return criar_tabela_html_resultado_canais(
+        desserializar_dataframe_cache(df_fmt_json),
+        desserializar_dataframe_cache(df_num_json),
+        table_id
+    )
 
 def validate_data(df):
     """Valida se as colunas necessárias existem no dataset"""
@@ -15307,10 +15618,10 @@ def render_bloco_cotacoes_funil_movel() -> None:
         st.info("Sem dados disponíveis para montar a tabela do funil CONTA.")
     else:
         st.markdown(
-            criar_tabela_html_funil_cotacoes(
-                df_formatado=tabela_funil_conta_fmt,
-                df_numerico=tabela_funil_conta_num,
-                table_id="tabela-funil-conta-cotacoes-ativacao"
+            cached_tabela_html_funil_cotacoes(
+                serializar_dataframe_cache(tabela_funil_conta_fmt),
+                serializar_dataframe_cache(tabela_funil_conta_num),
+                "tabela-funil-conta-cotacoes-ativacao"
             ),
             unsafe_allow_html=True
         )
@@ -15409,6 +15720,7 @@ def aplicar_filtros_globais_cached(
     incluir_periodo: bool = True
 ) -> pd.DataFrame:
     """Memoiza filtros globais por sessão sem serializar o DataFrame inteiro."""
+    agora = time.time()
     cache_key = (
         file_mtime_ref,
         tuple(regionais),
@@ -15421,11 +15733,17 @@ def aplicar_filtros_globais_cached(
     if not isinstance(cache, OrderedDict):
         cache = OrderedDict(cache)
 
+    for chave_existente, item_existente in list(cache.items()):
+        _, ts_existente = _desempacotar_item_cache_session(item_existente)
+        if ts_existente is not None and (agora - ts_existente) > SESSION_CACHE_TTL_SECONDS:
+            cache.pop(chave_existente, None)
+
     if cache_key in cache:
-        resultado_cache = cache.pop(cache_key)
-        cache[cache_key] = resultado_cache
-        st.session_state["_dashboard_filtros_globais_cache"] = cache
-        return resultado_cache.copy(deep=False)
+        resultado_cache, ts_cache = _desempacotar_item_cache_session(cache.pop(cache_key))
+        if ts_cache is None or (agora - ts_cache) <= SESSION_CACHE_TTL_SECONDS:
+            cache[cache_key] = (resultado_cache, agora)
+            st.session_state["_dashboard_filtros_globais_cache"] = cache
+            return resultado_cache.copy(deep=False)
 
     resultado = aplicar_filtros_globais(
         _df_base,
@@ -15451,7 +15769,7 @@ def aplicar_filtros_globais_cached(
     )
 
     if reter_em_cache:
-        cache[cache_key] = resultado
+        cache[cache_key] = (resultado, agora)
         while len(cache) > CACHE_MAX_ENTRIES_FILTERS:
             cache.popitem(last=False)
         st.session_state["_dashboard_filtros_globais_cache"] = cache
@@ -16069,7 +16387,7 @@ with tab1:
             'Televendas Receptivo', 
             'S2S+DAC',
             'E-Commerce',
-            'Inside Sales',
+            'Consultivo Remoto',
             'Hospitality'
         ]
     
@@ -16191,16 +16509,36 @@ with tab1:
                         label_visibility="collapsed"
                     )
 
-            df_grafico = df_filtered.copy()
-        
-            if canal_selecionado != "Todos":
-                df_grafico = df_grafico[df_grafico['CANAL_PLAN'] == canal_selecionado]
-            if regional_selecionada != "Todos":
-                df_grafico = df_grafico[df_grafico['REGIONAL'] == regional_selecionada]
-            if plataforma_selecionada != "Todos":
-                df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
-        
-            df_linhas_base = create_line_chart_data(df_grafico)
+            evolucao_mensal_path_obj = Path(EVOLUCAO_MENSAL_FILE_PATH)
+            evolucao_mensal_mtime = (
+                evolucao_mensal_path_obj.stat().st_mtime if evolucao_mensal_path_obj.exists() else None
+            )
+            indicadores_evolucao_ativ = tuple(
+                sorted(
+                    df_filtered['DSC_INDICADOR'].dropna().astype(str).str.strip().unique().tolist()
+                )
+            ) if 'DSC_INDICADOR' in df_filtered.columns else tuple()
+            df_evolucao_ativ = load_evolucao_mensal(
+                str(EVOLUCAO_MENSAL_FILE_PATH),
+                evolucao_mensal_mtime,
+                produto="Todas" if plataforma_selecionada == "Todos" else plataforma_selecionada,
+                regional="Todas" if regional_selecionada == "Todos" else regional_selecionada,
+                canal=canal_selecionado,
+                indicadores=indicadores_evolucao_ativ,
+                periodos=data_filter_key
+            )
+
+            if df_evolucao_ativ.empty:
+                df_grafico = df_filtered.copy()
+                if canal_selecionado != "Todos":
+                    df_grafico = df_grafico[df_grafico['CANAL_PLAN'] == canal_selecionado]
+                if regional_selecionada != "Todos":
+                    df_grafico = df_grafico[df_grafico['REGIONAL'] == regional_selecionada]
+                if plataforma_selecionada != "Todos":
+                    df_grafico = df_grafico[df_grafico['COD_PLATAFORMA'] == plataforma_selecionada]
+                df_linhas_base = create_line_chart_data(df_grafico)
+            else:
+                df_linhas_base = create_line_chart_data(df_evolucao_ativ)
             mes_ref_num_ativ, rotulo_mes_ref_ativ = obter_mes_referencia_grafico(mes_selecionado_cards)
             df_linhas = aplicar_regra_sem_zeros_e_fallback_orc(
                 df_linhas_base,
@@ -16217,39 +16555,23 @@ with tab1:
         
             titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
         
-            cores_personalizadas = {
-                '2025': '#790E09',
-                '2026 Real/Tend': '#FF2800',
-                '2026': '#5A6268'
-            }
-        
-            fig_linhas = px.line(
-                df_linhas,
-                x='Mês',
-                y='Valor',
-                color='Ano',
-                title='',
-                labels={'Valor': 'Volume', 'Mês': ''},
-                markers=True,
-                line_shape='spline',
-                color_discrete_map=cores_personalizadas
+            fig_linhas = pio.from_json(
+                cached_fig_linhas_json(
+                    serializar_dataframe_cache(df_linhas),
+                    ALTURA_EVOLUCAO_MENSAL_PADRAO,
+                    mes_selecionado_cards,
+                    'VOLUME',
+                    'Valor'
+                )
             )
-        
-            apply_standard_line_layout(fig_linhas, 'VOLUME', height=ALTURA_EVOLUCAO_MENSAL_PADRAO)
-            apply_standard_line_traces(fig_linhas, cores_personalizadas, valor_label='Valor', meta_year='2026')
-            ocultar_rotulo_orc_sobreposto(fig_linhas)
-            aplicar_estilo_visual_evolucao_mensal(
-                fig_linhas,
-                altura=ALTURA_EVOLUCAO_MENSAL_PADRAO,
-                mes_referencia=mes_selecionado_cards
+            fig_bar_resumo = pio.from_json(
+                cached_fig_bar_resumo_json(
+                    serializar_dataframe_cache(df_linhas_base),
+                    ALTURA_EVOLUCAO_MENSAL_PADRAO,
+                    mes_ref_num_ativ,
+                    rotulo_mes_ref_ativ
+                )
             )
-            fig_bar_resumo = criar_grafico_barras_resumo_evolucao_mensal(
-                df_linhas_base,
-                altura=ALTURA_EVOLUCAO_MENSAL_PADRAO,
-                mes_ref_num=mes_ref_num_ativ,
-                rotulo_mes_ref=rotulo_mes_ref_ativ
-            )
-            compactar_resumo_evolucao_mensal(fig_bar_resumo, ALTURA_EVOLUCAO_MENSAL_PADRAO)
         
             rotulo_mes_painel_ativ, comp_m1_ativ, comp_orc_ativ = obter_resumo_comparativo_evolucao(
                 df_linhas_base=df_linhas_base,
@@ -16601,183 +16923,6 @@ with tab1:
     
         df_mes_selecionado = df_filtered[df_filtered['dat_tratada'] == mes_selecionado]
     
-        if False and not df_mes_selecionado.empty:
-            bar_data, canal_totals = create_bar_chart_data(df_mes_selecionado)
-        
-            produtos_disponiveis = sorted(bar_data['COD_PLATAFORMA'].dropna().unique().tolist())
-            produtos_prioridade = ['CONTA', 'FIXA']
-            produtos_ordenados = [p for p in produtos_prioridade if p in produtos_disponiveis] + [
-                p for p in produtos_disponiveis if p not in produtos_prioridade
-            ]
-
-            color_map = {
-                'CONTA': '#790E09',
-                'FIXA': '#475569',
-                'CLICK TO CALL': '#0F766E',
-                'N/D': '#9CA3AF'
-            }
-            cores_adicionais = ['#A23B36', '#7F1D1D', '#64748B', '#0F766E', '#9A3412']
-            for i, produto in enumerate(produtos_ordenados):
-                if produto not in color_map:
-                    color_map[produto] = cores_adicionais[i % len(cores_adicionais)]
-
-            df_stack = (
-                bar_data.pivot_table(
-                    index='CANAL_PLAN',
-                    columns='COD_PLATAFORMA',
-                    values='QTDE',
-                    aggfunc='sum',
-                    observed=True
-                )
-                .reindex(canal_totals.index)
-                .fillna(0)
-            )
-            canais_plot = df_stack.index.tolist()
-            max_total_canal = float(canal_totals.max()) if not canal_totals.empty else 0.0
-            limite_texto_segmento = max_total_canal * 0.12 if max_total_canal > 0 else 0
-
-            fig_bar = go.Figure()
-            for produto in produtos_ordenados:
-                if produto not in df_stack.columns:
-                    continue
-
-                valores_x = df_stack[produto].astype(float).tolist()
-                textos_segmento = []
-                customdata = []
-                for canal_nome, valor_seg in zip(canais_plot, valores_x):
-                    total_canal = float(canal_totals.get(canal_nome, 0) or 0)
-                    part_canal = (valor_seg / total_canal * 100) if total_canal > 0 else 0
-                    customdata.append([total_canal, part_canal])
-                    textos_segmento.append(
-                        formatar_numero_brasileiro(valor_seg, 0) if valor_seg >= limite_texto_segmento else ''
-                    )
-
-                fig_bar.add_trace(go.Bar(
-                    y=canais_plot,
-                    x=valores_x,
-                    name=produto,
-                    orientation='h',
-                    marker=dict(
-                        color=color_map.get(produto, '#6C757D'),
-                        line=dict(color='rgba(255,255,255,0.95)', width=1.2)
-                    ),
-                    text=textos_segmento,
-                    textposition='inside',
-                    insidetextanchor='middle',
-                    textfont=dict(size=11, color='white'),
-                    customdata=customdata,
-                    hovertemplate=(
-                        "<b>Canal:</b> %{y}<br>"
-                        f"<b>Produto:</b> {produto}<br>"
-                        "<b>Volume:</b> %{x:,.0f}<br>"
-                        "<b>Participação no canal:</b> %{customdata[1]:.1f}%<br>"
-                        "<extra></extra>"
-                    )
-                ))
-
-            total_geral = float(canal_totals.sum())
-            deslocamento_rotulo = max_total_canal * 0.025 if max_total_canal > 0 else 1
-            for canal_nome in canais_plot:
-                total_canal = float(canal_totals.get(canal_nome, 0) or 0)
-                percentual = (total_canal / total_geral * 100) if total_geral > 0 else 0
-                fig_bar.add_annotation(
-                    x=total_canal + deslocamento_rotulo,
-                    y=canal_nome,
-                    text=(
-                        f"<b>{formatar_numero_brasileiro(total_canal, 0)}</b>"
-                        f"<br><span style='font-size:11px;color:#6B7280;'>({percentual:.1f}%)</span>"
-                    ),
-                    showarrow=False,
-                    xanchor='left',
-                    yanchor='middle',
-                    align='left',
-                    font=dict(size=12, color='#2F3747')
-                )
-
-            eixo_x_max = max_total_canal * 1.24 if max_total_canal > 0 else 1
-            altura_base_bar = max(470, 66 * len(canais_plot) + 110)
-            altura_bar_reduzida = max(400, int(altura_base_bar * 0.85))
-            fig_bar.update_layout(
-                barmode='stack',
-                plot_bgcolor='#FFFFFF',
-                paper_bgcolor='#FFFFFF',
-                font=dict(family='Manrope', size=13, color='#2F3747'),
-                margin=dict(l=22, r=220, t=72, b=32),
-                height=altura_bar_reduzida,
-                xaxis=dict(
-                    title='',
-                    showgrid=False,
-                    showline=True,
-                    linecolor='#E9ECEF',
-                    linewidth=1.4,
-                    zeroline=False,
-                    showticklabels=False,
-                    range=[0, eixo_x_max]
-                ),
-                yaxis=dict(
-                    title='',
-                    showgrid=False,
-                    tickfont=dict(size=12, color='#4B5563'),
-                    ticksuffix='  ',
-                    categoryorder='array',
-                    categoryarray=canais_plot[::-1]
-                ),
-                legend=dict(
-                    title=dict(text='<b>PRODUTOS</b>', font=dict(size=12, color='#2F3747')),
-                    orientation='v',
-                    yanchor='top',
-                    y=1.0,
-                    xanchor='left',
-                    x=1.01,
-                    bgcolor='rgba(255,255,255,0.92)',
-                    bordercolor='#E9ECEF',
-                    borderwidth=1,
-                    font=dict(size=11, color='#2F3747'),
-                    traceorder='normal'
-                ),
-                title=dict(
-                    text=f"<b>DISTRIBUIÇÃO POR CANAL</b><br><span style='font-size:13px;color:#6B7280;'>Análise de {mes_selecionado}</span>",
-                    x=0.01,
-                    xanchor='left',
-                    y=0.97,
-                    yanchor='top'
-                ),
-                hovermode='y unified',
-                hoverlabel=dict(
-                    bgcolor='white',
-                    bordercolor='#E9ECEF',
-                    font_size=12,
-                    font_family='Segoe UI',
-                    font_color='#2F3747'
-                ),
-                bargap=0.36,
-                bargroupgap=0.08,
-                uniformtext_minsize=10,
-                uniformtext_mode='hide'
-            )
-
-            fig_bar.add_annotation(
-                xref='paper',
-                yref='paper',
-                x=1.0,
-                y=1.13,
-                xanchor='right',
-                yanchor='top',
-                text=(
-                    "<span style='font-size:10px;color:#6B7280;'>TOTAL GERAL</span><br>"
-                    f"<span style='font-size:22px;color:#790E09;'><b>{formatar_numero_brasileiro(total_geral, 0)}</b></span>"
-                ),
-                showarrow=False,
-                align='right',
-                bgcolor='rgba(248,249,250,0.92)',
-                bordercolor='#E9ECEF',
-                borderwidth=1,
-                borderpad=6
-            )
-        
-            apply_standard_title_style(fig_bar)
-            st.plotly_chart(fig_bar, width='stretch', config={'displayModeBar': 'hover', 'displaylogo': False})
-
         st.markdown(
             build_visual_title_html("CANAIS ESTRATÉGICOS - PERFORMANCE POR REGIONAL", "grid"),
             unsafe_allow_html=True
@@ -17690,6 +17835,8 @@ with tab1:
                     st.dataframe(df_base_completa, width='stretch', hide_index=True, height=360)
         else:
             st.warning("Não há dados disponíveis para exibir a tabela dinâmica com os filtros atuais.")
+
+gc.collect()
 
 with tab2:
     if tab_desativacoes_ativa:
@@ -18911,6 +19058,8 @@ with tab2:
         
             st.markdown(criar_tabela_html_desativados(df_exibicao), unsafe_allow_html=True)
         
+gc.collect()
+
 with tab3:
     if tab_pedidos_ativa:
         st.markdown(
@@ -20577,7 +20726,23 @@ with tab3:
                     
                         return df_linhas
                 
-                    df_linhas_base_pedidos = create_line_chart_data_pedidos(df_evo)
+                    evolucao_mensal_path_obj = Path(EVOLUCAO_MENSAL_FILE_PATH)
+                    evolucao_mensal_mtime = (
+                        evolucao_mensal_path_obj.stat().st_mtime if evolucao_mensal_path_obj.exists() else None
+                    )
+                    df_evolucao_pedidos = load_evolucao_mensal(
+                        str(EVOLUCAO_MENSAL_FILE_PATH),
+                        evolucao_mensal_mtime,
+                        produto=plataforma_evo,
+                        regional=regional_evo,
+                        canal="E-Commerce",
+                        indicadores=("PEDIDOS",),
+                        periodos=data_filter_key
+                    )
+                    if df_evolucao_pedidos.empty:
+                        df_linhas_base_pedidos = create_line_chart_data_pedidos(df_evo)
+                    else:
+                        df_linhas_base_pedidos = create_line_chart_data(df_evolucao_pedidos)
                     mes_ref_num_ped, rotulo_mes_ref_ped = obter_mes_referencia_grafico(mes_selecionado_pedidos)
                     df_linhas_pedidos = aplicar_regra_sem_zeros_e_fallback_orc(
                         df_linhas_base_pedidos,
@@ -20592,39 +20757,23 @@ with tab3:
                 
                     titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
                 
-                    cores_personalizadas = {
-                        '2025': '#790E09',
-                        '2026 Real/Tend': '#FF2800',
-                        '2026': '#5A6268'
-                    }
-                
-                    fig_linhas_pedidos = px.line(
-                        df_linhas_pedidos,
-                        x='Mês',
-                        y='Valor',
-                        color='Ano',
-                        title='',
-                        labels={'Valor': 'Volume', 'Mês': ''},
-                        markers=True,
-                        line_shape='spline',
-                        color_discrete_map=cores_personalizadas
+                    fig_linhas_pedidos = pio.from_json(
+                        cached_fig_linhas_json(
+                            serializar_dataframe_cache(df_linhas_pedidos),
+                            ALTURA_EVOLUCAO_MENSAL_PADRAO,
+                            mes_selecionado_pedidos,
+                            'VOLUME DE PEDIDOS',
+                            'Valor'
+                        )
                     )
-                
-                    apply_standard_line_layout(fig_linhas_pedidos, 'VOLUME DE PEDIDOS', height=ALTURA_EVOLUCAO_MENSAL_PADRAO)
-                    apply_standard_line_traces(fig_linhas_pedidos, cores_personalizadas, valor_label='Valor', meta_year='2026')
-                    ocultar_rotulo_orc_sobreposto(fig_linhas_pedidos)
-                    aplicar_estilo_visual_evolucao_mensal(
-                        fig_linhas_pedidos,
-                        altura=ALTURA_EVOLUCAO_MENSAL_PADRAO,
-                        mes_referencia=mes_selecionado_pedidos
+                    fig_bar_resumo_pedidos = pio.from_json(
+                        cached_fig_bar_resumo_json(
+                            serializar_dataframe_cache(df_linhas_base_pedidos),
+                            ALTURA_EVOLUCAO_MENSAL_PADRAO,
+                            mes_ref_num_ped,
+                            rotulo_mes_ref_ped
+                        )
                     )
-                    fig_bar_resumo_pedidos = criar_grafico_barras_resumo_evolucao_mensal(
-                        df_linhas_base_pedidos,
-                        altura=ALTURA_EVOLUCAO_MENSAL_PADRAO,
-                        mes_ref_num=mes_ref_num_ped,
-                        rotulo_mes_ref=rotulo_mes_ref_ped
-                    )
-                    compactar_resumo_evolucao_mensal(fig_bar_resumo_pedidos, ALTURA_EVOLUCAO_MENSAL_PADRAO)
                     rotulo_mes_painel_ped, comp_m1_ped, comp_orc_ped = obter_resumo_comparativo_evolucao(
                         df_linhas_base_pedidos,
                         mes_ref_num=mes_ref_num_ped,
@@ -20787,6 +20936,8 @@ with tab3:
                                 width='stretch',
                                 config={'displayModeBar': 'hover', 'displaylogo': False}
                             )
+
+gc.collect()
 
 with tab4:
     if tab_ligacoes_ativa:
@@ -21576,14 +21727,30 @@ with tab4:
                 return df_grafico
 
             with st.spinner('📊 Gerando gráfico de evolução...'):
-                df_linhas_lig_base = create_line_chart_data_ligacoes_mensal(
-                    df_lig_reais=df_lig,
-                    df_metas_lig=df_metas_lig,
-                    df_lig_agregado=df_lig_agregado,
-                    plataforma=plataforma_linha,
-                    tipo_chamada=tipo_chamada_linha,
-                    regional=regional_linha
+                evolucao_mensal_path_obj = Path(EVOLUCAO_MENSAL_FILE_PATH)
+                evolucao_mensal_mtime = (
+                    evolucao_mensal_path_obj.stat().st_mtime if evolucao_mensal_path_obj.exists() else None
                 )
+                df_evolucao_lig = load_evolucao_mensal(
+                    str(EVOLUCAO_MENSAL_FILE_PATH),
+                    evolucao_mensal_mtime,
+                    produto=plataforma_linha,
+                    regional=regional_linha,
+                    canal="Televendas Receptivo",
+                    indicadores=("LIGACOES",),
+                    tipo_chamada=tipo_chamada_linha
+                )
+                if df_evolucao_lig.empty:
+                    df_linhas_lig_base = create_line_chart_data_ligacoes_mensal(
+                        df_lig_reais=df_lig,
+                        df_metas_lig=df_metas_lig,
+                        df_lig_agregado=df_lig_agregado,
+                        plataforma=plataforma_linha,
+                        tipo_chamada=tipo_chamada_linha,
+                        regional=regional_linha
+                    )
+                else:
+                    df_linhas_lig_base = create_line_chart_data(df_evolucao_lig)
                 mes_ref_num_lig, rotulo_mes_ref_lig = obter_mes_referencia_grafico(mes_selecionado)
                 df_linhas_lig = aplicar_regra_sem_zeros_e_fallback_orc(
                     df_linhas_lig_base,
@@ -21599,39 +21766,23 @@ with tab4:
             
                 titulo_filtros = " | ".join(filtros_ativos) if filtros_ativos else "Todos os Filtros"
             
-                cores_personalizadas = {
-                    '2025': '#790E09',
-                    '2026 Real/Tend': '#FF2800',
-                    '2026': '#5A6268'
-                }
-            
-                fig_linhas_lig = px.line(
-                    df_linhas_lig,
-                    x='Mês',
-                    y='Valor',
-                    color='Ano',
-                    title='',
-                    labels={'Valor': 'Volume de Ligações', 'Mês': ''},
-                    markers=True,
-                    line_shape='spline',
-                    color_discrete_map=cores_personalizadas
+                fig_linhas_lig = pio.from_json(
+                    cached_fig_linhas_json(
+                        serializar_dataframe_cache(df_linhas_lig),
+                        ALTURA_EVOLUCAO_MENSAL_LIGACOES,
+                        mes_selecionado,
+                        'VOLUME DE LIGAÇÕES',
+                        'Realizado'
+                    )
                 )
-            
-                apply_standard_line_layout(fig_linhas_lig, 'VOLUME DE LIGAÇÕES', height=ALTURA_EVOLUCAO_MENSAL_LIGACOES)
-                apply_standard_line_traces(fig_linhas_lig, cores_personalizadas, valor_label='Realizado', meta_year='2026')
-                ocultar_rotulo_orc_sobreposto(fig_linhas_lig)
-                aplicar_estilo_visual_evolucao_mensal(
-                    fig_linhas_lig,
-                    altura=ALTURA_EVOLUCAO_MENSAL_LIGACOES,
-                    mes_referencia=mes_selecionado
+                fig_bar_resumo_lig = pio.from_json(
+                    cached_fig_bar_resumo_json(
+                        serializar_dataframe_cache(df_linhas_lig_base),
+                        ALTURA_EVOLUCAO_MENSAL_LIGACOES,
+                        mes_ref_num_lig,
+                        rotulo_mes_ref_lig
+                    )
                 )
-                fig_bar_resumo_lig = criar_grafico_barras_resumo_evolucao_mensal(
-                    df_linhas_lig_base,
-                    altura=ALTURA_EVOLUCAO_MENSAL_LIGACOES,
-                    mes_ref_num=mes_ref_num_lig,
-                    rotulo_mes_ref=rotulo_mes_ref_lig
-                )
-                compactar_resumo_evolucao_mensal(fig_bar_resumo_lig, ALTURA_EVOLUCAO_MENSAL_LIGACOES)
                 rotulo_mes_painel_lig, comp_m1_lig, comp_orc_lig = obter_resumo_comparativo_evolucao(
                     df_linhas_lig_base,
                     mes_ref_num=mes_ref_num_lig,
@@ -22565,12 +22716,26 @@ with tab4:
                         html += "</tbody></table></div>"
                     
                         return html
+
+                    @st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+                    def cached_tabela_html_ligacoes_local(
+                        df_fmt_json: str,
+                        df_num_json: str,
+                        meses_lista_json: str,
+                        mes_foco_cache: str
+                    ) -> str:
+                        return criar_tabela_html_ligacoes(
+                            desserializar_dataframe_cache(df_fmt_json),
+                            desserializar_dataframe_cache(df_num_json),
+                            json.loads(meses_lista_json),
+                            mes_foco_cache
+                        )
                 
-                    tabela_html = criar_tabela_html_ligacoes(
-                        df_exibicao_formatado,
-                        df_tabela_final,
-                        meses_tabela,
-                        mes_selecionado
+                    tabela_html = cached_tabela_html_ligacoes_local(
+                        serializar_dataframe_cache(df_exibicao_formatado),
+                        serializar_dataframe_cache(df_tabela_final),
+                        json.dumps(list(meses_tabela), ensure_ascii=False),
+                        str(mes_selecionado)
                     )
                 
                     st.markdown(tabela_html, unsafe_allow_html=True)
@@ -22612,6 +22777,8 @@ with tab4:
                         st.write(f"**Regional selecionada:** {regional_selecionada}")
                         st.write(f"**Produto filtro:** {plataforma_filtro_tabela}")
                         st.write(f"**Tipo chamada filtro:** {tipo_chamada_filtro_tabela}")
+
+gc.collect()
 
 with tab5:
     if tab_funil_movel_ativa or tab_inicio_ativa:
@@ -22758,7 +22925,7 @@ with tab5:
                 return 'LIGACOES'
             if 'PEDID' in texto:
                 return 'PEDIDOS'
-            if 'GROSS' in texto and 'LIQ' in texto:
+            if 'INSTAL' in texto:
                 return 'INSTALACAO'
             if 'GROSS' in texto and 'LIQ' in texto:
                 return 'GROSS LIQUIDO'
@@ -23917,10 +24084,10 @@ with tab5:
                             produto_ref=produto_resultado,
                             incluir_total=True
                         )
-                        resultados_html_local[produto_resultado] = criar_tabela_html_resultado_canais(
-                            df_formatado=tabela_resultado_canais_fmt,
-                            df_numerico=tabela_resultado_canais_num,
-                            table_id=table_id_resultado
+                        resultados_html_local[produto_resultado] = cached_tabela_html_resultado_canais(
+                            serializar_dataframe_cache(tabela_resultado_canais_fmt),
+                            serializar_dataframe_cache(tabela_resultado_canais_num),
+                            table_id_resultado
                         )
                     return resultados_html_local
 
@@ -24472,7 +24639,7 @@ with tab5:
                             'S2S+DAC',
                             'E-Commerce',
                             'Hospitality',
-                            'Inside Sales'
+                            'Consultivo Remoto'
                         ]
                         ordem_dias_base = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']
                         mapa_weekday_dia = {6: 'dom', 0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab'}
@@ -24536,8 +24703,8 @@ with tab5:
                                 return 'Televendas Receptivo'
                             if 'TELEVENDAS ATIVO' in texto:
                                 return 'Televendas Ativo'
-                            if 'INSIDE SALES' in texto:
-                                return 'Inside Sales'
+                            if texto in CANAL_CONSULTIVO_REMOTO_ALIASES:
+                                return 'Consultivo Remoto'
                             if 'S2S' in texto and 'DAC' in texto:
                                 return 'S2S+DAC'
                             if 'HOSPITALITY' in texto:
@@ -26485,6 +26652,8 @@ with tab5:
                     unsafe_allow_html=True
                 )
 
+gc.collect()
+
 with tab5:
     if tab_funil_movel_ativa:
         render_bloco_cotacoes_funil_movel()
@@ -26576,6 +26745,8 @@ with tab5:
             st.session_state[source_key] = selecionado
 
         return selecionado
+
+gc.collect()
 
 with tab0:
     if tab_inicio_ativa:
