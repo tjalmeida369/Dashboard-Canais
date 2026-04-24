@@ -121,6 +121,8 @@ CANAL_CONSULTIVO_REMOTO_ALIASES = {"INSIDE SALES", "CONSULTIVO REMOTO", "CONSULT
 def normalizar_canal_plan(valor) -> str:
     """Canonicaliza o canal Consultivo Remoto, preservando aliases historicos."""
     texto = normalizar_texto_chave(valor)
+    if not texto:
+        return ""
     if texto in CANAL_CONSULTIVO_REMOTO_ALIASES:
         return CANAL_CONSULTIVO_REMOTO
     return str(valor).strip()
@@ -140,13 +142,13 @@ def encontrar_coluna_por_alias(colunas, *aliases: str) -> str | None:
             return coluna_real
     return None
 
-CACHE_MAX_ENTRIES_LARGE = 4
-CACHE_MAX_ENTRIES_MEDIUM = 8
-CACHE_MAX_ENTRIES_VIEW = 10
-CACHE_MAX_ENTRIES_FILTERS = 4
-CACHE_SESSION_VARIATIONS = 2
-SESSION_CACHE_MAX_TEXT_CHARS = 550_000
-SESSION_CACHE_MAX_CONTAINER_ITEMS = 12
+CACHE_MAX_ENTRIES_LARGE = 2
+CACHE_MAX_ENTRIES_MEDIUM = 4
+CACHE_MAX_ENTRIES_VIEW = 6
+CACHE_MAX_ENTRIES_FILTERS = 2
+CACHE_SESSION_VARIATIONS = 1
+SESSION_CACHE_MAX_TEXT_CHARS = 320_000
+SESSION_CACHE_MAX_CONTAINER_ITEMS = 8
 SESSION_CACHE_TTL_SECONDS = 1800
 COTACOES_CACHE_VERSION = "2026-04-02-cotacoes-otimizadas-v7"
 ALLOWED_CANAIS_VENDA_COTACOES = {
@@ -5122,7 +5124,7 @@ def load_ligacoes_performance_data(path: str, file_mtime: float | None = None) -
     return load_base_performance_data(path, file_mtime)
 
 
-@st.cache_data(show_spinner=False, max_entries=4, persist="disk", ttl=3600)
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_evolucao_mensal_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return _carregar_dataframe_preprocessado(
         path,
@@ -5134,7 +5136,7 @@ def load_evolucao_mensal_data(path: str, file_mtime: float | None = None) -> pd.
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=12, persist="disk", ttl=3600)
+@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
 def load_evolucao_mensal(
     path: str,
     file_mtime: float | None,
@@ -10808,7 +10810,7 @@ def normalizar_rotulo_produto(valor) -> str:
     return base
 
 
-@st.cache_data(show_spinner=False, max_entries=8, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=4, persist="disk")
 def cached_fig_linhas_json(
     df_json: str,
     altura: int,
@@ -10847,7 +10849,7 @@ def cached_fig_linhas_json(
     return fig.to_json()
 
 
-@st.cache_data(show_spinner=False, max_entries=8, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=4, persist="disk")
 def cached_fig_bar_resumo_json(
     df_json: str,
     altura: int,
@@ -13706,7 +13708,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     return html
 
 
-@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=3, persist="disk")
 def cached_tabela_html_funil_cotacoes(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
     return criar_tabela_html_funil_cotacoes(
         desserializar_dataframe_cache(df_fmt_json),
@@ -13715,7 +13717,7 @@ def cached_tabela_html_funil_cotacoes(df_fmt_json: str, df_num_json: str, table_
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=3, persist="disk")
 def cached_tabela_html_analitica(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
     return criar_tabela_html_analitica(
         desserializar_dataframe_cache(df_fmt_json),
@@ -13724,7 +13726,7 @@ def cached_tabela_html_analitica(df_fmt_json: str, df_num_json: str, table_id: s
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+@st.cache_data(show_spinner=False, max_entries=3, persist="disk")
 def cached_tabela_html_resultado_canais(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
     return criar_tabela_html_resultado_canais(
         desserializar_dataframe_cache(df_fmt_json),
@@ -15255,15 +15257,11 @@ def render_bloco_backlog_fixa_pme() -> None:
         unsafe_allow_html=True
     )
 
-    backlog_path = resolver_arquivo_dashboard(
-        BACKLOG_CONSOLIDADO_FILE_PATH,
-        "backlog_consolidado.csv",
-        DASHBOARD_APP_DIR / "arquivos" / "backlog_arquivos" / "backlog_consolidado.csv"
-    )
+    backlog_path = resolver_arquivo_preprocessado("backlog_consolidado_limpo.parquet")
     backlog_path = backlog_path if Path(backlog_path).exists() else None
 
     if backlog_path is None:
-        st.info("Arquivo `backlog_consolidado.csv` não encontrado no caminho configurado.")
+        st.info("Arquivo `dados_preprocessados/backlog_consolidado_limpo.parquet` não encontrado. Rode `preprocess_all.py` para gerar a base otimizada de Backlog.")
         return
 
     backlog_mtime = Path(backlog_path).stat().st_mtime if Path(backlog_path).exists() else None
@@ -15762,9 +15760,9 @@ def aplicar_filtros_globais_cached(
 
     reter_em_cache = (
         resultado.empty or (
-            len(resultado) <= 75_000 and
-            memoria_resultado <= 12 * 1024 * 1024 and
-            (len(_df_base) == 0 or len(resultado) < int(len(_df_base) * 0.70))
+            len(resultado) <= 30_000 and
+            memoria_resultado <= 5 * 1024 * 1024 and
+            (len(_df_base) == 0 or len(resultado) < int(len(_df_base) * 0.35))
         )
     )
 
@@ -22717,7 +22715,7 @@ with tab4:
                     
                         return html
 
-                    @st.cache_data(show_spinner=False, max_entries=6, persist="disk")
+                    @st.cache_data(show_spinner=False, max_entries=3, persist="disk")
                     def cached_tabela_html_ligacoes_local(
                         df_fmt_json: str,
                         df_num_json: str,
@@ -26657,6 +26655,8 @@ gc.collect()
 with tab5:
     if tab_funil_movel_ativa:
         render_bloco_cotacoes_funil_movel()
+        render_bloco_backlog_fixa_pme()
+        gc.collect()
 
     def build_home_source_filters_html(info_text: object, titulo: str = "Filtros de Origem") -> str:
         partes = [
