@@ -14930,6 +14930,10 @@ def criar_grafico_funil_segmentado_fixa(
         customdata = []
         larguras_visuais = _gerar_larguras_visuais_funil_segmentado(len(df_seg))
         valores_reais = df_seg['QTDE'].astype(float).tolist()
+        valores_por_indicador_norm = {
+            normalizar_chave_visual(str(linha_seg.get('INDICADOR', '')).strip()): float(linha_seg.get('QTDE', 0.0))
+            for _, linha_seg in df_seg.iterrows()
+        }
         valor_anterior_real = None
         etapa_anterior = ''
 
@@ -14939,9 +14943,14 @@ def criar_grafico_funil_segmentado_fixa(
             valor_rotulo = _formatar_valor_real_funil_segmentado(indicador_ref, valor_real)
             indicador_norm = normalizar_chave_visual(indicador_ref)
             eh_primeiro_step_investimento = valor_anterior_real is None and indicador_norm == 'investimento'
+            valor_base_step = valor_anterior_real
+            etapa_base_step = etapa_anterior
+            if indicador_norm in {'instalacao', 'instalado', 'instalados'} and 'venda bruta' in valores_por_indicador_norm:
+                valor_base_step = valores_por_indicador_norm.get('venda bruta')
+                etapa_base_step = 'VENDA BRUTA'
             percentual_step = _formatar_percentual_step_funil_segmentado(
                 valor_real,
-                valor_anterior_real,
+                valor_base_step,
                 valor_base_primeiro_step=total_investimento_mes if eh_primeiro_step_investimento else None
             )
 
@@ -14951,8 +14960,9 @@ def criar_grafico_funil_segmentado_fixa(
             if percentual_step:
                 if eh_primeiro_step_investimento:
                     texto_hover_step = f"<br><b>% do investimento total do mês:</b> {percentual_step}"
-                elif etapa_anterior:
-                    texto_hover_step = f"<br><b>% vs etapa anterior ({etapa_anterior}):</b> {percentual_step}"
+                elif etapa_base_step:
+                    rotulo_base_step = "% vs etapa anterior" if etapa_base_step == etapa_anterior else "% vs etapa base"
+                    texto_hover_step = f"<br><b>{rotulo_base_step} ({etapa_base_step}):</b> {percentual_step}"
                 else:
                     texto_hover_step = ""
             else:
@@ -14962,7 +14972,7 @@ def criar_grafico_funil_segmentado_fixa(
                 segmento_ref,
                 valor_rotulo,
                 percentual_step,
-                etapa_anterior,
+                etapa_base_step,
                 texto_hover_step,
             ])
 
@@ -19778,7 +19788,7 @@ with tab3:
             container_evolucao_pedidos = st.container()
             st.markdown(build_visual_title_html("PEDIDOS POR REGIONAL", "grid"), unsafe_allow_html=True)
         
-            col_filtro_t1_pedidos, col_filtro_t2_pedidos = st.columns(2)
+            col_filtro_t1_pedidos, _ = st.columns(2)
         
             with col_filtro_t1_pedidos:
                 plataforma_tabela_pedidos = st.multiselect(
@@ -19788,21 +19798,10 @@ with tab3:
                     key="filtro_plataforma_tabela_pedidos"
                 )
         
-            with col_filtro_t2_pedidos:
-                indicador_tabela_pedidos = st.multiselect(
-                    "Filtrar por Indicador:",
-                    options=["Todos"] + sorted(df_pedidos['DSC_INDICADOR'].dropna().unique().tolist()),
-                    default=["Todos"],
-                    key="filtro_indicador_tabela_pedidos"
-                )
-        
             df_tabela_pedidos = df_pedidos.copy()
         
             if "Todos" not in plataforma_tabela_pedidos:
                 df_tabela_pedidos = df_tabela_pedidos[df_tabela_pedidos['COD_PLATAFORMA'].isin(plataforma_tabela_pedidos)]
-        
-            if "Todos" not in indicador_tabela_pedidos:
-                df_tabela_pedidos = df_tabela_pedidos[df_tabela_pedidos['DSC_INDICADOR'].isin(indicador_tabela_pedidos)]
         
             if not pd.api.types.is_datetime64_any_dtype(df_tabela_pedidos['DAT_MOVIMENTO2']):
                 df_tabela_pedidos['DAT_MOVIMENTO2'] = pd.to_datetime(df_tabela_pedidos['DAT_MOVIMENTO2'], errors='coerce')
