@@ -161,6 +161,8 @@ _RUN_CSS_RENDERED: set[str] = set()
 if not hasattr(st, "_dashboard_markdown_original"):
     setattr(st, "_dashboard_markdown_original", st.markdown)
 _ST_MARKDOWN_ORIGINAL = getattr(st, "_dashboard_markdown_original")
+st.markdown = _ST_MARKDOWN_ORIGINAL
+setattr(st, "_dashboard_export_original_markdown", _ST_MARKDOWN_ORIGINAL)
 
 
 def serializar_dataframe_cache(df: pd.DataFrame | None) -> str:
@@ -378,23 +380,6 @@ def renderizar_html_otimizado(html: object, markdown_kwargs: dict | None = None)
 
     if corpo.strip():
         _ST_MARKDOWN_ORIGINAL(corpo, **kwargs_corpo)
-
-
-def _markdown_dashboard_otimizado(body, *args, **kwargs):
-    """Evita reinjetar blocos <style> idênticos no mesmo rerun."""
-    unsafe_html = bool(kwargs.get("unsafe_allow_html", False))
-    if not unsafe_html and args:
-        unsafe_html = any(isinstance(arg, bool) and arg for arg in args[:1])
-    if unsafe_html and isinstance(body, str) and "<style" in body.lower():
-        renderizar_html_otimizado(body, kwargs)
-        return None
-    return _ST_MARKDOWN_ORIGINAL(body, *args, **kwargs)
-
-
-if not getattr(st.markdown, "_dashboard_html_otimizado", False):
-    _markdown_dashboard_otimizado._dashboard_html_otimizado = True
-    st.markdown = _markdown_dashboard_otimizado
-
 
 def obter_opcao_preferida_dashboard(
     options,
