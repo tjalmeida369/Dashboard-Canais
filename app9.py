@@ -158,6 +158,9 @@ ALLOWED_CANAIS_VENDA_COTACOES = {
 }
 HTML_STYLE_BLOCK_RE = re.compile(r"<style[^>]*>.*?</style>", re.IGNORECASE | re.DOTALL)
 _RUN_CSS_RENDERED: set[str] = set()
+if not hasattr(st, "_dashboard_markdown_original"):
+    setattr(st, "_dashboard_markdown_original", st.markdown)
+_ST_MARKDOWN_ORIGINAL = getattr(st, "_dashboard_markdown_original")
 
 
 def serializar_dataframe_cache(df: pd.DataFrame | None) -> str:
@@ -353,7 +356,7 @@ def obter_cache_session_dashboard(
     return valor
 
 
-def renderizar_html_otimizado(html: object) -> None:
+def renderizar_html_otimizado(html: object, markdown_kwargs: dict | None = None) -> None:
     """Renderiza HTML pesado reutilizando blocos <style> iguais apenas uma vez por execução."""
     if html is None:
         return
@@ -361,15 +364,36 @@ def renderizar_html_otimizado(html: object) -> None:
     if not html_texto.strip():
         return
 
+    kwargs_corpo = {"unsafe_allow_html": True}
+    if isinstance(markdown_kwargs, dict):
+        kwargs_corpo.update(markdown_kwargs)
+        kwargs_corpo["unsafe_allow_html"] = True
+
     estilos = HTML_STYLE_BLOCK_RE.findall(html_texto)
     corpo = HTML_STYLE_BLOCK_RE.sub("", html_texto)
     for estilo in estilos:
         if estilo not in _RUN_CSS_RENDERED:
-            st.markdown(estilo, unsafe_allow_html=True)
+            _ST_MARKDOWN_ORIGINAL(estilo, unsafe_allow_html=True)
             _RUN_CSS_RENDERED.add(estilo)
 
     if corpo.strip():
-        st.markdown(corpo, unsafe_allow_html=True)
+        _ST_MARKDOWN_ORIGINAL(corpo, **kwargs_corpo)
+
+
+def _markdown_dashboard_otimizado(body, *args, **kwargs):
+    """Evita reinjetar blocos <style> idênticos no mesmo rerun."""
+    unsafe_html = bool(kwargs.get("unsafe_allow_html", False))
+    if not unsafe_html and args:
+        unsafe_html = any(isinstance(arg, bool) and arg for arg in args[:1])
+    if unsafe_html and isinstance(body, str) and "<style" in body.lower():
+        renderizar_html_otimizado(body, kwargs)
+        return None
+    return _ST_MARKDOWN_ORIGINAL(body, *args, **kwargs)
+
+
+if not getattr(st.markdown, "_dashboard_html_otimizado", False):
+    _markdown_dashboard_otimizado._dashboard_html_otimizado = True
+    st.markdown = _markdown_dashboard_otimizado
 
 
 def obter_opcao_preferida_dashboard(
@@ -5028,6 +5052,8 @@ ATIVADOS_FILE_PATH = resolver_arquivo_preprocessado(
 )
 BASE_PERFORMANCE_FILE_PATH = resolver_arquivo_preprocessado("base_performance_mensal.parquet")
 ANALITICA_DIARIA_FILE_PATH = resolver_arquivo_preprocessado("analitica_diaria.parquet")
+HOME_ANALITICA_DIARIA_FILE_PATH = resolver_arquivo_preprocessado("home_analitica_diaria.parquet", ANALITICA_DIARIA_FILE_PATH)
+HOME_ANALITICA_MENSAL_FILE_PATH = resolver_arquivo_preprocessado("home_analitica_mensal.parquet", HOME_ANALITICA_DIARIA_FILE_PATH, ANALITICA_DIARIA_FILE_PATH)
 PEDIDOS_FILE_PATH = resolver_arquivo_preprocessado("pedidos_ecommerce.parquet", RAW_PRIMARY_BASE_FILE_PATH)
 LIGACOES_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_receptivo.parquet", RAW_LIGACOES_FILE_PATH)
 LIGACOES_MENSAL_AGREGADO_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_mensal_agregado.parquet")
@@ -5153,6 +5179,32 @@ def load_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd
             'DSC_INDICADOR', 'DSC_IND_NORM', 'IND_NORM'
         ]
     )
+
+
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+def load_home_analitica_mensal_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={
+            'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM',
+            'QTDE', 'DESAFIO_QTD', 'TEND_QTD', 'DSC_INDICADOR', 'DSC_IND_NORM', 'IND_NORM'
+        },
+        text_cols=[
+            'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM',
+            'DSC_INDICADOR', 'DSC_IND_NORM', 'IND_NORM'
+        ],
+        numeric_cols=['QTDE', 'DESAFIO_QTD', 'TEND_QTD'],
+        category_cols=[
+            'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM',
+            'DSC_INDICADOR', 'DSC_IND_NORM', 'IND_NORM'
+        ]
+    )
+
+
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+def load_home_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return load_analitica_diaria_data(path, file_mtime)
 
 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
@@ -23983,19 +24035,24 @@ with tab5:
             partes.append("</div>")
             return "".join(partes)
 
-        perf_base_path_obj = Path(BASE_PERFORMANCE_FILE_PATH)
-        perf_base_mtime = perf_base_path_obj.stat().st_mtime if perf_base_path_obj.exists() else None
-        df_perf_base = load_base_performance_data(str(BASE_PERFORMANCE_FILE_PATH), perf_base_mtime)
-        if df_perf_base.empty:
-            df_perf_base = preparar_base_performance(df)
-        ligacoes_perf_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
-        lig_perf_path_obj = Path(LIGACOES_PERFORMANCE_FILE_PATH)
-        lig_perf_mtime = lig_perf_path_obj.stat().st_mtime if lig_perf_path_obj.exists() else None
-        df_lig_perf = load_ligacoes_performance_data(str(LIGACOES_PERFORMANCE_FILE_PATH), lig_perf_mtime)
-        if df_lig_perf.empty:
-            df_lig_raw = load_ligacoes_para_performance(ligacoes_perf_mtime)
-            df_lig_perf = preparar_base_performance(df_lig_raw)
+        if tab_inicio_ativa:
+            perf_base_path_obj = Path(BASE_PERFORMANCE_FILE_PATH)
+            perf_base_mtime = perf_base_path_obj.stat().st_mtime if perf_base_path_obj.exists() else None
+            df_perf_base = load_base_performance_data(str(BASE_PERFORMANCE_FILE_PATH), perf_base_mtime)
+            if df_perf_base.empty:
+                df_perf_base = preparar_base_performance(df)
+            ligacoes_perf_mtime = Path(LIGACOES_FILE_PATH).stat().st_mtime if Path(LIGACOES_FILE_PATH).exists() else None
+            lig_perf_path_obj = Path(LIGACOES_PERFORMANCE_FILE_PATH)
+            lig_perf_mtime = lig_perf_path_obj.stat().st_mtime if lig_perf_path_obj.exists() else None
+            df_lig_perf = load_ligacoes_performance_data(str(LIGACOES_PERFORMANCE_FILE_PATH), lig_perf_mtime)
+            if df_lig_perf.empty:
+                df_lig_raw = load_ligacoes_para_performance(ligacoes_perf_mtime)
+                df_lig_perf = preparar_base_performance(df_lig_raw)
+            else:
+                df_lig_raw = pd.DataFrame()
         else:
+            df_perf_base = pd.DataFrame()
+            df_lig_perf = pd.DataFrame()
             df_lig_raw = pd.DataFrame()
 
         if not df_lig_perf.empty:
@@ -24069,11 +24126,27 @@ with tab5:
             )
             df_perf_base = pd.concat([df_perf_base[~mask_remove_lig], df_lig_perf], ignore_index=True)
 
-        analitica_path_obj = Path(ANALITICA_DIARIA_FILE_PATH)
-        analitica_mtime = analitica_path_obj.stat().st_mtime if analitica_path_obj.exists() else None
-        base_analitica = load_analitica_diaria_data(str(ANALITICA_DIARIA_FILE_PATH), analitica_mtime)
-        if base_analitica.empty:
-            base_analitica = preparar_base_analitica(df)
+        if tab_inicio_ativa:
+            home_mensal_path_obj = Path(HOME_ANALITICA_MENSAL_FILE_PATH)
+            home_mensal_mtime = home_mensal_path_obj.stat().st_mtime if home_mensal_path_obj.exists() else None
+            base_analitica = load_home_analitica_mensal_data(str(HOME_ANALITICA_MENSAL_FILE_PATH), home_mensal_mtime)
+            if base_analitica.empty:
+                analitica_path_obj = Path(ANALITICA_DIARIA_FILE_PATH)
+                analitica_mtime = analitica_path_obj.stat().st_mtime if analitica_path_obj.exists() else None
+                base_analitica = load_analitica_diaria_data(str(ANALITICA_DIARIA_FILE_PATH), analitica_mtime)
+            if base_analitica.empty:
+                base_analitica = preparar_base_analitica(df)
+            base_analitica_diaria_home = pd.DataFrame()
+            home_diaria_path_obj = Path(HOME_ANALITICA_DIARIA_FILE_PATH)
+            home_diaria_mtime = home_diaria_path_obj.stat().st_mtime if home_diaria_path_obj.exists() else None
+        else:
+            base_analitica = pd.DataFrame({
+                'dat_tratada': [get_mes_atual_formatado()],
+                'REGIONAL': ['Todas'],
+                'CANAL_PLAN': ['Todos'],
+            })
+            base_analitica_diaria_home = pd.DataFrame()
+            home_diaria_mtime = None
 
         meses_analitico = sorted(
             base_analitica['dat_tratada'].dropna().unique().tolist(),
@@ -24136,7 +24209,7 @@ with tab5:
 
             mes_resultado_m1 = get_mes_anterior(mes_resultado)
             mes_resultado_m2 = get_mes_anterior(mes_resultado_m1)
-            base_resultado = base_analitica
+            base_resultado = base_analitica if tab_inicio_ativa else pd.DataFrame()
             if str(regional_resultado).strip() != "Todas":
                 regional_resultado_norm3 = str(regional_resultado).strip().upper()[:3]
                 base_resultado = base_resultado[
@@ -24214,15 +24287,16 @@ with tab5:
                                 resultados_html.get(produto_resultado, ""),
                                 unsafe_allow_html=True
                             )
-            st.markdown(
-                build_visual_title_html(
-                    "ATIVAÇÃO CONTA - MOTIVO DOS ATIVADOS",
-                    "grid",
-                    "subsection-title",
-                    extra_style="margin-top:18px;"
-                ),
-                unsafe_allow_html=True
-            )
+            if tab_funil_movel_ativa:
+                st.markdown(
+                    build_visual_title_html(
+                        "ATIVAÇÃO CONTA - MOTIVO DOS ATIVADOS",
+                        "grid",
+                        "subsection-title",
+                        extra_style="margin-top:18px;"
+                    ),
+                    unsafe_allow_html=True
+                )
 
             df_gross_motivo = preparar_base_gross_motivo_status(
                 globals().get("df_ativados_source", df)
@@ -24558,7 +24632,14 @@ with tab5:
         elif base_analitica.empty:
             st.info("Nao ha dados para montar a evolucao semanal.")
         else:
-            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica)
+            if tab_inicio_ativa and (base_analitica_diaria_home is None or getattr(base_analitica_diaria_home, "empty", True)):
+                base_analitica_diaria_home = load_home_analitica_diaria_data(
+                    str(HOME_ANALITICA_DIARIA_FILE_PATH),
+                    home_diaria_mtime
+                )
+                if base_analitica_diaria_home.empty and "DATA_DIA" in base_analitica.columns:
+                    base_analitica_diaria_home = base_analitica
+            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica_diaria_home)
 
             if not meses_disp_sem:
                 if render_blocos_home_only_no_funil_movel:
@@ -26623,7 +26704,14 @@ with tab5:
                 if render_blocos_home_only_no_funil_movel:
                     st.warning("Sem dados para os filtros selecionados.")
         if tab_inicio_ativa and tem_meses_analitico:
-            base_necessidade_diaria = preparar_base_necessidade_diaria(base_analitica)
+            if base_analitica_diaria_home is None or getattr(base_analitica_diaria_home, "empty", True):
+                base_analitica_diaria_home = load_home_analitica_diaria_data(
+                    str(HOME_ANALITICA_DIARIA_FILE_PATH),
+                    home_diaria_mtime
+                )
+                if base_analitica_diaria_home.empty and "DATA_DIA" in base_analitica.columns:
+                    base_analitica_diaria_home = base_analitica
+            base_necessidade_diaria = preparar_base_necessidade_diaria(base_analitica_diaria_home)
             if render_blocos_home_only_no_funil_movel:
                 st.markdown(
                     build_visual_title_html(
