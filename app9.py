@@ -16496,33 +16496,50 @@ labels_abas_dashboard = [
     "FUNIL MÓVEL",
     "DESATIVAÇÕES"
 ]
+DASHBOARD_TAB_KEY = "dashboard_tab_ativa"
+DASHBOARD_TAB_DEFAULT = labels_abas_dashboard[0]
+tabs_dashboard_stateful = False
 try:
     tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
         labels_abas_dashboard,
-        default="INÍCIO",
-        key="dashboard_tab_ativa",
+        default=DASHBOARD_TAB_DEFAULT,
+        key=DASHBOARD_TAB_KEY,
         on_change="rerun"
     )
+    tabs_dashboard_stateful = True
 except TypeError:
     try:
         tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
             labels_abas_dashboard,
-            key="dashboard_tab_ativa",
+            key=DASHBOARD_TAB_KEY,
             on_change="rerun"
         )
+        tabs_dashboard_stateful = True
     except TypeError:
         tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(labels_abas_dashboard)
+        tabs_dashboard_stateful = False
 
-def _tab_deve_renderizar(tab) -> bool:
+def _tab_deve_renderizar(tab, label: str) -> bool:
+    if tabs_dashboard_stateful:
+        tab_estado = st.session_state.get(DASHBOARD_TAB_KEY)
+        if tab_estado in labels_abas_dashboard:
+            return str(tab_estado) == str(label)
+
     estado_aberto = getattr(tab, "open", None)
-    return True if estado_aberto is None else bool(estado_aberto)
+    if isinstance(estado_aberto, bool):
+        return estado_aberto
 
-tab_inicio_ativa = _tab_deve_renderizar(tab0)
-tab_ativados_ativa = _tab_deve_renderizar(tab1)
-tab_desativacoes_ativa = _tab_deve_renderizar(tab2)
-tab_pedidos_ativa = _tab_deve_renderizar(tab3)
-tab_ligacoes_ativa = _tab_deve_renderizar(tab4)
-tab_funil_movel_ativa = _tab_deve_renderizar(tab5)
+    # Fallback para execuções fora do runtime ou versões antigas:
+    # preserva navegação em versões sem abas stateful e evita renderizar tudo
+    # quando o Streamlit expõe "open" como método dinâmico do DeltaGenerator.
+    return True if not tabs_dashboard_stateful else str(label) == DASHBOARD_TAB_DEFAULT
+
+tab_inicio_ativa = _tab_deve_renderizar(tab0, "INÍCIO")
+tab_ativados_ativa = _tab_deve_renderizar(tab1, "ATIVADOS")
+tab_desativacoes_ativa = _tab_deve_renderizar(tab2, "DESATIVAÇÕES")
+tab_pedidos_ativa = _tab_deve_renderizar(tab3, "PEDIDOS")
+tab_ligacoes_ativa = _tab_deve_renderizar(tab4, "LIGAÇÕES")
+tab_funil_movel_ativa = _tab_deve_renderizar(tab5, "FUNIL MÓVEL")
 
 components.html(
     """
