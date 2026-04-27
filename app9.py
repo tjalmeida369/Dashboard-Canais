@@ -5045,6 +5045,7 @@ LIGACOES_MENSAL_AGREGADO_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_me
 LIGACOES_PERFORMANCE_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_performance_mensal.parquet")
 EVOLUCAO_MENSAL_FILE_PATH = resolver_arquivo_preprocessado("evolucao_mensal.parquet", "evolucao_mensal_agregado.parquet")
 COTACOES_FILE_PATH = resolver_arquivo_preprocessado("cotacoes_agregado.parquet", RAW_COTACOES_FILE_PATH)
+GROSS_MOTIVO_STATUS_FILE_PATH = resolver_arquivo_preprocessado("gross_motivo_status.parquet", PRIMARY_BASE_FILE_PATH)
 BACKLOG_CONSOLIDADO_FILE_PATH = resolver_arquivo_preprocessado(
     "backlog_consolidado_limpo.parquet",
     RAW_BACKLOG_CONSOLIDADO_FILE_PATH
@@ -5190,6 +5191,38 @@ def load_home_analitica_mensal_data(path: str, file_mtime: float | None = None) 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_home_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return load_analitica_diaria_data(path, file_mtime)
+
+
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+def load_gross_motivo_status_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    return _carregar_dataframe_preprocessado(
+        path,
+        file_mtime,
+        required_cols={'dat_tratada', 'CANAL_PLAN', 'REGIONAL', 'MOTIVO_STS', 'QTDE'},
+        text_cols=['dat_tratada', 'CANAL_PLAN', 'REGIONAL', 'MOTIVO_STS'],
+        numeric_cols=['QTDE'],
+        category_cols=['dat_tratada', 'CANAL_PLAN', 'REGIONAL', 'MOTIVO_STS']
+    )
+
+
+def home_analitica_diaria_pronta(df_base: pd.DataFrame | None) -> bool:
+    colunas_prontas = {
+        'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM',
+        'QTDE', 'DESAFIO_QTD', 'TEND_QTD', 'DAT_MOVIMENTO2', 'DATA_DIA',
+        'DSC_INDICADOR', 'IND_NORM'
+    }
+    return bool(df_base is not None and not df_base.empty and colunas_prontas.issubset(set(df_base.columns)))
+
+
+def montar_contexto_home_analitica_pronta(df_base: pd.DataFrame) -> tuple[pd.DataFrame, list, list, list, list]:
+    meses_disp_sem = sorted(
+        df_base['dat_tratada'].dropna().astype(str).str.strip().unique().tolist(),
+        key=mes_ano_para_data
+    )
+    canais_disp_sem = ["Todos"] + sorted(df_base['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist())
+    produtos_disp_sem = ['CONTA', 'FIXA']
+    regionais_disp_sem = ["Todas"] + sorted(df_base['REGIONAL'].dropna().astype(str).str.strip().unique().tolist())
+    return df_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem
 
 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
@@ -16865,10 +16898,11 @@ with tab1:
         if df_ativados_source.empty:
             df_ativados_source = df
         ativados_cache_ref = ativados_mtime if ativados_mtime is not None else file_mtime
+        df_ativados_filtros_base = df_ativados_source if not df_ativados_source.empty else df
 
         df_filtered = aplicar_filtros_globais_cached(
-            df,
-            file_mtime,
+            df_ativados_filtros_base,
+            ativados_cache_ref,
             region_filter_key,
             canal_filter_key,
             data_filter_key,
@@ -16876,8 +16910,8 @@ with tab1:
             incluir_periodo=True
         )
         df_filtered_sem_periodo = aplicar_filtros_globais_cached(
-            df,
-            file_mtime,
+            df_ativados_filtros_base,
+            ativados_cache_ref,
             region_filter_key,
             canal_filter_key,
             data_filter_key,
@@ -16885,8 +16919,8 @@ with tab1:
             incluir_periodo=False
         )
         df_cards_base_global = aplicar_filtros_globais_cached(
-            df,
-            file_mtime,
+            df_ativados_filtros_base,
+            ativados_cache_ref,
             region_filter_key,
             canal_filter_key,
             data_filter_key,
@@ -25205,9 +25239,19 @@ with tab5:
                     unsafe_allow_html=True
                 )
 
-            df_gross_motivo = preparar_base_gross_motivo_status(
-                globals().get("df_ativados_source", df)
-            ) if tab_funil_movel_ativa else pd.DataFrame()
+            if tab_funil_movel_ativa:
+                gross_motivo_path_obj = Path(GROSS_MOTIVO_STATUS_FILE_PATH)
+                gross_motivo_mtime = gross_motivo_path_obj.stat().st_mtime if gross_motivo_path_obj.exists() else None
+                df_gross_motivo = load_gross_motivo_status_data(
+                    str(GROSS_MOTIVO_STATUS_FILE_PATH),
+                    gross_motivo_mtime
+                )
+                if df_gross_motivo.empty:
+                    df_gross_motivo = preparar_base_gross_motivo_status(
+                        globals().get("df_ativados_source", df)
+                    )
+            else:
+                df_gross_motivo = pd.DataFrame()
             if df_gross_motivo.empty:
                 if tab_funil_movel_ativa:
                     st.info("Sem dados disponiveis para montar os graficos de ativacao por motivo.")
@@ -25546,7 +25590,10 @@ with tab5:
                 )
                 if base_analitica_diaria_home.empty and "DATA_DIA" in base_analitica.columns:
                     base_analitica_diaria_home = base_analitica
-            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica_diaria_home)
+            if home_analitica_diaria_pronta(base_analitica_diaria_home):
+                df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = montar_contexto_home_analitica_pronta(base_analitica_diaria_home)
+            else:
+                df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica_diaria_home)
 
             if not meses_disp_sem:
                 if render_blocos_home_only_no_funil_movel:
@@ -27791,7 +27838,10 @@ with tab5:
                 )
                 if base_analitica_diaria_home.empty and "DATA_DIA" in base_analitica.columns:
                     base_analitica_diaria_home = base_analitica
-            base_necessidade_diaria = preparar_base_necessidade_diaria(base_analitica_diaria_home)
+            if home_analitica_diaria_pronta(base_analitica_diaria_home):
+                base_necessidade_diaria = base_analitica_diaria_home
+            else:
+                base_necessidade_diaria = preparar_base_necessidade_diaria(base_analitica_diaria_home)
             if render_blocos_home_only_no_funil_movel:
                 st.markdown(
                     build_visual_title_html(
@@ -28336,6 +28386,262 @@ with tab0:
         if not html_need_conta_home and not html_need_fixa_home:
             st.info("Os dados de NECESSIDADE DIÁRIA não estão disponíveis para a capa.")
 
+st.markdown(
+    """
+    <style>
+    /* Harmonização final das tabelas executivas: padrão RESUMO MENSAL POR CANAL */
+    body .tabela-container-melhorada,
+    body .tabela-container-pedidos,
+    body .tabela-container-ligacoes,
+    body .tabela-container-desativados,
+    body .tabela-container-resultado-canais,
+    body .tabela-analitico-migracoes-pme-container,
+    body .tabela-funil-movel-cotacoes-valor-mensal-container,
+    body .tabela-funil-fixa-backlog-fixa-pme-container {
+        border: 2px solid #790E09 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 6px 18px rgba(121,14,9,0.12) !important;
+        background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%) !important;
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+    }
+
+    body table.tabela-melhorada,
+    body table.tabela-pedidos,
+    body table.tabela-ligacoes,
+    body table.tabela-desativados,
+    body table.tabela-resultado-canais,
+    body table.tabela-analitico-migracoes-pme,
+    body table.tabela-funil-movel-cotacoes-valor-mensal,
+    body table.tabela-funil-fixa-backlog-fixa-pme {
+        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        font-variant-numeric: tabular-nums !important;
+        border-collapse: collapse !important;
+        border-spacing: 0 !important;
+    }
+
+    body table.tabela-melhorada thead th,
+    body table.tabela-pedidos thead th,
+    body table.tabela-ligacoes thead th,
+    body table.tabela-desativados thead th,
+    body table.tabela-resultado-canais thead th,
+    body table.tabela-analitico-migracoes-pme thead th,
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th,
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th {
+        background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+        text-shadow: none !important;
+        box-shadow: none !important;
+        border-right: 1px solid rgba(255,255,255,0.90) !important;
+        border-bottom: 0 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.05 !important;
+        text-transform: uppercase !important;
+    }
+
+    body table.tabela-melhorada thead th:first-child,
+    body table.tabela-pedidos thead th:first-child,
+    body table.tabela-ligacoes thead th:first-child,
+    body table.tabela-desativados thead th:first-child,
+    body table.tabela-resultado-canais thead th:first-child,
+    body table.tabela-analitico-migracoes-pme thead th.col-regional,
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th.col-canal,
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th.col-canal {
+        background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
+    }
+
+    body table.tabela-melhorada thead th.col-tend,
+    body table.tabela-melhorada thead th.col-real-mes,
+    body table.tabela-pedidos thead th.col-tend-pedidos,
+    body table.tabela-pedidos thead th.col-real-jan26-pedidos,
+    body table.tabela-ligacoes thead th.col-real-mes,
+    body table.tabela-desativados thead th.col-real-mes-desativados,
+    body table.tabela-resultado-canais thead th:nth-child(5),
+    body table.tabela-analitico-migracoes-pme thead th.col-tend,
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th.col-mes-atual,
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th.col-mes-atual,
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th.col-total-mes,
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th.col-total-mes {
+        background: linear-gradient(135deg, #B7443B 0%, #8F241D 100%) !important;
+    }
+
+    body table.tabela-melhorada thead th:nth-last-child(6),
+    body table.tabela-melhorada thead th:nth-last-child(5),
+    body table.tabela-pedidos thead th:nth-last-child(6),
+    body table.tabela-pedidos thead th:nth-last-child(5),
+    body table.tabela-ligacoes thead th:nth-last-child(6),
+    body table.tabela-ligacoes thead th:nth-last-child(5),
+    body table.tabela-resultado-canais thead th:nth-child(8),
+    body table.tabela-resultado-canais thead th:nth-child(9),
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(5),
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(4),
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(5),
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(4) {
+        background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
+    }
+
+    body table.tabela-melhorada thead th.col-meta,
+    body table.tabela-pedidos thead th.col-meta-pedidos,
+    body table.tabela-ligacoes thead th.col-meta-mes,
+    body table.tabela-resultado-canais thead th.col-meta,
+    body table.tabela-resultado-canais thead th:nth-child(10),
+    body table.tabela-resultado-canais thead th:nth-child(13),
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(3),
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(3) {
+        background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+    }
+
+    body table.tabela-melhorada thead th.col-alcance,
+    body table.tabela-melhorada thead th.col-variacao,
+    body table.tabela-pedidos thead th.col-alcance-pedidos,
+    body table.tabela-pedidos thead th.col-variacao-pedidos,
+    body table.tabela-ligacoes thead th.col-alcance,
+    body table.tabela-ligacoes thead th.col-variacao,
+    body table.tabela-desativados thead th.col-variacao-desativados,
+    body table.tabela-resultado-canais thead th.col-var,
+    body table.tabela-resultado-canais thead th:nth-child(6),
+    body table.tabela-resultado-canais thead th:nth-child(7),
+    body table.tabela-resultado-canais thead th:nth-child(11),
+    body table.tabela-resultado-canais thead th:nth-child(12),
+    body table.tabela-resultado-canais thead th:nth-child(14),
+    body table.tabela-analitico-migracoes-pme thead th.col-mom,
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(7),
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(6),
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(2),
+    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(1),
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(7),
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(6),
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(2),
+    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(1) {
+        background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+    }
+
+    body table.tabela-melhorada tbody td,
+    body table.tabela-pedidos tbody td,
+    body table.tabela-ligacoes tbody td,
+    body table.tabela-desativados tbody td,
+    body table.tabela-resultado-canais tbody td,
+    body table.tabela-analitico-migracoes-pme tbody td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td,
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td {
+        color: #2F3747 !important;
+        border-bottom: 1px solid #FFFFFF !important;
+        border-right: 1px solid #FFFFFF !important;
+        font-weight: 400 !important;
+        text-shadow: none !important;
+        box-shadow: none !important;
+    }
+
+    body table.tabela-melhorada tbody tr:nth-child(odd) td,
+    body table.tabela-pedidos tbody tr:nth-child(odd) td,
+    body table.tabela-ligacoes tbody tr:nth-child(odd) td,
+    body table.tabela-desativados tbody tr:nth-child(odd) td,
+    body table.tabela-resultado-canais tbody tr:nth-child(odd) td,
+    body table.tabela-analitico-migracoes-pme tbody tr:nth-child(odd) td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(odd) td,
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody tr:nth-child(odd) td {
+        background: #FFF9F8 !important;
+    }
+
+    body table.tabela-melhorada tbody tr:nth-child(even) td,
+    body table.tabela-pedidos tbody tr:nth-child(even) td,
+    body table.tabela-ligacoes tbody tr:nth-child(even) td,
+    body table.tabela-desativados tbody tr:nth-child(even) td,
+    body table.tabela-resultado-canais tbody tr:nth-child(even) td,
+    body table.tabela-analitico-migracoes-pme tbody tr:nth-child(even) td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(even) td,
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody tr:nth-child(even) td {
+        background: #FDF3F2 !important;
+    }
+
+    body table.tabela-melhorada tbody td:first-child,
+    body table.tabela-pedidos tbody td:first-child,
+    body table.tabela-ligacoes tbody td:first-child,
+    body table.tabela-desativados tbody td:first-child,
+    body table.tabela-resultado-canais tbody td:first-child,
+    body table.tabela-analitico-migracoes-pme tbody td.col-regional,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td.col-canal,
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td.col-canal {
+        color: #333333 !important;
+        font-weight: 600 !important;
+        box-shadow: none !important;
+    }
+
+    body table.tabela-resultado-canais tbody td:nth-child(8),
+    body table.tabela-resultado-canais tbody td:nth-child(9),
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(5),
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(4),
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(5),
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(4) {
+        background: linear-gradient(180deg, rgba(47,55,71,0.06) 0%, rgba(47,55,71,0.025) 100%) !important;
+        color: #1F2937 !important;
+        font-weight: 600 !important;
+    }
+
+    body table.tabela-melhorada tbody td.col-meta,
+    body table.tabela-pedidos tbody td.col-meta-pedidos,
+    body table.tabela-ligacoes tbody td.col-meta-mes,
+    body table.tabela-resultado-canais tbody td.col-meta,
+    body table.tabela-resultado-canais tbody td:nth-child(10),
+    body table.tabela-resultado-canais tbody td:nth-child(13),
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(3),
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(3) {
+        background: linear-gradient(180deg, rgba(121,14,9,0.06) 0%, rgba(121,14,9,0.022) 100%) !important;
+        color: #6B1F1A !important;
+        font-weight: 600 !important;
+    }
+
+    body table.tabela-melhorada tbody td.col-alcance,
+    body table.tabela-melhorada tbody td.col-variacao,
+    body table.tabela-pedidos tbody td.col-alcance-pedidos,
+    body table.tabela-pedidos tbody td.col-variacao-pedidos,
+    body table.tabela-ligacoes tbody td.col-alcance,
+    body table.tabela-ligacoes tbody td.col-variacao,
+    body table.tabela-desativados tbody td.col-variacao-desativados,
+    body table.tabela-resultado-canais tbody td.col-var,
+    body table.tabela-resultado-canais tbody td:nth-child(6),
+    body table.tabela-resultado-canais tbody td:nth-child(7),
+    body table.tabela-resultado-canais tbody td:nth-child(11),
+    body table.tabela-resultado-canais tbody td:nth-child(12),
+    body table.tabela-resultado-canais tbody td:nth-child(14),
+    body table.tabela-analitico-migracoes-pme tbody td.col-mom,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(7),
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(6),
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(2),
+    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(1),
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(7),
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(6),
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(2),
+    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(1) {
+        background: linear-gradient(180deg, rgba(90,98,104,0.08) 0%, rgba(90,98,104,0.03) 100%) !important;
+        font-weight: 600 !important;
+    }
+
+    body table.tabela-analitico-migracoes-pme td.col-valor::before,
+    body table.tabela-funil-movel-cotacoes-valor-mensal td.col-valor::before,
+    body table.tabela-funil-fixa-backlog-fixa-pme td.col-valor::before {
+        display: none !important;
+    }
+
+    body table.tabela-melhorada tr.linha-total-melhorada td,
+    body table.tabela-pedidos tr.linha-total-pedidos td,
+    body table.tabela-ligacoes tr.linha-total-ligacoes td,
+    body table.tabela-desativados tr.linha-total-desativados td,
+    body table.tabela-resultado-canais tr.linha-total-resultado td,
+    body table.tabela-analitico-migracoes-pme tr.linha-total td,
+    body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total td,
+    body table.tabela-funil-fixa-backlog-fixa-pme tr.linha-total td {
+        background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        border-right: 1px solid rgba(255,255,255,0.13) !important;
+        box-shadow: none !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 home_inicio_ctx.clear()
 limpar_objetos_runtime_dashboard()
