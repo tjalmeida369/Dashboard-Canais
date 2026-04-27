@@ -17222,12 +17222,22 @@ with tab1:
                 .astype(float)
                 .to_dict()
             )
-            canais_ordenados = (
-                df_mes.groupby('CANAL_PLAN', observed=True)['QTDE']
-                .sum()
-                .sort_values(ascending=False)
-                .index.astype(str)
-                .tolist()
+            ordem_canais_resumo_mensal = [
+                'Televendas Ativo',
+                'Televendas Receptivo',
+                'S2S+DAC',
+                'E-Commerce',
+                'Hospitality',
+                'Consultivo Remoto'
+            ]
+            canais_disponiveis_resumo = df_mes['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist()
+            canais_ordenados = [
+                canal_ref for canal_ref in ordem_canais_resumo_mensal
+                if canal_ref in canais_disponiveis_resumo
+            ]
+            canais_ordenados.extend(
+                canal_ref for canal_ref in sorted(canais_disponiveis_resumo)
+                if canal_ref not in canais_ordenados
             )
 
             def _lookup_canal_mensal(mapa_ref: dict, canal_ref: str | None = None) -> dict[str, float]:
