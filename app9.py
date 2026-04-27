@@ -7702,6 +7702,226 @@ def criar_tabela_html_backlog_canais(
     html += "</tbody></table></div>"
     return html
 
+def criar_tabela_html_resumo_mensal_canal(
+    df_formatado: pd.DataFrame,
+    df_numerico: pd.DataFrame,
+    table_id: str
+) -> str:
+    """Tabela limpa para o resumo mensal por canal, sem data bars e com cabecalhos quebrados."""
+    if df_formatado is None or df_formatado.empty:
+        return ""
+
+    colunas = list(df_formatado.columns)
+    col_canal = colunas[0] if colunas else "CANAL"
+    colunas_variacao = {"MoM", "YoY", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"}
+    colunas_ytd = {"YTD25", "YTD26"}
+    colunas_meta = {"YTD_ORÇ"}
+    qtd_colunas_num = max(len(colunas) - 1, 1)
+    largura_canal_pct = 12.0
+    largura_demais_pct = (100.0 - largura_canal_pct) / qtd_colunas_num
+    colgroup_html = "<colgroup>" + "".join(
+        [f'<col style="width:{largura_canal_pct:.4f}%;">'] +
+        [f'<col style="width:{largura_demais_pct:.4f}%;">' for _ in range(qtd_colunas_num)]
+    ) + "</colgroup>"
+
+    def _classe_variacao(valor) -> str:
+        try:
+            valor_float = float(valor)
+        except Exception:
+            valor_float = 0.0
+        if valor_float > 0:
+            return "status-positivo"
+        if valor_float < 0:
+            return "status-negativo"
+        return "status-neutro"
+
+    def _cabecalho(coluna: str) -> str:
+        coluna_str = str(coluna)
+        if coluna_str == "YTD26 vs YTD25":
+            return "YTD26<br>vs<br>YTD25"
+        if coluna_str == "YTD26 vs YTD_ORÇ":
+            return "YTD26<br>vs<br>ORÇ"
+        return escape(coluna_str)
+
+    mes_atual_label = get_mes_atual_formatado().strip().lower()
+    html = f"""
+    <style>
+        .{table_id}-container {{
+            width: 100%;
+            overflow-x: auto;
+            border: 2px solid #790E09;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(121,14,9,0.12);
+            margin: 8px 0 14px 0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%);
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+        }}
+        table.{table_id} {{
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 1480px;
+            table-layout: fixed;
+            font-size: clamp(8.8px, 0.68vw, 10.4px);
+            font-family: 'Manrope', 'Segoe UI', sans-serif;
+            font-variant-numeric: tabular-nums;
+        }}
+        .{table_id} thead th {{
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+            color: #FFFFFF;
+            padding: 5px 3px;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: 0.15px;
+            border-right: 1px solid rgba(255,255,255,0.90);
+            white-space: normal;
+            overflow-wrap: anywhere;
+            line-height: 1.0;
+            font-size: clamp(8.0px, 0.62vw, 9.8px);
+            text-transform: uppercase;
+        }}
+        .{table_id} thead th.col-canal {{
+            position: sticky;
+            left: 0;
+            z-index: 50;
+            text-align: left;
+            padding-left: 7px;
+            background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
+        }}
+        .{table_id} thead th.col-variacao {{
+            background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
+        }}
+        .{table_id} thead th.col-ytd {{
+            background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
+        }}
+        .{table_id} thead th.col-meta {{
+            background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
+        }}
+        .{table_id} thead th.col-mes-atual {{
+            background: linear-gradient(135deg, #B7443B 0%, #8F241D 100%) !important;
+        }}
+        .{table_id} tbody td {{
+            padding: 4px 3px;
+            text-align: right;
+            border-bottom: 1px solid #FFFFFF;
+            border-right: 1px solid #FFFFFF;
+            font-weight: 400;
+            color: #2F3747;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.08;
+        }}
+        .{table_id} tbody tr:nth-child(odd) td {{ background: #FFF9F8; }}
+        .{table_id} tbody tr:nth-child(even) td {{ background: #FDF3F2; }}
+        .{table_id} tbody td.col-canal {{
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            text-align: left;
+            padding-left: 6px;
+            font-weight: 600;
+            color: #333333;
+            white-space: nowrap;
+        }}
+        .{table_id} tbody tr:nth-child(odd) td.col-canal {{ background: #FFF9F8 !important; }}
+        .{table_id} tbody tr:nth-child(even) td.col-canal {{ background: #FDF3F2 !important; }}
+        .{table_id} tbody td.col-ytd {{
+            background: linear-gradient(180deg, rgba(47,55,71,0.06) 0%, rgba(47,55,71,0.025) 100%) !important;
+            color: #1F2937 !important;
+            font-weight: 600;
+        }}
+        .{table_id} tbody td.col-meta {{
+            background: linear-gradient(180deg, rgba(121,14,9,0.06) 0%, rgba(121,14,9,0.022) 100%) !important;
+            color: #6B1F1A !important;
+            font-weight: 600;
+        }}
+        .{table_id} tbody td.col-variacao {{
+            position: relative;
+            background: linear-gradient(180deg, rgba(90,98,104,0.08) 0%, rgba(90,98,104,0.03) 100%) !important;
+            font-weight: 600;
+            padding-left: 14px !important;
+        }}
+        .{table_id} tbody td.col-variacao.status-positivo {{
+            color: #1B5E20 !important;
+        }}
+        .{table_id} tbody td.col-variacao.status-negativo {{
+            color: #B71C1C !important;
+        }}
+        .{table_id} tbody td.col-variacao.status-neutro {{
+            color: #475569 !important;
+        }}
+        .{table_id} tbody tr:not(.linha-total) td.col-variacao.status-positivo::before {{
+            content: "▲";
+            position: absolute;
+            left: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 8px;
+            color: #2E7D32;
+        }}
+        .{table_id} tbody tr:not(.linha-total) td.col-variacao.status-negativo::before {{
+            content: "▼";
+            position: absolute;
+            left: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 8px;
+            color: #C62828;
+        }}
+        .{table_id} tbody tr.linha-total td {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 700;
+            border-bottom: 2px solid #A23B36;
+        }}
+    </style>
+    <div class="{table_id}-container">
+      <table class="{table_id}">
+        {colgroup_html}
+        <thead>
+          <tr>
+    """
+
+    for idx_col, coluna in enumerate(colunas):
+        classes = []
+        coluna_norm = str(coluna).replace("TEND.", "").strip().lower()
+        if idx_col == 0:
+            classes.append("col-canal")
+        elif str(coluna) in colunas_variacao:
+            classes.append("col-variacao")
+        elif str(coluna) in colunas_ytd:
+            classes.append("col-ytd")
+        elif str(coluna) in colunas_meta:
+            classes.append("col-meta")
+        if idx_col > 0 and coluna_norm == mes_atual_label:
+            classes.append("col-mes-atual")
+        html += f'<th class="{" ".join(classes)}">{_cabecalho(str(coluna))}</th>'
+    html += "</tr></thead><tbody>"
+
+    for idx_linha, row in df_formatado.iterrows():
+        canal_ref = str(df_numerico.iloc[idx_linha, 0]) if df_numerico is not None and idx_linha < len(df_numerico) else str(row.iloc[0])
+        is_total = canal_ref.strip().upper() == "TOTAL"
+        html += '<tr class="linha-total">' if is_total else "<tr>"
+        for idx_col, coluna in enumerate(colunas):
+            classes = []
+            if idx_col == 0:
+                classes.append("col-canal")
+            elif str(coluna) in colunas_variacao:
+                classes.extend(["col-variacao", _classe_variacao(df_numerico.iloc[idx_linha, idx_col])])
+            elif str(coluna) in colunas_ytd:
+                classes.append("col-ytd")
+            elif str(coluna) in colunas_meta:
+                classes.append("col-meta")
+            valor = escape(str(row[coluna]))
+            html += f'<td class="{" ".join(classes)}">{valor}</td>'
+        html += "</tr>"
+
+    html += "</tbody></table></div>"
+    return html
+
 def criar_tabela_html_migracoes_regionais(
     df_formatado: pd.DataFrame,
     df_numerico: pd.DataFrame,
@@ -13911,10 +14131,10 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         }}
         #{table_id} .tabela-resultado-canais {{
             width: 100%;
-            min-width: 100%;
+            min-width: 1180px;
             border-collapse: collapse;
             border-spacing: 0;
-            font-size: 10px;
+            font-size: 10.2px;
             line-height: 1.14;
             table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
@@ -13941,7 +14161,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             text-transform: uppercase;
             letter-spacing: 0.3px;
             line-height: 1.2;
-            font-size: 8px;
+            font-size: 8.8px;
         }}
         #{table_id} .tabela-resultado-canais th.col-var {{
             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
@@ -13958,7 +14178,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             font-weight: 400;
             font-variant-numeric: tabular-nums;
             color: #1F2937;
-            font-size: 8.7px;
+            font-size: 9.6px;
             line-height: 1.16;
             white-space: nowrap;
             overflow: hidden;
@@ -14061,7 +14281,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             font-weight: 700;
             border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
             padding: 5px 3px 3px 3px !important;
-            font-size: 8.7px;
+            font-size: 9.6px;
             vertical-align: bottom !important;
         }}
         #{table_id} .linha-total-resultado td.col-canal {{
@@ -17060,7 +17280,7 @@ with tab1:
                 st.info(f"Sem dados para {produto_resumo_mensal} no resumo mensal por canal.")
             else:
                 st.markdown(
-                    criar_tabela_html_backlog_canais(
+                    criar_tabela_html_resumo_mensal_canal(
                         df_mensal_ativ_fmt,
                         df_mensal_ativ_num,
                         f"tabela-resumo-mensal-canal-{produto_resumo_mensal.lower()}"
@@ -24881,7 +25101,7 @@ with tab5:
                     return resultados_html_local
 
                 resultados_html = obter_cache_session_dashboard(
-                    "home_resultado_canais_html_v2",
+                    "home_resultado_canais_html_v3",
                     (
                         "resultado_canais",
                         file_mtime,
@@ -24894,25 +25114,20 @@ with tab5:
                 home_inicio_ctx["resultado_fixa"] = resultados_html.get("FIXA", "")
 
                 if render_blocos_home_only_no_funil_movel:
-                    col_res_t1, col_res_t2 = st.columns(2, gap="medium")
-                    for col_ref, produto_resultado in [
-                        (col_res_t1, 'CONTA'),
-                        (col_res_t2, 'FIXA')
-                    ]:
-                        with col_ref:
-                            st.markdown(
-                                build_visual_title_html(
-                                    produto_resultado,
-                                    produto_resultado,
-                                    "subsection-title",
-                                    extra_style="margin-top:8px;"
-                                ),
-                                unsafe_allow_html=True
-                            )
-                            st.markdown(
-                                resultados_html.get(produto_resultado, ""),
-                                unsafe_allow_html=True
-                            )
+                    for produto_resultado in ['CONTA', 'FIXA']:
+                        st.markdown(
+                            build_visual_title_html(
+                                produto_resultado,
+                                produto_resultado,
+                                "subsection-title",
+                                extra_style="margin-top:8px;"
+                            ),
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(
+                            resultados_html.get(produto_resultado, ""),
+                            unsafe_allow_html=True
+                        )
             if tab_funil_movel_ativa:
                 st.markdown(
                     build_visual_title_html(
@@ -27164,9 +27379,6 @@ with tab5:
                     mom_demanda = calcular_variacao_percentual(demanda, demanda_m1)
                     mom_vb = calcular_variacao_percentual(vb, vb_m1)
                     mom_ativ = calcular_variacao_percentual(ativ, ativ_m1)
-                    dem_ytd25, dem_ytd26, dem_ytd_orc, dem_ytd_vs_25, dem_ytd_vs_orc = calcular_ytd_resumo_regional(reg, 'DEMANDA', 'DEMANDA_ORC')
-                    vb_ytd25, vb_ytd26, vb_ytd_orc, vb_ytd_vs_25, vb_ytd_vs_orc = calcular_ytd_resumo_regional(reg, 'VB', 'VB_ORC')
-                    ativ_ytd25, ativ_ytd26, ativ_ytd_orc, ativ_ytd_vs_25, ativ_ytd_vs_orc = calcular_ytd_resumo_regional(reg, 'ATIV', 'ATIV_ORC')
                     conv_vb = (vb / demanda) * 100 if demanda > 0 else np.nan
                     conv_ativ = (ativ / vb) * 100 if vb > 0 else np.nan
                     pct_demanda = (((demanda / meta_demanda) - 1) * 100) if meta_demanda > 0 else np.nan
@@ -27180,31 +27392,16 @@ with tab5:
                         'DEMANDA_MOM': mom_demanda,
                         'DEMANDA_ORC': meta_demanda,
                         'DEMANDA_PCT': pct_demanda,
-                        'DEMANDA_YTD25': dem_ytd25,
-                        'DEMANDA_YTD26': dem_ytd26,
-                        'DEMANDA_YTD_ORC': dem_ytd_orc,
-                        'DEMANDA_YTD_VS_25': dem_ytd_vs_25,
-                        'DEMANDA_YTD_VS_ORC': dem_ytd_vs_orc,
                         'VB_REAL': vb,
                         'VB_M1': vb_m1,
                         'VB_MOM': mom_vb,
                         'VB_ORC': meta_vb,
                         'VB_PCT': pct_vb,
-                        'VB_YTD25': vb_ytd25,
-                        'VB_YTD26': vb_ytd26,
-                        'VB_YTD_ORC': vb_ytd_orc,
-                        'VB_YTD_VS_25': vb_ytd_vs_25,
-                        'VB_YTD_VS_ORC': vb_ytd_vs_orc,
                         'ATIV_REAL': ativ,
                         'ATIV_M1': ativ_m1,
                         'ATIV_MOM': mom_ativ,
                         'ATIV_ORC': meta_ativ,
                         'ATIV_PCT': pct_ativ,
-                        'ATIV_YTD25': ativ_ytd25,
-                        'ATIV_YTD26': ativ_ytd26,
-                        'ATIV_YTD_ORC': ativ_ytd_orc,
-                        'ATIV_YTD_VS_25': ativ_ytd_vs_25,
-                        'ATIV_YTD_VS_ORC': ativ_ytd_vs_orc,
                         'CONV_VB': conv_vb,
                         'CONV_ATIV': conv_ativ
                     })
@@ -27216,21 +27413,12 @@ with tab5:
                 total_dem_real = float(df_saida['DEMANDA_REAL'].sum())
                 total_dem_m1 = float(df_saida['DEMANDA_M1'].sum())
                 total_dem_orc = float(df_saida['DEMANDA_ORC'].sum())
-                total_dem_ytd25 = float(df_saida['DEMANDA_YTD25'].sum())
-                total_dem_ytd26 = float(df_saida['DEMANDA_YTD26'].sum())
-                total_dem_ytd_orc = float(df_saida['DEMANDA_YTD_ORC'].sum())
                 total_vb_real = float(df_saida['VB_REAL'].sum())
                 total_vb_m1 = float(df_saida['VB_M1'].sum())
                 total_vb_orc = float(df_saida['VB_ORC'].sum())
-                total_vb_ytd25 = float(df_saida['VB_YTD25'].sum())
-                total_vb_ytd26 = float(df_saida['VB_YTD26'].sum())
-                total_vb_ytd_orc = float(df_saida['VB_YTD_ORC'].sum())
                 total_ativ_real = float(df_saida['ATIV_REAL'].sum())
                 total_ativ_m1 = float(df_saida['ATIV_M1'].sum())
                 total_ativ_orc = float(df_saida['ATIV_ORC'].sum())
-                total_ativ_ytd25 = float(df_saida['ATIV_YTD25'].sum())
-                total_ativ_ytd26 = float(df_saida['ATIV_YTD26'].sum())
-                total_ativ_ytd_orc = float(df_saida['ATIV_YTD_ORC'].sum())
                 total_row = {
                     'REGIONAL': 'TOTAL',
                     'DEMANDA_REAL': total_dem_real,
@@ -27238,31 +27426,16 @@ with tab5:
                     'DEMANDA_MOM': calcular_variacao_percentual(total_dem_real, total_dem_m1),
                     'DEMANDA_ORC': total_dem_orc,
                     'DEMANDA_PCT': (((total_dem_real / total_dem_orc) - 1) * 100) if total_dem_orc > 0 else np.nan,
-                    'DEMANDA_YTD25': total_dem_ytd25,
-                    'DEMANDA_YTD26': total_dem_ytd26,
-                    'DEMANDA_YTD_ORC': total_dem_ytd_orc,
-                    'DEMANDA_YTD_VS_25': calcular_variacao_percentual(total_dem_ytd26, total_dem_ytd25),
-                    'DEMANDA_YTD_VS_ORC': calcular_variacao_percentual(total_dem_ytd26, total_dem_ytd_orc),
                     'VB_REAL': total_vb_real,
                     'VB_M1': total_vb_m1,
                     'VB_MOM': calcular_variacao_percentual(total_vb_real, total_vb_m1),
                     'VB_ORC': total_vb_orc,
                     'VB_PCT': (((total_vb_real / total_vb_orc) - 1) * 100) if total_vb_orc > 0 else np.nan,
-                    'VB_YTD25': total_vb_ytd25,
-                    'VB_YTD26': total_vb_ytd26,
-                    'VB_YTD_ORC': total_vb_ytd_orc,
-                    'VB_YTD_VS_25': calcular_variacao_percentual(total_vb_ytd26, total_vb_ytd25),
-                    'VB_YTD_VS_ORC': calcular_variacao_percentual(total_vb_ytd26, total_vb_ytd_orc),
                     'ATIV_REAL': total_ativ_real,
                     'ATIV_M1': total_ativ_m1,
                     'ATIV_MOM': calcular_variacao_percentual(total_ativ_real, total_ativ_m1),
                     'ATIV_ORC': total_ativ_orc,
                     'ATIV_PCT': (((total_ativ_real / total_ativ_orc) - 1) * 100) if total_ativ_orc > 0 else np.nan,
-                    'ATIV_YTD25': total_ativ_ytd25,
-                    'ATIV_YTD26': total_ativ_ytd26,
-                    'ATIV_YTD_ORC': total_ativ_ytd_orc,
-                    'ATIV_YTD_VS_25': calcular_variacao_percentual(total_ativ_ytd26, total_ativ_ytd25),
-                    'ATIV_YTD_VS_ORC': calcular_variacao_percentual(total_ativ_ytd26, total_ativ_ytd_orc),
                     'CONV_VB': (total_vb_real / total_dem_real) * 100 if total_dem_real > 0 else np.nan,
                     'CONV_ATIV': (total_ativ_real / total_vb_real) * 100 if total_vb_real > 0 else np.nan
                 }
@@ -27311,10 +27484,10 @@ with tab5:
                 }}
                 table.{tabela_id} {{
                     border-collapse: collapse;
-                    width: max-content;
-                    min-width: 1780px;
+                    width: 100%;
+                    min-width: 1120px;
                     table-layout: fixed;
-                    font-size: 9.5px;
+                    font-size: 10px;
                     line-height: 1.05;
                 }}
                 .{tabela_id} thead th {{
@@ -27379,8 +27552,8 @@ with tab5:
                     text-overflow: clip;
                 }}
                 .{tabela_id} tbody td:nth-child(5),
-                .{tabela_id} tbody td:nth-child(15),
-                .{tabela_id} tbody td:nth-child(25) {{
+                .{tabela_id} tbody td:nth-child(10),
+                .{tabela_id} tbody td:nth-child(15) {{
                     background: #FFF3F0 !important;
                     color: #6B1F1A;
                     font-weight: 400;
@@ -27398,16 +27571,16 @@ with tab5:
                     font-weight: 600;
                 }}
                 .{tabela_id} tbody tr.linha-total td:nth-child(5),
-                .{tabela_id} tbody tr.linha-total td:nth-child(15),
-                .{tabela_id} tbody tr.linha-total td:nth-child(25) {{
+                .{tabela_id} tbody tr.linha-total td:nth-child(10),
+                .{tabela_id} tbody tr.linha-total td:nth-child(15) {{
                     background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
                     color: #FFFFFF !important;
                 }}
                 </style>
                 """
-                largura_regional_pct = 12.0
-                largura_demais_pct = (100.0 - largura_regional_pct) / 32.0
-                larguras_cols_pct = [largura_regional_pct] + [largura_demais_pct] * 32
+                largura_regional_pct = 7.0
+                largura_demais_pct = (100.0 - largura_regional_pct) / 17.0
+                larguras_cols_pct = [largura_regional_pct] + [largura_demais_pct] * 17
                 colgroup_html = "<colgroup>" + "".join(
                     [f'<col style="width:{w:.4f}%;">' for w in larguras_cols_pct]
                 ) + "</colgroup>"
@@ -27424,13 +27597,6 @@ with tab5:
                     html_rows += f'<td>{fmt_num(row["DEMANDA_ORC"])}</td>'
                     classe_dem_pct = "" if is_total else f" {classe_pct(row['DEMANDA_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_dem_pct}">{fmt_pct_com_icone(row["DEMANDA_PCT"], is_total=is_total)}</td>'
-                    html_rows += f'<td>{fmt_num(row["DEMANDA_YTD25"])}</td>'
-                    html_rows += f'<td>{fmt_num(row["DEMANDA_YTD26"])}</td>'
-                    html_rows += f'<td>{fmt_num(row["DEMANDA_YTD_ORC"])}</td>'
-                    classe_dem_ytd25 = "" if is_total else f" {classe_pct(row['DEMANDA_YTD_VS_25'])}"
-                    html_rows += f'<td class="col-pct{classe_dem_ytd25}">{fmt_pct_com_icone(row["DEMANDA_YTD_VS_25"], is_total=is_total)}</td>'
-                    classe_dem_ytdorc = "" if is_total else f" {classe_pct(row['DEMANDA_YTD_VS_ORC'])}"
-                    html_rows += f'<td class="col-pct{classe_dem_ytdorc}">{fmt_pct_com_icone(row["DEMANDA_YTD_VS_ORC"], is_total=is_total)}</td>'
 
                     html_rows += f'<td>{fmt_num(row["VB_REAL"])}</td>'
                     html_rows += f'<td>{fmt_num(row["VB_M1"])}</td>'
@@ -27439,13 +27605,6 @@ with tab5:
                     html_rows += f'<td>{fmt_num(row["VB_ORC"])}</td>'
                     classe_vb_pct = "" if is_total else f" {classe_pct(row['VB_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_vb_pct}">{fmt_pct_com_icone(row["VB_PCT"], is_total=is_total)}</td>'
-                    html_rows += f'<td>{fmt_num(row["VB_YTD25"])}</td>'
-                    html_rows += f'<td>{fmt_num(row["VB_YTD26"])}</td>'
-                    html_rows += f'<td>{fmt_num(row["VB_YTD_ORC"])}</td>'
-                    classe_vb_ytd25 = "" if is_total else f" {classe_pct(row['VB_YTD_VS_25'])}"
-                    html_rows += f'<td class="col-pct{classe_vb_ytd25}">{fmt_pct_com_icone(row["VB_YTD_VS_25"], is_total=is_total)}</td>'
-                    classe_vb_ytdorc = "" if is_total else f" {classe_pct(row['VB_YTD_VS_ORC'])}"
-                    html_rows += f'<td class="col-pct{classe_vb_ytdorc}">{fmt_pct_com_icone(row["VB_YTD_VS_ORC"], is_total=is_total)}</td>'
 
                     html_rows += f'<td>{fmt_num(row["ATIV_REAL"])}</td>'
                     html_rows += f'<td>{fmt_num(row["ATIV_M1"])}</td>'
@@ -27454,13 +27613,6 @@ with tab5:
                     html_rows += f'<td>{fmt_num(row["ATIV_ORC"])}</td>'
                     classe_ativ_pct = "" if is_total else f" {classe_pct(row['ATIV_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_ativ_pct}">{fmt_pct_com_icone(row["ATIV_PCT"], is_total=is_total)}</td>'
-                    html_rows += f'<td>{fmt_num(row["ATIV_YTD25"])}</td>'
-                    html_rows += f'<td>{fmt_num(row["ATIV_YTD26"])}</td>'
-                    html_rows += f'<td>{fmt_num(row["ATIV_YTD_ORC"])}</td>'
-                    classe_ativ_ytd25 = "" if is_total else f" {classe_pct(row['ATIV_YTD_VS_25'])}"
-                    html_rows += f'<td class="col-pct{classe_ativ_ytd25}">{fmt_pct_com_icone(row["ATIV_YTD_VS_25"], is_total=is_total)}</td>'
-                    classe_ativ_ytdorc = "" if is_total else f" {classe_pct(row['ATIV_YTD_VS_ORC'])}"
-                    html_rows += f'<td class="col-pct{classe_ativ_ytdorc}">{fmt_pct_com_icone(row["ATIV_YTD_VS_ORC"], is_total=is_total)}</td>'
 
                     html_rows += f'<td class="col-pct">{fmt_pct(row["CONV_VB"])}</td>'
                     html_rows += f'<td class="col-pct">{fmt_pct(row["CONV_ATIV"])}</td>'
@@ -27474,9 +27626,9 @@ with tab5:
                     <thead>
                       <tr>
                         <th rowspan="2">REGIONAL</th>
-                        <th colspan="10">DEMANDA</th>
-                        <th colspan="10">VENDA BRUTA</th>
-                        <th colspan="10">ATIVADOS</th>
+                        <th colspan="5">DEMANDA</th>
+                        <th colspan="5">VENDA BRUTA</th>
+                        <th colspan="5">ATIVADOS</th>
                         <th colspan="2">CONVERSÃO</th>
                       </tr>
                       <tr>
@@ -27485,31 +27637,16 @@ with tab5:
                         <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub">ORÇ</th>
                         <th class="th-sub th-pct">% ORÇ</th>
-                        <th class="th-sub">YTD25</th>
-                        <th class="th-sub">YTD26</th>
-                        <th class="th-sub">YTD_ORÇ</th>
-                        <th class="th-sub th-pct">YTD26<br>vs<br>YTD25</th>
-                        <th class="th-sub th-pct">YTD26<br>vs<br>ORÇ</th>
                         <th class="th-sub">REAL</th>
                         <th class="th-sub">M-1</th>
                         <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub">ORÇ</th>
                         <th class="th-sub th-pct">% ORÇ</th>
-                        <th class="th-sub">YTD25</th>
-                        <th class="th-sub">YTD26</th>
-                        <th class="th-sub">YTD_ORÇ</th>
-                        <th class="th-sub th-pct">YTD26<br>vs<br>YTD25</th>
-                        <th class="th-sub th-pct">YTD26<br>vs<br>ORÇ</th>
                         <th class="th-sub">REAL</th>
                         <th class="th-sub">M-1</th>
                         <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub">ORÇ</th>
                         <th class="th-sub th-pct">% ORÇ</th>
-                        <th class="th-sub">YTD25</th>
-                        <th class="th-sub">YTD26</th>
-                        <th class="th-sub">YTD_ORÇ</th>
-                        <th class="th-sub th-pct">YTD26<br>vs<br>YTD25</th>
-                        <th class="th-sub th-pct">YTD26<br>vs<br>ORÇ</th>
                         <th class="th-conv">V. BRUTA</th>
                         <th class="th-conv">ATIVADOS</th>
                       </tr>
@@ -27532,7 +27669,7 @@ with tab5:
                 return html_regional_produtos_local
 
             html_regional_produtos = obter_cache_session_dashboard(
-                "home_regional_resumo_html_v2",
+                "home_regional_resumo_html_v3",
                 (
                     "regional_resumo",
                     file_mtime,
@@ -27838,21 +27975,18 @@ with tab0:
         html_resultado_conta_home = home_inicio_ctx.get("resultado_conta", "")
         html_resultado_fixa_home = home_inicio_ctx.get("resultado_fixa", "")
         if html_resultado_conta_home or html_resultado_fixa_home:
-            col_home_res_1, col_home_res_2 = st.columns(2, gap="medium")
-            with col_home_res_1:
-                if html_resultado_conta_home:
-                    st.markdown(
-                        build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
-                        unsafe_allow_html=True
-                    )
-                    renderizar_html_otimizado(html_resultado_conta_home)
-            with col_home_res_2:
-                if html_resultado_fixa_home:
-                    st.markdown(
-                        build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:8px;"),
-                        unsafe_allow_html=True
-                    )
-                    renderizar_html_otimizado(html_resultado_fixa_home)
+            if html_resultado_conta_home:
+                st.markdown(
+                    build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
+                    unsafe_allow_html=True
+                )
+                renderizar_html_otimizado(html_resultado_conta_home)
+            if html_resultado_fixa_home:
+                st.markdown(
+                    build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:8px;"),
+                    unsafe_allow_html=True
+                )
+                renderizar_html_otimizado(html_resultado_fixa_home)
         else:
             st.info("Os dados de RESULTADO DOS CANAIS não estão disponíveis para a capa.")
 
