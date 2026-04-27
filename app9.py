@@ -5045,7 +5045,6 @@ LIGACOES_MENSAL_AGREGADO_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_me
 LIGACOES_PERFORMANCE_FILE_PATH = resolver_arquivo_preprocessado("ligacoes_performance_mensal.parquet")
 EVOLUCAO_MENSAL_FILE_PATH = resolver_arquivo_preprocessado("evolucao_mensal.parquet", "evolucao_mensal_agregado.parquet")
 COTACOES_FILE_PATH = resolver_arquivo_preprocessado("cotacoes_agregado.parquet", RAW_COTACOES_FILE_PATH)
-GROSS_MOTIVO_STATUS_FILE_PATH = resolver_arquivo_preprocessado("gross_motivo_status.parquet", PRIMARY_BASE_FILE_PATH)
 BACKLOG_CONSOLIDADO_FILE_PATH = resolver_arquivo_preprocessado(
     "backlog_consolidado_limpo.parquet",
     RAW_BACKLOG_CONSOLIDADO_FILE_PATH
@@ -5191,38 +5190,6 @@ def load_home_analitica_mensal_data(path: str, file_mtime: float | None = None) 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
 def load_home_analitica_diaria_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     return load_analitica_diaria_data(path, file_mtime)
-
-
-@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
-def load_gross_motivo_status_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
-    return _carregar_dataframe_preprocessado(
-        path,
-        file_mtime,
-        required_cols={'dat_tratada', 'CANAL_PLAN', 'REGIONAL', 'MOTIVO_STS', 'QTDE'},
-        text_cols=['dat_tratada', 'CANAL_PLAN', 'REGIONAL', 'MOTIVO_STS'],
-        numeric_cols=['QTDE'],
-        category_cols=['dat_tratada', 'CANAL_PLAN', 'REGIONAL', 'MOTIVO_STS']
-    )
-
-
-def home_analitica_diaria_pronta(df_base: pd.DataFrame | None) -> bool:
-    colunas_prontas = {
-        'CANAL_PLAN', 'COD_PLATAFORMA', 'REGIONAL', 'dat_tratada', 'MES_NORM',
-        'QTDE', 'DESAFIO_QTD', 'TEND_QTD', 'DAT_MOVIMENTO2', 'DATA_DIA',
-        'DSC_INDICADOR', 'IND_NORM'
-    }
-    return bool(df_base is not None and not df_base.empty and colunas_prontas.issubset(set(df_base.columns)))
-
-
-def montar_contexto_home_analitica_pronta(df_base: pd.DataFrame) -> tuple[pd.DataFrame, list, list, list, list]:
-    meses_disp_sem = sorted(
-        df_base['dat_tratada'].dropna().astype(str).str.strip().unique().tolist(),
-        key=mes_ano_para_data
-    )
-    canais_disp_sem = ["Todos"] + sorted(df_base['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist())
-    produtos_disp_sem = ['CONTA', 'FIXA']
-    regionais_disp_sem = ["Todas"] + sorted(df_base['REGIONAL'].dropna().astype(str).str.strip().unique().tolist())
-    return df_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem
 
 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
@@ -7794,7 +7761,7 @@ def criar_tabela_html_resumo_mensal_canal(
             width: 100%;
             min-width: 100%;
             table-layout: fixed;
-            font-size: clamp(8.4px, 0.64vw, 9.8px);
+            font-size: clamp(7.6px, 0.58vw, 9.1px);
             font-family: 'Manrope', 'Segoe UI', sans-serif;
             font-variant-numeric: tabular-nums;
         }}
@@ -7812,7 +7779,7 @@ def criar_tabela_html_resumo_mensal_canal(
             white-space: normal;
             overflow-wrap: anywhere;
             line-height: 1.0;
-            font-size: clamp(7.3px, 0.56vw, 9.0px);
+            font-size: clamp(6.8px, 0.52vw, 8.5px);
             text-transform: uppercase;
         }}
         .{table_id} thead th.col-canal {{
@@ -14049,56 +14016,34 @@ def montar_tabela_resultado_canais_exibicao_numerica(
     if df_tabela is None or df_tabela.empty:
         return pd.DataFrame(columns=colunas_saida)
 
-    def _coluna_numerica_origem(nome_coluna: str, valor_padrao: float = 0.0) -> pd.Series:
-        """Preserva valores numéricos já tratados e só aplica parser BR quando vier texto."""
-        if nome_coluna in df_tabela.columns:
-            serie = df_tabela[nome_coluna]
-        else:
-            serie = pd.Series(valor_padrao, index=df_tabela.index)
-
-        if pd.api.types.is_numeric_dtype(serie):
-            return pd.to_numeric(serie, errors='coerce').fillna(0.0).astype(float)
-
-        serie_txt = serie.astype('string').str.strip()
-        tem_formato_br = (
-            serie_txt.str.contains(',', regex=False, na=False).any()
-            or serie_txt.str.match(r"^-?\d{1,3}(\.\d{3})+(\,\d+)?$", na=False).any()
-        )
-        if not tem_formato_br:
-            serie_direta = pd.to_numeric(serie, errors='coerce')
-            if serie_direta.notna().any():
-                return serie_direta.fillna(0.0).astype(float)
-
-        return normalizar_numerico_serie(serie).fillna(0.0).astype(float)
-
     df_num = pd.DataFrame({
         colunas_saida[0]: df_tabela['CANAL_PLAN'].astype(str),
-        colunas_saida[1]: _coluna_numerica_origem('MES_YOY_BASE'),
-        colunas_saida[2]: _coluna_numerica_origem('MES_M2'),
-        colunas_saida[3]: _coluna_numerica_origem('MES_M1'),
-        colunas_saida[4]: _coluna_numerica_origem('MES_ATUAL_TEND'),
-        colunas_saida[5]: _coluna_numerica_origem('MOM'),
-        colunas_saida[6]: _coluna_numerica_origem('YOY'),
-        colunas_saida[7]: _coluna_numerica_origem('YTD25'),
-        colunas_saida[8]: _coluna_numerica_origem('YTD26'),
-        colunas_saida[9]: _coluna_numerica_origem('YTD_ORC'),
-        colunas_saida[10]: _coluna_numerica_origem('VAR_YTD'),
-        colunas_saida[11]: _coluna_numerica_origem('VAR_YTD_ORC'),
-        colunas_saida[12]: _coluna_numerica_origem('META'),
-        colunas_saida[13]: _coluna_numerica_origem('VAR_META')
+        colunas_saida[1]: normalizar_numerico_serie(df_tabela.get('MES_YOY_BASE', 0)).fillna(0.0),
+        colunas_saida[2]: normalizar_numerico_serie(df_tabela['MES_M2']).fillna(0.0),
+        colunas_saida[3]: normalizar_numerico_serie(df_tabela['MES_M1']).fillna(0.0),
+        colunas_saida[4]: normalizar_numerico_serie(df_tabela['MES_ATUAL_TEND']).fillna(0.0),
+        colunas_saida[5]: normalizar_numerico_serie(df_tabela['MOM']).fillna(0.0),
+        colunas_saida[6]: normalizar_numerico_serie(df_tabela['YOY']).fillna(0.0),
+        colunas_saida[7]: normalizar_numerico_serie(df_tabela['YTD25']).fillna(0.0),
+        colunas_saida[8]: normalizar_numerico_serie(df_tabela['YTD26']).fillna(0.0),
+        colunas_saida[9]: normalizar_numerico_serie(df_tabela['YTD_ORC']).fillna(0.0),
+        colunas_saida[10]: normalizar_numerico_serie(df_tabela['VAR_YTD']).fillna(0.0),
+        colunas_saida[11]: normalizar_numerico_serie(df_tabela['VAR_YTD_ORC']).fillna(0.0),
+        colunas_saida[12]: normalizar_numerico_serie(df_tabela['META']).fillna(0.0),
+        colunas_saida[13]: normalizar_numerico_serie(df_tabela['VAR_META']).fillna(0.0)
     })
 
     if incluir_total and not df_num.empty:
-        total_m12 = float(_coluna_numerica_origem('MES_YOY_BASE').sum())
-        total_m2 = float(_coluna_numerica_origem('MES_M2').sum())
-        total_m1 = float(_coluna_numerica_origem('MES_M1').sum())
-        total_m0 = float(_coluna_numerica_origem('MES_ATUAL_TEND').sum())
-        total_ytd25 = float(_coluna_numerica_origem('YTD25').sum())
-        total_ytd26 = float(_coluna_numerica_origem('YTD26').sum())
-        total_ytd_orc = float(_coluna_numerica_origem('YTD_ORC').sum())
-        total_meta = float(_coluna_numerica_origem('META').sum())
+        total_m12 = float(pd.to_numeric(df_num[colunas_saida[1]], errors='coerce').fillna(0.0).sum())
+        total_m2 = float(pd.to_numeric(df_num[colunas_saida[2]], errors='coerce').fillna(0.0).sum())
+        total_m1 = float(pd.to_numeric(df_num[colunas_saida[3]], errors='coerce').fillna(0.0).sum())
+        total_m0 = float(pd.to_numeric(df_num[colunas_saida[4]], errors='coerce').fillna(0.0).sum())
+        total_ytd25 = float(pd.to_numeric(df_num[colunas_saida[7]], errors='coerce').fillna(0.0).sum())
+        total_ytd26 = float(pd.to_numeric(df_num[colunas_saida[8]], errors='coerce').fillna(0.0).sum())
+        total_ytd_orc = float(pd.to_numeric(df_num[colunas_saida[9]], errors='coerce').fillna(0.0).sum())
+        total_meta = float(pd.to_numeric(df_num[colunas_saida[12]], errors='coerce').fillna(0.0).sum())
         mom_total = (((total_m0 / total_m1) - 1.0) * 100.0) if total_m1 > 0 else 0.0
-        total_yoy_base = total_m12
+        total_yoy_base = float(pd.to_numeric(df_tabela.get('MES_YOY_BASE', 0), errors='coerce').fillna(0.0).sum())
         yoy_total = calcular_variacao_percentual(total_m0, total_yoy_base)
         var_ytd_total = calcular_variacao_percentual(total_ytd26, total_ytd25)
         var_ytd_orc_total = calcular_variacao_percentual(total_ytd26, total_ytd_orc)
@@ -16551,50 +16496,33 @@ labels_abas_dashboard = [
     "FUNIL MÓVEL",
     "DESATIVAÇÕES"
 ]
-DASHBOARD_TAB_KEY = "dashboard_tab_ativa"
-DASHBOARD_TAB_DEFAULT = labels_abas_dashboard[0]
-tabs_dashboard_stateful = False
 try:
     tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
         labels_abas_dashboard,
-        default=DASHBOARD_TAB_DEFAULT,
-        key=DASHBOARD_TAB_KEY,
+        default="INÍCIO",
+        key="dashboard_tab_ativa",
         on_change="rerun"
     )
-    tabs_dashboard_stateful = True
 except TypeError:
     try:
         tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(
             labels_abas_dashboard,
-            key=DASHBOARD_TAB_KEY,
+            key="dashboard_tab_ativa",
             on_change="rerun"
         )
-        tabs_dashboard_stateful = True
     except TypeError:
         tab0, tab1, tab3, tab4, tab5, tab2 = st.tabs(labels_abas_dashboard)
-        tabs_dashboard_stateful = False
 
-def _tab_deve_renderizar(tab, label: str) -> bool:
-    if tabs_dashboard_stateful:
-        tab_estado = st.session_state.get(DASHBOARD_TAB_KEY)
-        if tab_estado in labels_abas_dashboard:
-            return str(tab_estado) == str(label)
-
+def _tab_deve_renderizar(tab) -> bool:
     estado_aberto = getattr(tab, "open", None)
-    if isinstance(estado_aberto, bool):
-        return estado_aberto
+    return True if estado_aberto is None else bool(estado_aberto)
 
-    # Fallback para execuções fora do runtime ou versões antigas:
-    # preserva navegação em versões sem abas stateful e evita renderizar tudo
-    # quando o Streamlit expõe "open" como método dinâmico do DeltaGenerator.
-    return True if not tabs_dashboard_stateful else str(label) == DASHBOARD_TAB_DEFAULT
-
-tab_inicio_ativa = _tab_deve_renderizar(tab0, "INÍCIO")
-tab_ativados_ativa = _tab_deve_renderizar(tab1, "ATIVADOS")
-tab_desativacoes_ativa = _tab_deve_renderizar(tab2, "DESATIVAÇÕES")
-tab_pedidos_ativa = _tab_deve_renderizar(tab3, "PEDIDOS")
-tab_ligacoes_ativa = _tab_deve_renderizar(tab4, "LIGAÇÕES")
-tab_funil_movel_ativa = _tab_deve_renderizar(tab5, "FUNIL MÓVEL")
+tab_inicio_ativa = _tab_deve_renderizar(tab0)
+tab_ativados_ativa = _tab_deve_renderizar(tab1)
+tab_desativacoes_ativa = _tab_deve_renderizar(tab2)
+tab_pedidos_ativa = _tab_deve_renderizar(tab3)
+tab_ligacoes_ativa = _tab_deve_renderizar(tab4)
+tab_funil_movel_ativa = _tab_deve_renderizar(tab5)
 
 components.html(
     """
@@ -16898,11 +16826,10 @@ with tab1:
         if df_ativados_source.empty:
             df_ativados_source = df
         ativados_cache_ref = ativados_mtime if ativados_mtime is not None else file_mtime
-        df_ativados_filtros_base = df_ativados_source if not df_ativados_source.empty else df
 
         df_filtered = aplicar_filtros_globais_cached(
-            df_ativados_filtros_base,
-            ativados_cache_ref,
+            df,
+            file_mtime,
             region_filter_key,
             canal_filter_key,
             data_filter_key,
@@ -16910,8 +16837,8 @@ with tab1:
             incluir_periodo=True
         )
         df_filtered_sem_periodo = aplicar_filtros_globais_cached(
-            df_ativados_filtros_base,
-            ativados_cache_ref,
+            df,
+            file_mtime,
             region_filter_key,
             canal_filter_key,
             data_filter_key,
@@ -16919,8 +16846,8 @@ with tab1:
             incluir_periodo=False
         )
         df_cards_base_global = aplicar_filtros_globais_cached(
-            df_ativados_filtros_base,
-            ativados_cache_ref,
+            df,
+            file_mtime,
             region_filter_key,
             canal_filter_key,
             data_filter_key,
@@ -17278,22 +17205,12 @@ with tab1:
                 .astype(float)
                 .to_dict()
             )
-            ordem_canais_resumo_mensal = [
-                'Televendas Ativo',
-                'Televendas Receptivo',
-                'S2S+DAC',
-                'E-Commerce',
-                'Hospitality',
-                'Consultivo Remoto'
-            ]
-            canais_disponiveis_resumo = df_mes['CANAL_PLAN'].dropna().astype(str).str.strip().unique().tolist()
-            canais_ordenados = [
-                canal_ref for canal_ref in ordem_canais_resumo_mensal
-                if canal_ref in canais_disponiveis_resumo
-            ]
-            canais_ordenados.extend(
-                canal_ref for canal_ref in sorted(canais_disponiveis_resumo)
-                if canal_ref not in canais_ordenados
+            canais_ordenados = (
+                df_mes.groupby('CANAL_PLAN', observed=True)['QTDE']
+                .sum()
+                .sort_values(ascending=False)
+                .index.astype(str)
+                .tolist()
             )
 
             def _lookup_canal_mensal(mapa_ref: dict, canal_ref: str | None = None) -> dict[str, float]:
@@ -25169,8 +25086,8 @@ with tab5:
                 def _montar_ctx_resultado_canais_home():
                     resultados_html_local: dict[str, str] = {}
                     for produto_resultado, table_id_resultado in [
-                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v3'),
-                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v3')
+                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v2'),
+                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v2')
                     ]:
                         tabela_resultado_canais = construir_tabela_resultado_canais(
                             df_base=base_resultado,
@@ -25201,7 +25118,7 @@ with tab5:
                     return resultados_html_local
 
                 resultados_html = obter_cache_session_dashboard(
-                    "home_resultado_canais_html_v5",
+                    "home_resultado_canais_html_v4",
                     (
                         "resultado_canais",
                         file_mtime,
@@ -25239,19 +25156,9 @@ with tab5:
                     unsafe_allow_html=True
                 )
 
-            if tab_funil_movel_ativa:
-                gross_motivo_path_obj = Path(GROSS_MOTIVO_STATUS_FILE_PATH)
-                gross_motivo_mtime = gross_motivo_path_obj.stat().st_mtime if gross_motivo_path_obj.exists() else None
-                df_gross_motivo = load_gross_motivo_status_data(
-                    str(GROSS_MOTIVO_STATUS_FILE_PATH),
-                    gross_motivo_mtime
-                )
-                if df_gross_motivo.empty:
-                    df_gross_motivo = preparar_base_gross_motivo_status(
-                        globals().get("df_ativados_source", df)
-                    )
-            else:
-                df_gross_motivo = pd.DataFrame()
+            df_gross_motivo = preparar_base_gross_motivo_status(
+                globals().get("df_ativados_source", df)
+            ) if tab_funil_movel_ativa else pd.DataFrame()
             if df_gross_motivo.empty:
                 if tab_funil_movel_ativa:
                     st.info("Sem dados disponiveis para montar os graficos de ativacao por motivo.")
@@ -25590,10 +25497,7 @@ with tab5:
                 )
                 if base_analitica_diaria_home.empty and "DATA_DIA" in base_analitica.columns:
                     base_analitica_diaria_home = base_analitica
-            if home_analitica_diaria_pronta(base_analitica_diaria_home):
-                df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = montar_contexto_home_analitica_pronta(base_analitica_diaria_home)
-            else:
-                df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica_diaria_home)
+            df_sem_base, meses_disp_sem, canais_disp_sem, produtos_disp_sem, regionais_disp_sem = preparar_contexto_evolucao_semanal_analitico(base_analitica_diaria_home)
 
             if not meses_disp_sem:
                 if render_blocos_home_only_no_funil_movel:
@@ -27228,23 +27132,14 @@ with tab5:
                     df_lig_filt = df_lig_resumo[df_lig_resumo['dat_tratada'] == mes_reg_sel].copy()
                     if canal_reg_sel != "Todos":
                         df_lig_filt = df_lig_filt[df_lig_filt['CANAL_PLAN'] == canal_reg_sel]
+                    df_lig_filt = df_lig_filt[df_lig_filt['COD_PLATAFORMA'] == produto_norm]
                     df_lig_filt_m1 = df_lig_resumo[df_lig_resumo['dat_tratada'] == mes_reg_m1].copy()
                     if canal_reg_sel != "Todos":
                         df_lig_filt_m1 = df_lig_filt_m1[df_lig_filt_m1['CANAL_PLAN'] == canal_reg_sel]
+                    df_lig_filt_m1 = df_lig_filt_m1[df_lig_filt_m1['COD_PLATAFORMA'] == produto_norm]
 
                 regionais_reg = sorted(df_reg['REGIONAL'].dropna().unique().tolist())
                 linhas_saida = []
-
-                def filtrar_ligacoes_resumo_produto(df_lig_ref: pd.DataFrame, produto_ref_local: str) -> pd.DataFrame:
-                    """Replica a regra dos cards de Ligações: FIXA por CABEADO e CONTA por TIPO_CHAMADA."""
-                    if df_lig_ref is None or df_lig_ref.empty:
-                        return pd.DataFrame()
-                    produto_local = str(produto_ref_local).strip().upper()
-                    if produto_local == 'FIXA':
-                        mask_prod_lig = df_lig_ref['CABEADO'].astype(str).str.strip().str.upper().isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
-                    else:
-                        mask_prod_lig = df_lig_ref['TIPO_CHAMADA'].astype(str).str.strip().eq('DEMAIS')
-                    return df_lig_ref.loc[mask_prod_lig]
 
                 def calcular_orc_vb_projetado(df_r_ref: pd.DataFrame, df_r_m1_ref: pd.DataFrame) -> float:
                     canais_cur = set(df_r_ref['CANAL_PLAN'].dropna().astype(str).str.strip().tolist())
@@ -27324,15 +27219,14 @@ with tab5:
                         if canal_reg_sel != "Todos":
                             df_lig_calc = df_lig_calc[df_lig_calc['CANAL_PLAN'] == canal_reg_sel]
                         df_lig_calc = df_lig_calc[
-                            df_lig_calc['REGIONAL'] == reg_ref
+                            (df_lig_calc['COD_PLATAFORMA'] == produto_norm) &
+                            (df_lig_calc['REGIONAL'] == reg_ref)
                         ].copy()
                         if not df_lig_calc.empty:
-                            lig_val = float(
-                                pd.to_numeric(
-                                    filtrar_ligacoes_resumo_produto(df_lig_calc, produto_reg_sel).get('QTDE', 0),
-                                    errors='coerce'
-                                ).fillna(0).sum()
-                            )
+                            if produto_reg_sel == 'FIXA':
+                                lig_val = float(df_lig_calc[df_lig_calc['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
+                            else:
+                                lig_val = float(df_lig_calc[df_lig_calc['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
                     if mes_ref_norm_calc == mes_corrente_norm:
                         lig_tend_val = obter_tend_ligacoes_produto(mes_ref_norm_calc, reg_ref, produto_reg_sel)
                         if lig_tend_val > 0:
@@ -27421,20 +27315,16 @@ with tab5:
                     lig_m1 = 0.0
                     if not df_lig_filt.empty:
                         df_r_lig = df_lig_filt[df_lig_filt['REGIONAL'] == reg]
-                        lig_real = float(
-                            pd.to_numeric(
-                                filtrar_ligacoes_resumo_produto(df_r_lig, produto_reg_sel).get('QTDE', 0),
-                                errors='coerce'
-                            ).fillna(0).sum()
-                        )
+                        if produto_reg_sel == 'FIXA':
+                            lig_real = float(df_r_lig[df_r_lig['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
+                        else:  # CONTA
+                            lig_real = float(df_r_lig[df_r_lig['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
                     if not df_lig_filt_m1.empty:
                         df_r_lig_m1 = df_lig_filt_m1[df_lig_filt_m1['REGIONAL'] == reg]
-                        lig_m1 = float(
-                            pd.to_numeric(
-                                filtrar_ligacoes_resumo_produto(df_r_lig_m1, produto_reg_sel).get('QTDE', 0),
-                                errors='coerce'
-                            ).fillna(0).sum()
-                        )
+                        if produto_reg_sel == 'FIXA':
+                            lig_m1 = float(df_r_lig_m1[df_r_lig_m1['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
+                        else:
+                            lig_m1 = float(df_r_lig_m1[df_r_lig_m1['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
                     if lig_m1 <= 0:
                         lig_m1 = soma_indicador(df_r_m1, aliases_lig, meta=False)
                     if df_lig_filt.empty:
@@ -27796,7 +27686,7 @@ with tab5:
                 return html_regional_produtos_local
 
             html_regional_produtos = obter_cache_session_dashboard(
-                "home_regional_resumo_html_v5",
+                "home_regional_resumo_html_v4",
                 (
                     "regional_resumo",
                     file_mtime,
@@ -27838,10 +27728,7 @@ with tab5:
                 )
                 if base_analitica_diaria_home.empty and "DATA_DIA" in base_analitica.columns:
                     base_analitica_diaria_home = base_analitica
-            if home_analitica_diaria_pronta(base_analitica_diaria_home):
-                base_necessidade_diaria = base_analitica_diaria_home
-            else:
-                base_necessidade_diaria = preparar_base_necessidade_diaria(base_analitica_diaria_home)
+            base_necessidade_diaria = preparar_base_necessidade_diaria(base_analitica_diaria_home)
             if render_blocos_home_only_no_funil_movel:
                 st.markdown(
                     build_visual_title_html(
@@ -28386,262 +28273,6 @@ with tab0:
         if not html_need_conta_home and not html_need_fixa_home:
             st.info("Os dados de NECESSIDADE DIÁRIA não estão disponíveis para a capa.")
 
-st.markdown(
-    """
-    <style>
-    /* Harmonização final das tabelas executivas: padrão RESUMO MENSAL POR CANAL */
-    body .tabela-container-melhorada,
-    body .tabela-container-pedidos,
-    body .tabela-container-ligacoes,
-    body .tabela-container-desativados,
-    body .tabela-container-resultado-canais,
-    body .tabela-analitico-migracoes-pme-container,
-    body .tabela-funil-movel-cotacoes-valor-mensal-container,
-    body .tabela-funil-fixa-backlog-fixa-pme-container {
-        border: 2px solid #790E09 !important;
-        border-radius: 12px !important;
-        box-shadow: 0 6px 18px rgba(121,14,9,0.12) !important;
-        background: linear-gradient(180deg, #FFFFFF 0%, #FFF7F6 100%) !important;
-        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
-    }
-
-    body table.tabela-melhorada,
-    body table.tabela-pedidos,
-    body table.tabela-ligacoes,
-    body table.tabela-desativados,
-    body table.tabela-resultado-canais,
-    body table.tabela-analitico-migracoes-pme,
-    body table.tabela-funil-movel-cotacoes-valor-mensal,
-    body table.tabela-funil-fixa-backlog-fixa-pme {
-        font-family: 'Manrope', 'Segoe UI', sans-serif !important;
-        font-variant-numeric: tabular-nums !important;
-        border-collapse: collapse !important;
-        border-spacing: 0 !important;
-    }
-
-    body table.tabela-melhorada thead th,
-    body table.tabela-pedidos thead th,
-    body table.tabela-ligacoes thead th,
-    body table.tabela-desativados thead th,
-    body table.tabela-resultado-canais thead th,
-    body table.tabela-analitico-migracoes-pme thead th,
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th,
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th {
-        background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
-        color: #FFFFFF !important;
-        font-weight: 800 !important;
-        text-shadow: none !important;
-        box-shadow: none !important;
-        border-right: 1px solid rgba(255,255,255,0.90) !important;
-        border-bottom: 0 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        line-height: 1.05 !important;
-        text-transform: uppercase !important;
-    }
-
-    body table.tabela-melhorada thead th:first-child,
-    body table.tabela-pedidos thead th:first-child,
-    body table.tabela-ligacoes thead th:first-child,
-    body table.tabela-desativados thead th:first-child,
-    body table.tabela-resultado-canais thead th:first-child,
-    body table.tabela-analitico-migracoes-pme thead th.col-regional,
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th.col-canal,
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th.col-canal {
-        background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%) !important;
-    }
-
-    body table.tabela-melhorada thead th.col-tend,
-    body table.tabela-melhorada thead th.col-real-mes,
-    body table.tabela-pedidos thead th.col-tend-pedidos,
-    body table.tabela-pedidos thead th.col-real-jan26-pedidos,
-    body table.tabela-ligacoes thead th.col-real-mes,
-    body table.tabela-desativados thead th.col-real-mes-desativados,
-    body table.tabela-resultado-canais thead th:nth-child(5),
-    body table.tabela-analitico-migracoes-pme thead th.col-tend,
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th.col-mes-atual,
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th.col-mes-atual,
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th.col-total-mes,
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th.col-total-mes {
-        background: linear-gradient(135deg, #B7443B 0%, #8F241D 100%) !important;
-    }
-
-    body table.tabela-melhorada thead th:nth-last-child(6),
-    body table.tabela-melhorada thead th:nth-last-child(5),
-    body table.tabela-pedidos thead th:nth-last-child(6),
-    body table.tabela-pedidos thead th:nth-last-child(5),
-    body table.tabela-ligacoes thead th:nth-last-child(6),
-    body table.tabela-ligacoes thead th:nth-last-child(5),
-    body table.tabela-resultado-canais thead th:nth-child(8),
-    body table.tabela-resultado-canais thead th:nth-child(9),
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(5),
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(4),
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(5),
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(4) {
-        background: linear-gradient(135deg, #D45D44 0%, #A23B36 100%) !important;
-    }
-
-    body table.tabela-melhorada thead th.col-meta,
-    body table.tabela-pedidos thead th.col-meta-pedidos,
-    body table.tabela-ligacoes thead th.col-meta-mes,
-    body table.tabela-resultado-canais thead th.col-meta,
-    body table.tabela-resultado-canais thead th:nth-child(10),
-    body table.tabela-resultado-canais thead th:nth-child(13),
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(3),
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(3) {
-        background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
-    }
-
-    body table.tabela-melhorada thead th.col-alcance,
-    body table.tabela-melhorada thead th.col-variacao,
-    body table.tabela-pedidos thead th.col-alcance-pedidos,
-    body table.tabela-pedidos thead th.col-variacao-pedidos,
-    body table.tabela-ligacoes thead th.col-alcance,
-    body table.tabela-ligacoes thead th.col-variacao,
-    body table.tabela-desativados thead th.col-variacao-desativados,
-    body table.tabela-resultado-canais thead th.col-var,
-    body table.tabela-resultado-canais thead th:nth-child(6),
-    body table.tabela-resultado-canais thead th:nth-child(7),
-    body table.tabela-resultado-canais thead th:nth-child(11),
-    body table.tabela-resultado-canais thead th:nth-child(12),
-    body table.tabela-resultado-canais thead th:nth-child(14),
-    body table.tabela-analitico-migracoes-pme thead th.col-mom,
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(7),
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(6),
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(2),
-    body table.tabela-funil-movel-cotacoes-valor-mensal thead th:nth-last-child(1),
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(7),
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(6),
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(2),
-    body table.tabela-funil-fixa-backlog-fixa-pme thead th:nth-last-child(1) {
-        background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
-    }
-
-    body table.tabela-melhorada tbody td,
-    body table.tabela-pedidos tbody td,
-    body table.tabela-ligacoes tbody td,
-    body table.tabela-desativados tbody td,
-    body table.tabela-resultado-canais tbody td,
-    body table.tabela-analitico-migracoes-pme tbody td,
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td,
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td {
-        color: #2F3747 !important;
-        border-bottom: 1px solid #FFFFFF !important;
-        border-right: 1px solid #FFFFFF !important;
-        font-weight: 400 !important;
-        text-shadow: none !important;
-        box-shadow: none !important;
-    }
-
-    body table.tabela-melhorada tbody tr:nth-child(odd) td,
-    body table.tabela-pedidos tbody tr:nth-child(odd) td,
-    body table.tabela-ligacoes tbody tr:nth-child(odd) td,
-    body table.tabela-desativados tbody tr:nth-child(odd) td,
-    body table.tabela-resultado-canais tbody tr:nth-child(odd) td,
-    body table.tabela-analitico-migracoes-pme tbody tr:nth-child(odd) td,
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(odd) td,
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody tr:nth-child(odd) td {
-        background: #FFF9F8 !important;
-    }
-
-    body table.tabela-melhorada tbody tr:nth-child(even) td,
-    body table.tabela-pedidos tbody tr:nth-child(even) td,
-    body table.tabela-ligacoes tbody tr:nth-child(even) td,
-    body table.tabela-desativados tbody tr:nth-child(even) td,
-    body table.tabela-resultado-canais tbody tr:nth-child(even) td,
-    body table.tabela-analitico-migracoes-pme tbody tr:nth-child(even) td,
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody tr:nth-child(even) td,
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody tr:nth-child(even) td {
-        background: #FDF3F2 !important;
-    }
-
-    body table.tabela-melhorada tbody td:first-child,
-    body table.tabela-pedidos tbody td:first-child,
-    body table.tabela-ligacoes tbody td:first-child,
-    body table.tabela-desativados tbody td:first-child,
-    body table.tabela-resultado-canais tbody td:first-child,
-    body table.tabela-analitico-migracoes-pme tbody td.col-regional,
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td.col-canal,
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td.col-canal {
-        color: #333333 !important;
-        font-weight: 600 !important;
-        box-shadow: none !important;
-    }
-
-    body table.tabela-resultado-canais tbody td:nth-child(8),
-    body table.tabela-resultado-canais tbody td:nth-child(9),
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(5),
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(4),
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(5),
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(4) {
-        background: linear-gradient(180deg, rgba(47,55,71,0.06) 0%, rgba(47,55,71,0.025) 100%) !important;
-        color: #1F2937 !important;
-        font-weight: 600 !important;
-    }
-
-    body table.tabela-melhorada tbody td.col-meta,
-    body table.tabela-pedidos tbody td.col-meta-pedidos,
-    body table.tabela-ligacoes tbody td.col-meta-mes,
-    body table.tabela-resultado-canais tbody td.col-meta,
-    body table.tabela-resultado-canais tbody td:nth-child(10),
-    body table.tabela-resultado-canais tbody td:nth-child(13),
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(3),
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(3) {
-        background: linear-gradient(180deg, rgba(121,14,9,0.06) 0%, rgba(121,14,9,0.022) 100%) !important;
-        color: #6B1F1A !important;
-        font-weight: 600 !important;
-    }
-
-    body table.tabela-melhorada tbody td.col-alcance,
-    body table.tabela-melhorada tbody td.col-variacao,
-    body table.tabela-pedidos tbody td.col-alcance-pedidos,
-    body table.tabela-pedidos tbody td.col-variacao-pedidos,
-    body table.tabela-ligacoes tbody td.col-alcance,
-    body table.tabela-ligacoes tbody td.col-variacao,
-    body table.tabela-desativados tbody td.col-variacao-desativados,
-    body table.tabela-resultado-canais tbody td.col-var,
-    body table.tabela-resultado-canais tbody td:nth-child(6),
-    body table.tabela-resultado-canais tbody td:nth-child(7),
-    body table.tabela-resultado-canais tbody td:nth-child(11),
-    body table.tabela-resultado-canais tbody td:nth-child(12),
-    body table.tabela-resultado-canais tbody td:nth-child(14),
-    body table.tabela-analitico-migracoes-pme tbody td.col-mom,
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(7),
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(6),
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(2),
-    body table.tabela-funil-movel-cotacoes-valor-mensal tbody td:nth-last-child(1),
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(7),
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(6),
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(2),
-    body table.tabela-funil-fixa-backlog-fixa-pme tbody td:nth-last-child(1) {
-        background: linear-gradient(180deg, rgba(90,98,104,0.08) 0%, rgba(90,98,104,0.03) 100%) !important;
-        font-weight: 600 !important;
-    }
-
-    body table.tabela-analitico-migracoes-pme td.col-valor::before,
-    body table.tabela-funil-movel-cotacoes-valor-mensal td.col-valor::before,
-    body table.tabela-funil-fixa-backlog-fixa-pme td.col-valor::before {
-        display: none !important;
-    }
-
-    body table.tabela-melhorada tr.linha-total-melhorada td,
-    body table.tabela-pedidos tr.linha-total-pedidos td,
-    body table.tabela-ligacoes tr.linha-total-ligacoes td,
-    body table.tabela-desativados tr.linha-total-desativados td,
-    body table.tabela-resultado-canais tr.linha-total-resultado td,
-    body table.tabela-analitico-migracoes-pme tr.linha-total td,
-    body table.tabela-funil-movel-cotacoes-valor-mensal tr.linha-total td,
-    body table.tabela-funil-fixa-backlog-fixa-pme tr.linha-total td {
-        background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        border-right: 1px solid rgba(255,255,255,0.13) !important;
-        box-shadow: none !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 home_inicio_ctx.clear()
 limpar_objetos_runtime_dashboard()
