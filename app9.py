@@ -7759,9 +7759,9 @@ def criar_tabela_html_resumo_mensal_canal(
         table.{table_id} {{
             border-collapse: collapse;
             width: 100%;
-            min-width: 1480px;
+            min-width: 100%;
             table-layout: fixed;
-            font-size: clamp(8.8px, 0.68vw, 10.4px);
+            font-size: clamp(7.6px, 0.58vw, 9.1px);
             font-family: 'Manrope', 'Segoe UI', sans-serif;
             font-variant-numeric: tabular-nums;
         }}
@@ -7771,15 +7771,15 @@ def criar_tabela_html_resumo_mensal_canal(
             z-index: 40;
             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
             color: #FFFFFF;
-            padding: 5px 3px;
+            padding: 4px 2px;
             text-align: center;
             font-weight: 800;
-            letter-spacing: 0.15px;
+            letter-spacing: 0.05px;
             border-right: 1px solid rgba(255,255,255,0.90);
             white-space: normal;
             overflow-wrap: anywhere;
             line-height: 1.0;
-            font-size: clamp(8.0px, 0.62vw, 9.8px);
+            font-size: clamp(6.8px, 0.52vw, 8.5px);
             text-transform: uppercase;
         }}
         .{table_id} thead th.col-canal {{
@@ -7803,7 +7803,7 @@ def criar_tabela_html_resumo_mensal_canal(
             background: linear-gradient(135deg, #B7443B 0%, #8F241D 100%) !important;
         }}
         .{table_id} tbody td {{
-            padding: 4px 3px;
+            padding: 3px 2px;
             text-align: right;
             border-bottom: 1px solid #FFFFFF;
             border-right: 1px solid #FFFFFF;
@@ -7813,6 +7813,7 @@ def criar_tabela_html_resumo_mensal_canal(
             overflow: hidden;
             text-overflow: ellipsis;
             line-height: 1.08;
+            letter-spacing: -0.02em;
         }}
         .{table_id} tbody tr:nth-child(odd) td {{ background: #FFF9F8; }}
         .{table_id} tbody tr:nth-child(even) td {{ background: #FDF3F2; }}
@@ -7876,6 +7877,20 @@ def criar_tabela_html_resumo_mensal_canal(
             color: #FFFFFF !important;
             font-weight: 700;
             border-bottom: 2px solid #A23B36;
+        }}
+        .{table_id} tbody tr.linha-total td.col-canal,
+        .{table_id} tbody tr.linha-total td.col-ytd,
+        .{table_id} tbody tr.linha-total td.col-meta,
+        .{table_id} tbody tr.linha-total td.col-variacao,
+        .{table_id} tbody tr.linha-total td.col-variacao.status-positivo,
+        .{table_id} tbody tr.linha-total td.col-variacao.status-negativo,
+        .{table_id} tbody tr.linha-total td.col-variacao.status-neutro {{
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+        }}
+        .{table_id} tbody tr.linha-total td::before {{
+            content: "" !important;
         }}
     </style>
     <div class="{table_id}-container">
@@ -14123,7 +14138,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             overflow-y: auto;
             overflow-x: auto;
             border: 2px solid #790E09;
-            border-radius: 10px;
+            border-radius: 0;
             box-shadow: 0 4px 20px rgba(121, 14, 9, 0.14);
             font-family: 'Manrope', 'Segoe UI', sans-serif;
             margin: 10px 0 18px 0;
@@ -14134,8 +14149,8 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             min-width: 1180px;
             border-collapse: collapse;
             border-spacing: 0;
-            font-size: 10.2px;
-            line-height: 1.14;
+            font-size: 11.5px;
+            line-height: 1.16;
             table-layout: fixed;
             font-family: 'Manrope', 'Segoe UI', sans-serif;
         }}
@@ -14148,10 +14163,10 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
             color: #FFFFFF !important;
             font-weight: 700;
-            padding: 4px 3px;
+            padding: 6px 4px;
             text-align: center;
             vertical-align: middle !important;
-            border-bottom: 3px solid #5A0A06;
+            border-bottom: 0 !important;
             border-right: 1px solid #FFFFFF;
             white-space: normal;
             overflow: visible;
@@ -14161,7 +14176,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             text-transform: uppercase;
             letter-spacing: 0.3px;
             line-height: 1.2;
-            font-size: 8.8px;
+            font-size: 10px;
         }}
         #{table_id} .tabela-resultado-canais th.col-var {{
             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
@@ -14170,7 +14185,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais td {{
-            padding: 5px 3px 3px 3px;
+            padding: 6px 4px 4px 4px;
             text-align: right;
             vertical-align: bottom !important;
             border-bottom: 1px solid #FFFFFF;
@@ -14178,7 +14193,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             font-weight: 400;
             font-variant-numeric: tabular-nums;
             color: #1F2937;
-            font-size: 9.6px;
+            font-size: 11px;
             line-height: 1.16;
             white-space: nowrap;
             overflow: hidden;
@@ -14266,8 +14281,9 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
         }}
         #{table_id} .linha-total-resultado {{
             position: sticky;
-            top: 28px;
+            top: 34px;
             z-index: 95;
+            border-top: 0 !important;
             border-bottom: 2px solid #790E09;
         }}
         #{table_id} .tabela-resultado-canais tbody tr.linha-canal-resultado td {{
@@ -14279,9 +14295,10 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
             color: #FFFFFF !important;
             font-weight: 700;
+            border-top: 0 !important;
             border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
-            padding: 5px 3px 3px 3px !important;
-            font-size: 9.6px;
+            padding: 6px 4px 4px 4px !important;
+            font-size: 11px;
             vertical-align: bottom !important;
         }}
         #{table_id} .linha-total-resultado td.col-canal {{
@@ -25069,8 +25086,8 @@ with tab5:
                 def _montar_ctx_resultado_canais_home():
                     resultados_html_local: dict[str, str] = {}
                     for produto_resultado, table_id_resultado in [
-                        ('CONTA', 'tabela-analitico-resultado-canais-conta'),
-                        ('FIXA', 'tabela-analitico-resultado-canais-fixa')
+                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v2'),
+                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v2')
                     ]:
                         tabela_resultado_canais = construir_tabela_resultado_canais(
                             df_base=base_resultado,
@@ -25101,7 +25118,7 @@ with tab5:
                     return resultados_html_local
 
                 resultados_html = obter_cache_session_dashboard(
-                    "home_resultado_canais_html_v3",
+                    "home_resultado_canais_html_v4",
                     (
                         "resultado_canais",
                         file_mtime,
@@ -27487,7 +27504,7 @@ with tab5:
                     width: 100%;
                     min-width: 1120px;
                     table-layout: fixed;
-                    font-size: 10px;
+                    font-size: 11px;
                     line-height: 1.05;
                 }}
                 .{tabela_id} thead th {{
@@ -27495,18 +27512,18 @@ with tab5:
                     top: 0;
                     background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
                     color: #fff;
-                    padding: 4px 5px;
+                    padding: 5px 5px;
                     text-align: center;
                     font-weight: 700;
                     letter-spacing: 0.2px;
                     white-space: nowrap;
-                    font-size: 9px;
+                    font-size: 10.1px;
                     border-right: 1px solid rgba(255,255,255,0.85);
                     border-bottom: 1px solid rgba(255,255,255,0.25);
                 }}
                 .{tabela_id} thead tr:first-child th {{
                     background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
-                    font-size: 9.2px;
+                    font-size: 10.3px;
                 }}
                 .{tabela_id} thead th.th-sub {{
                     background: linear-gradient(135deg, #8F1B14 0%, #6C0C08 100%);
@@ -27518,12 +27535,12 @@ with tab5:
                     background: linear-gradient(135deg, #A4342D 0%, #7A130E 100%);
                 }}
                 .{tabela_id} tbody td {{
-                    padding: 3px 5px;
+                    padding: 4px 5px;
                     text-align: right;
                     border-bottom: 1px solid #F0E4E2;
                     font-weight: 400;
                     color: #2F3747;
-                    font-size: 9.5px;
+                    font-size: 10.7px;
                     line-height: 1.05;
                     white-space: nowrap;
                     overflow: hidden;
@@ -27551,9 +27568,9 @@ with tab5:
                     overflow: visible;
                     text-overflow: clip;
                 }}
-                .{tabela_id} tbody td:nth-child(5),
-                .{tabela_id} tbody td:nth-child(10),
-                .{tabela_id} tbody td:nth-child(15) {{
+                .{tabela_id} tbody td:nth-child(4),
+                .{tabela_id} tbody td:nth-child(9),
+                .{tabela_id} tbody td:nth-child(14) {{
                     background: #FFF3F0 !important;
                     color: #6B1F1A;
                     font-weight: 400;
@@ -27570,9 +27587,9 @@ with tab5:
                     color: #475569 !important;
                     font-weight: 600;
                 }}
-                .{tabela_id} tbody tr.linha-total td:nth-child(5),
-                .{tabela_id} tbody tr.linha-total td:nth-child(10),
-                .{tabela_id} tbody tr.linha-total td:nth-child(15) {{
+                .{tabela_id} tbody tr.linha-total td:nth-child(4),
+                .{tabela_id} tbody tr.linha-total td:nth-child(9),
+                .{tabela_id} tbody tr.linha-total td:nth-child(14) {{
                     background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
                     color: #FFFFFF !important;
                 }}
@@ -27590,27 +27607,27 @@ with tab5:
                     html_rows += '<tr class="linha-total">' if is_total else "<tr>"
                     html_rows += f'<td class="col-regional">{escape(str(row["REGIONAL"]))}</td>'
 
-                    html_rows += f'<td>{fmt_num(row["DEMANDA_REAL"])}</td>'
                     html_rows += f'<td>{fmt_num(row["DEMANDA_M1"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["DEMANDA_REAL"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["DEMANDA_ORC"])}</td>'
                     classe_dem_mom = "" if is_total else f" {classe_pct(row['DEMANDA_MOM'])}"
                     html_rows += f'<td class="col-pct{classe_dem_mom}">{fmt_pct_com_icone(row["DEMANDA_MOM"], is_total=is_total)}</td>'
-                    html_rows += f'<td>{fmt_num(row["DEMANDA_ORC"])}</td>'
                     classe_dem_pct = "" if is_total else f" {classe_pct(row['DEMANDA_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_dem_pct}">{fmt_pct_com_icone(row["DEMANDA_PCT"], is_total=is_total)}</td>'
 
-                    html_rows += f'<td>{fmt_num(row["VB_REAL"])}</td>'
                     html_rows += f'<td>{fmt_num(row["VB_M1"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["VB_REAL"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["VB_ORC"])}</td>'
                     classe_vb_mom = "" if is_total else f" {classe_pct(row['VB_MOM'])}"
                     html_rows += f'<td class="col-pct{classe_vb_mom}">{fmt_pct_com_icone(row["VB_MOM"], is_total=is_total)}</td>'
-                    html_rows += f'<td>{fmt_num(row["VB_ORC"])}</td>'
                     classe_vb_pct = "" if is_total else f" {classe_pct(row['VB_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_vb_pct}">{fmt_pct_com_icone(row["VB_PCT"], is_total=is_total)}</td>'
 
-                    html_rows += f'<td>{fmt_num(row["ATIV_REAL"])}</td>'
                     html_rows += f'<td>{fmt_num(row["ATIV_M1"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["ATIV_REAL"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["ATIV_ORC"])}</td>'
                     classe_ativ_mom = "" if is_total else f" {classe_pct(row['ATIV_MOM'])}"
                     html_rows += f'<td class="col-pct{classe_ativ_mom}">{fmt_pct_com_icone(row["ATIV_MOM"], is_total=is_total)}</td>'
-                    html_rows += f'<td>{fmt_num(row["ATIV_ORC"])}</td>'
                     classe_ativ_pct = "" if is_total else f" {classe_pct(row['ATIV_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_ativ_pct}">{fmt_pct_com_icone(row["ATIV_PCT"], is_total=is_total)}</td>'
 
@@ -27632,20 +27649,20 @@ with tab5:
                         <th colspan="2">CONVERSÃO</th>
                       </tr>
                       <tr>
-                        <th class="th-sub">REAL</th>
                         <th class="th-sub">M-1</th>
-                        <th class="th-sub th-pct">MoM</th>
+                        <th class="th-sub">REAL</th>
                         <th class="th-sub">ORÇ</th>
+                        <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub th-pct">% ORÇ</th>
-                        <th class="th-sub">REAL</th>
                         <th class="th-sub">M-1</th>
-                        <th class="th-sub th-pct">MoM</th>
+                        <th class="th-sub">REAL</th>
                         <th class="th-sub">ORÇ</th>
+                        <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub th-pct">% ORÇ</th>
-                        <th class="th-sub">REAL</th>
                         <th class="th-sub">M-1</th>
-                        <th class="th-sub th-pct">MoM</th>
+                        <th class="th-sub">REAL</th>
                         <th class="th-sub">ORÇ</th>
+                        <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub th-pct">% ORÇ</th>
                         <th class="th-conv">V. BRUTA</th>
                         <th class="th-conv">ATIVADOS</th>
@@ -27669,7 +27686,7 @@ with tab5:
                 return html_regional_produtos_local
 
             html_regional_produtos = obter_cache_session_dashboard(
-                "home_regional_resumo_html_v3",
+                "home_regional_resumo_html_v4",
                 (
                     "regional_resumo",
                     file_mtime,
