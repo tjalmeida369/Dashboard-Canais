@@ -7761,7 +7761,7 @@ def criar_tabela_html_resumo_mensal_canal(
             width: 100%;
             min-width: 100%;
             table-layout: fixed;
-            font-size: clamp(7.6px, 0.58vw, 9.1px);
+            font-size: clamp(8.4px, 0.64vw, 9.8px);
             font-family: 'Manrope', 'Segoe UI', sans-serif;
             font-variant-numeric: tabular-nums;
         }}
@@ -7779,7 +7779,7 @@ def criar_tabela_html_resumo_mensal_canal(
             white-space: normal;
             overflow-wrap: anywhere;
             line-height: 1.0;
-            font-size: clamp(6.8px, 0.52vw, 8.5px);
+            font-size: clamp(7.3px, 0.56vw, 9.0px);
             text-transform: uppercase;
         }}
         .{table_id} thead th.col-canal {{
@@ -27149,14 +27149,23 @@ with tab5:
                     df_lig_filt = df_lig_resumo[df_lig_resumo['dat_tratada'] == mes_reg_sel].copy()
                     if canal_reg_sel != "Todos":
                         df_lig_filt = df_lig_filt[df_lig_filt['CANAL_PLAN'] == canal_reg_sel]
-                    df_lig_filt = df_lig_filt[df_lig_filt['COD_PLATAFORMA'] == produto_norm]
                     df_lig_filt_m1 = df_lig_resumo[df_lig_resumo['dat_tratada'] == mes_reg_m1].copy()
                     if canal_reg_sel != "Todos":
                         df_lig_filt_m1 = df_lig_filt_m1[df_lig_filt_m1['CANAL_PLAN'] == canal_reg_sel]
-                    df_lig_filt_m1 = df_lig_filt_m1[df_lig_filt_m1['COD_PLATAFORMA'] == produto_norm]
 
                 regionais_reg = sorted(df_reg['REGIONAL'].dropna().unique().tolist())
                 linhas_saida = []
+
+                def filtrar_ligacoes_resumo_produto(df_lig_ref: pd.DataFrame, produto_ref_local: str) -> pd.DataFrame:
+                    """Replica a regra dos cards de Ligações: FIXA por CABEADO e CONTA por TIPO_CHAMADA."""
+                    if df_lig_ref is None or df_lig_ref.empty:
+                        return pd.DataFrame()
+                    produto_local = str(produto_ref_local).strip().upper()
+                    if produto_local == 'FIXA':
+                        mask_prod_lig = df_lig_ref['CABEADO'].astype(str).str.strip().str.upper().isin({'SIM', 'S', 'TRUE', '1', 'FIXA'})
+                    else:
+                        mask_prod_lig = df_lig_ref['TIPO_CHAMADA'].astype(str).str.strip().eq('DEMAIS')
+                    return df_lig_ref.loc[mask_prod_lig]
 
                 def calcular_orc_vb_projetado(df_r_ref: pd.DataFrame, df_r_m1_ref: pd.DataFrame) -> float:
                     canais_cur = set(df_r_ref['CANAL_PLAN'].dropna().astype(str).str.strip().tolist())
@@ -27236,14 +27245,15 @@ with tab5:
                         if canal_reg_sel != "Todos":
                             df_lig_calc = df_lig_calc[df_lig_calc['CANAL_PLAN'] == canal_reg_sel]
                         df_lig_calc = df_lig_calc[
-                            (df_lig_calc['COD_PLATAFORMA'] == produto_norm) &
-                            (df_lig_calc['REGIONAL'] == reg_ref)
+                            df_lig_calc['REGIONAL'] == reg_ref
                         ].copy()
                         if not df_lig_calc.empty:
-                            if produto_reg_sel == 'FIXA':
-                                lig_val = float(df_lig_calc[df_lig_calc['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
-                            else:
-                                lig_val = float(df_lig_calc[df_lig_calc['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
+                            lig_val = float(
+                                pd.to_numeric(
+                                    filtrar_ligacoes_resumo_produto(df_lig_calc, produto_reg_sel).get('QTDE', 0),
+                                    errors='coerce'
+                                ).fillna(0).sum()
+                            )
                     if mes_ref_norm_calc == mes_corrente_norm:
                         lig_tend_val = obter_tend_ligacoes_produto(mes_ref_norm_calc, reg_ref, produto_reg_sel)
                         if lig_tend_val > 0:
@@ -27332,16 +27342,20 @@ with tab5:
                     lig_m1 = 0.0
                     if not df_lig_filt.empty:
                         df_r_lig = df_lig_filt[df_lig_filt['REGIONAL'] == reg]
-                        if produto_reg_sel == 'FIXA':
-                            lig_real = float(df_r_lig[df_r_lig['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
-                        else:  # CONTA
-                            lig_real = float(df_r_lig[df_r_lig['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
+                        lig_real = float(
+                            pd.to_numeric(
+                                filtrar_ligacoes_resumo_produto(df_r_lig, produto_reg_sel).get('QTDE', 0),
+                                errors='coerce'
+                            ).fillna(0).sum()
+                        )
                     if not df_lig_filt_m1.empty:
                         df_r_lig_m1 = df_lig_filt_m1[df_lig_filt_m1['REGIONAL'] == reg]
-                        if produto_reg_sel == 'FIXA':
-                            lig_m1 = float(df_r_lig_m1[df_r_lig_m1['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
-                        else:
-                            lig_m1 = float(df_r_lig_m1[df_r_lig_m1['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
+                        lig_m1 = float(
+                            pd.to_numeric(
+                                filtrar_ligacoes_resumo_produto(df_r_lig_m1, produto_reg_sel).get('QTDE', 0),
+                                errors='coerce'
+                            ).fillna(0).sum()
+                        )
                     if lig_m1 <= 0:
                         lig_m1 = soma_indicador(df_r_m1, aliases_lig, meta=False)
                     if df_lig_filt.empty:
@@ -27703,7 +27717,7 @@ with tab5:
                 return html_regional_produtos_local
 
             html_regional_produtos = obter_cache_session_dashboard(
-                "home_regional_resumo_html_v4",
+                "home_regional_resumo_html_v5",
                 (
                     "regional_resumo",
                     file_mtime,
