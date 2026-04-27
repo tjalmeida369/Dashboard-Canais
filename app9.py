@@ -14016,34 +14016,56 @@ def montar_tabela_resultado_canais_exibicao_numerica(
     if df_tabela is None or df_tabela.empty:
         return pd.DataFrame(columns=colunas_saida)
 
+    def _coluna_numerica_origem(nome_coluna: str, valor_padrao: float = 0.0) -> pd.Series:
+        """Preserva valores numéricos já tratados e só aplica parser BR quando vier texto."""
+        if nome_coluna in df_tabela.columns:
+            serie = df_tabela[nome_coluna]
+        else:
+            serie = pd.Series(valor_padrao, index=df_tabela.index)
+
+        if pd.api.types.is_numeric_dtype(serie):
+            return pd.to_numeric(serie, errors='coerce').fillna(0.0).astype(float)
+
+        serie_txt = serie.astype('string').str.strip()
+        tem_formato_br = (
+            serie_txt.str.contains(',', regex=False, na=False).any()
+            or serie_txt.str.match(r"^-?\d{1,3}(\.\d{3})+(\,\d+)?$", na=False).any()
+        )
+        if not tem_formato_br:
+            serie_direta = pd.to_numeric(serie, errors='coerce')
+            if serie_direta.notna().any():
+                return serie_direta.fillna(0.0).astype(float)
+
+        return normalizar_numerico_serie(serie).fillna(0.0).astype(float)
+
     df_num = pd.DataFrame({
         colunas_saida[0]: df_tabela['CANAL_PLAN'].astype(str),
-        colunas_saida[1]: normalizar_numerico_serie(df_tabela.get('MES_YOY_BASE', 0)).fillna(0.0),
-        colunas_saida[2]: normalizar_numerico_serie(df_tabela['MES_M2']).fillna(0.0),
-        colunas_saida[3]: normalizar_numerico_serie(df_tabela['MES_M1']).fillna(0.0),
-        colunas_saida[4]: normalizar_numerico_serie(df_tabela['MES_ATUAL_TEND']).fillna(0.0),
-        colunas_saida[5]: normalizar_numerico_serie(df_tabela['MOM']).fillna(0.0),
-        colunas_saida[6]: normalizar_numerico_serie(df_tabela['YOY']).fillna(0.0),
-        colunas_saida[7]: normalizar_numerico_serie(df_tabela['YTD25']).fillna(0.0),
-        colunas_saida[8]: normalizar_numerico_serie(df_tabela['YTD26']).fillna(0.0),
-        colunas_saida[9]: normalizar_numerico_serie(df_tabela['YTD_ORC']).fillna(0.0),
-        colunas_saida[10]: normalizar_numerico_serie(df_tabela['VAR_YTD']).fillna(0.0),
-        colunas_saida[11]: normalizar_numerico_serie(df_tabela['VAR_YTD_ORC']).fillna(0.0),
-        colunas_saida[12]: normalizar_numerico_serie(df_tabela['META']).fillna(0.0),
-        colunas_saida[13]: normalizar_numerico_serie(df_tabela['VAR_META']).fillna(0.0)
+        colunas_saida[1]: _coluna_numerica_origem('MES_YOY_BASE'),
+        colunas_saida[2]: _coluna_numerica_origem('MES_M2'),
+        colunas_saida[3]: _coluna_numerica_origem('MES_M1'),
+        colunas_saida[4]: _coluna_numerica_origem('MES_ATUAL_TEND'),
+        colunas_saida[5]: _coluna_numerica_origem('MOM'),
+        colunas_saida[6]: _coluna_numerica_origem('YOY'),
+        colunas_saida[7]: _coluna_numerica_origem('YTD25'),
+        colunas_saida[8]: _coluna_numerica_origem('YTD26'),
+        colunas_saida[9]: _coluna_numerica_origem('YTD_ORC'),
+        colunas_saida[10]: _coluna_numerica_origem('VAR_YTD'),
+        colunas_saida[11]: _coluna_numerica_origem('VAR_YTD_ORC'),
+        colunas_saida[12]: _coluna_numerica_origem('META'),
+        colunas_saida[13]: _coluna_numerica_origem('VAR_META')
     })
 
     if incluir_total and not df_num.empty:
-        total_m12 = float(pd.to_numeric(df_num[colunas_saida[1]], errors='coerce').fillna(0.0).sum())
-        total_m2 = float(pd.to_numeric(df_num[colunas_saida[2]], errors='coerce').fillna(0.0).sum())
-        total_m1 = float(pd.to_numeric(df_num[colunas_saida[3]], errors='coerce').fillna(0.0).sum())
-        total_m0 = float(pd.to_numeric(df_num[colunas_saida[4]], errors='coerce').fillna(0.0).sum())
-        total_ytd25 = float(pd.to_numeric(df_num[colunas_saida[7]], errors='coerce').fillna(0.0).sum())
-        total_ytd26 = float(pd.to_numeric(df_num[colunas_saida[8]], errors='coerce').fillna(0.0).sum())
-        total_ytd_orc = float(pd.to_numeric(df_num[colunas_saida[9]], errors='coerce').fillna(0.0).sum())
-        total_meta = float(pd.to_numeric(df_num[colunas_saida[12]], errors='coerce').fillna(0.0).sum())
+        total_m12 = float(_coluna_numerica_origem('MES_YOY_BASE').sum())
+        total_m2 = float(_coluna_numerica_origem('MES_M2').sum())
+        total_m1 = float(_coluna_numerica_origem('MES_M1').sum())
+        total_m0 = float(_coluna_numerica_origem('MES_ATUAL_TEND').sum())
+        total_ytd25 = float(_coluna_numerica_origem('YTD25').sum())
+        total_ytd26 = float(_coluna_numerica_origem('YTD26').sum())
+        total_ytd_orc = float(_coluna_numerica_origem('YTD_ORC').sum())
+        total_meta = float(_coluna_numerica_origem('META').sum())
         mom_total = (((total_m0 / total_m1) - 1.0) * 100.0) if total_m1 > 0 else 0.0
-        total_yoy_base = float(pd.to_numeric(df_tabela.get('MES_YOY_BASE', 0), errors='coerce').fillna(0.0).sum())
+        total_yoy_base = total_m12
         yoy_total = calcular_variacao_percentual(total_m0, total_yoy_base)
         var_ytd_total = calcular_variacao_percentual(total_ytd26, total_ytd25)
         var_ytd_orc_total = calcular_variacao_percentual(total_ytd26, total_ytd_orc)
@@ -25113,8 +25135,8 @@ with tab5:
                 def _montar_ctx_resultado_canais_home():
                     resultados_html_local: dict[str, str] = {}
                     for produto_resultado, table_id_resultado in [
-                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v2'),
-                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v2')
+                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v3'),
+                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v3')
                     ]:
                         tabela_resultado_canais = construir_tabela_resultado_canais(
                             df_base=base_resultado,
@@ -25145,7 +25167,7 @@ with tab5:
                     return resultados_html_local
 
                 resultados_html = obter_cache_session_dashboard(
-                    "home_resultado_canais_html_v4",
+                    "home_resultado_canais_html_v5",
                     (
                         "resultado_canais",
                         file_mtime,
