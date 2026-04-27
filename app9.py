@@ -6070,13 +6070,15 @@ def montar_tabela_backlog_canais(
         df_num.loc[idx_linha, "YoY"] = metricas_backlog["YOY"]
         df_num.loc[idx_linha, "YTD25"] = metricas_backlog["YTD25"]
         df_num.loc[idx_linha, "YTD26"] = metricas_backlog["YTD26"]
-        df_num.loc[idx_linha, "% YTD"] = metricas_backlog["% YTD"]
+        df_num.loc[idx_linha, "YTD_ORÇ"] = metricas_backlog["YTD_ORÇ"]
+        df_num.loc[idx_linha, "YTD26 vs YTD25"] = metricas_backlog["YTD26 vs YTD25"]
+        df_num.loc[idx_linha, "YTD26 vs YTD_ORÇ"] = metricas_backlog["YTD26 vs YTD_ORÇ"]
 
     df_fmt = df_num.copy().astype(object)
     for col in df_fmt.columns:
         if col == "CANAL":
             continue
-        if col in {"MoM", "YoY", "% YTD"}:
+        if col in {"MoM", "YoY", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"}:
             df_fmt[col] = pd.to_numeric(df_fmt[col], errors="coerce").fillna(0).apply(
                 lambda valor: f"{float(valor):+.1f}%".replace(".", ",")
             )
@@ -6392,7 +6394,7 @@ def montar_tabela_funil_cotacoes(
     PEDIDOS, COTACAO, ATIVAÇÃO e taxas de conversao.
     """
     mes_coluna_vazia = str((mes_ref or get_mes_atual_formatado())).strip().upper()
-    colunas_vazias = ["ETAPA", mes_coluna_vazia, "MoM", "YoY", "YTD25", "YTD26", "% YTD"]
+    colunas_vazias = ["ETAPA", mes_coluna_vazia, "MoM", "YoY", "YTD25", "YTD26", "YTD_ORÇ", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"]
     if (
         (df_base_principal is None or df_base_principal.empty) and
         (df_cotacoes_base is None or df_cotacoes_base.empty)
@@ -6444,7 +6446,7 @@ def montar_tabela_funil_cotacoes(
             label_mes = f"{label_mes} (TEND.)"
         colunas_meses.append(label_mes)
         mapa_coluna_mes[str(mes_item).strip().lower()] = label_mes
-    colunas_saida = ["ETAPA", *colunas_meses, "MoM", "YoY", "YTD25", "YTD26", "% YTD"]
+    colunas_saida = ["ETAPA", *colunas_meses, "MoM", "YoY", "YTD25", "YTD26", "YTD_ORÇ", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"]
 
     canal_escolhido = str(canal_ref or "Todos").strip()
     canais_alvo = None if canal_escolhido.lower() == "todos" else {canal_escolhido}
@@ -6623,6 +6625,9 @@ def montar_tabela_funil_cotacoes(
             cotacoes_por_mes[mes_norm] = _somar_cotacoes(mes_norm, usar_tendencia=usar_tend_extra)
         if mes_norm not in instalados_por_mes:
             instalados_por_mes[mes_norm] = _somar_instalados(mes_norm, usar_tendencia=usar_tend_extra)
+    entradas_orc_por_mes = {mes_item: _somar_entrada(mes_item, meta=True) for mes_item in meses_metricas}
+    cotacoes_orc_por_mes = {mes_item: 0.0 for mes_item in meses_metricas}
+    instalados_orc_por_mes = {mes_item: _somar_instalados(mes_item, meta=True) for mes_item in meses_metricas}
     ped_vs_cot_por_mes = {
         mes_item: _ratio_pct(cotacoes_por_mes.get(mes_item, 0.0), entradas_por_mes.get(mes_item, 0.0))
         for mes_item in meses_metricas
@@ -6644,10 +6649,15 @@ def montar_tabela_funil_cotacoes(
     valor_atual_inst_vs = inst_vs_cot_por_mes.get(mes_foco, np.nan)
     valor_anterior_inst_vs = inst_vs_cot_por_mes.get(mes_m1, np.nan)
 
-    def _metricas_valores_funil(lookup_ref: dict[str, float]) -> dict[str, float]:
-        return calcular_yoy_ytd_mensal_lookup(lookup_ref, {}, mes_foco, mes_corrente)
+    def _metricas_valores_funil(lookup_ref: dict[str, float], lookup_orc_ref: dict[str, float] | None = None) -> dict[str, float]:
+        return calcular_yoy_ytd_mensal_lookup(lookup_ref, {}, mes_foco, mes_corrente, lookup_orc=lookup_orc_ref)
 
-    def _metricas_conversao_funil(lookup_num: dict[str, float], lookup_den: dict[str, float]) -> dict[str, float]:
+    def _metricas_conversao_funil(
+        lookup_num: dict[str, float],
+        lookup_den: dict[str, float],
+        lookup_num_orc: dict[str, float] | None = None,
+        lookup_den_orc: dict[str, float] | None = None
+    ) -> dict[str, float]:
         mes_yoy = get_mes_ano_anterior(mes_foco)
         atual = _ratio_pct(lookup_num.get(mes_foco, 0.0), lookup_den.get(mes_foco, 0.0))
         base_yoy = _ratio_pct(lookup_num.get(mes_yoy, 0.0), lookup_den.get(mes_yoy, 0.0))
@@ -6661,16 +6671,24 @@ def montar_tabela_funil_cotacoes(
             sum(float(lookup_num.get(m, 0.0)) for m in meses_ytd26),
             sum(float(lookup_den.get(m, 0.0)) for m in meses_ytd26)
         )
+        lookup_num_orc = lookup_num_orc or {}
+        lookup_den_orc = lookup_den_orc or {}
+        ytd_orc = _ratio_pct(
+            sum(float(lookup_num_orc.get(m, 0.0)) for m in meses_ytd26),
+            sum(float(lookup_den_orc.get(m, 0.0)) for m in meses_ytd26)
+        )
         return {
             "YOY": _pp_delta(atual, base_yoy),
             "YTD25": ytd25,
             "YTD26": ytd26,
-            "% YTD": _pp_delta(ytd26, ytd25),
+            "YTD_ORÇ": ytd_orc,
+            "YTD26 vs YTD25": _pp_delta(ytd26, ytd25),
+            "YTD26 vs YTD_ORÇ": _pp_delta(ytd26, ytd_orc),
         }
 
     linhas_numericas = []
     if exibir_linha_entrada:
-        metricas_entrada = _metricas_valores_funil(entradas_por_mes)
+        metricas_entrada = _metricas_valores_funil(entradas_por_mes, entradas_orc_por_mes)
         linhas_numericas.append({
             "ETAPA": label_entrada,
             **{mapa_coluna_mes[mes_item]: float(entradas_por_mes.get(mes_item, 0.0)) for mes_item in meses_serie},
@@ -6678,12 +6696,14 @@ def montar_tabela_funil_cotacoes(
             "YoY": metricas_entrada["YOY"],
             "YTD25": metricas_entrada["YTD25"],
             "YTD26": metricas_entrada["YTD26"],
-            "% YTD": metricas_entrada["% YTD"],
+            "YTD_ORÇ": metricas_entrada["YTD_ORÇ"],
+            "YTD26 vs YTD25": metricas_entrada["YTD26 vs YTD25"],
+            "YTD26 vs YTD_ORÇ": metricas_entrada["YTD26 vs YTD_ORÇ"],
         })
 
-    metricas_cot = _metricas_valores_funil(cotacoes_por_mes)
-    metricas_inst = _metricas_valores_funil(instalados_por_mes)
-    metricas_inst_vs = _metricas_conversao_funil(instalados_por_mes, cotacoes_por_mes)
+    metricas_cot = _metricas_valores_funil(cotacoes_por_mes, cotacoes_orc_por_mes)
+    metricas_inst = _metricas_valores_funil(instalados_por_mes, instalados_orc_por_mes)
+    metricas_inst_vs = _metricas_conversao_funil(instalados_por_mes, cotacoes_por_mes, instalados_orc_por_mes, cotacoes_orc_por_mes)
     linhas_numericas.extend([
         {
             "ETAPA": "COTAÇÃO",
@@ -6692,7 +6712,9 @@ def montar_tabela_funil_cotacoes(
             "YoY": metricas_cot["YOY"],
             "YTD25": metricas_cot["YTD25"],
             "YTD26": metricas_cot["YTD26"],
-            "% YTD": metricas_cot["% YTD"],
+            "YTD_ORÇ": metricas_cot["YTD_ORÇ"],
+            "YTD26 vs YTD25": metricas_cot["YTD26 vs YTD25"],
+            "YTD26 vs YTD_ORÇ": metricas_cot["YTD26 vs YTD_ORÇ"],
         },
         {
             "ETAPA": label_saida,
@@ -6701,7 +6723,9 @@ def montar_tabela_funil_cotacoes(
             "YoY": metricas_inst["YOY"],
             "YTD25": metricas_inst["YTD25"],
             "YTD26": metricas_inst["YTD26"],
-            "% YTD": metricas_inst["% YTD"],
+            "YTD_ORÇ": metricas_inst["YTD_ORÇ"],
+            "YTD26 vs YTD25": metricas_inst["YTD26 vs YTD25"],
+            "YTD26 vs YTD_ORÇ": metricas_inst["YTD26 vs YTD_ORÇ"],
         },
         {
             "ETAPA": label_conv_2,
@@ -6710,11 +6734,13 @@ def montar_tabela_funil_cotacoes(
             "YoY": metricas_inst_vs["YOY"],
             "YTD25": metricas_inst_vs["YTD25"],
             "YTD26": metricas_inst_vs["YTD26"],
-            "% YTD": metricas_inst_vs["% YTD"],
+            "YTD_ORÇ": metricas_inst_vs["YTD_ORÇ"],
+            "YTD26 vs YTD25": metricas_inst_vs["YTD26 vs YTD25"],
+            "YTD26 vs YTD_ORÇ": metricas_inst_vs["YTD26 vs YTD_ORÇ"],
         },
     ])
     if exibir_linha_entrada:
-        metricas_conv_1 = _metricas_conversao_funil(cotacoes_por_mes, entradas_por_mes)
+        metricas_conv_1 = _metricas_conversao_funil(cotacoes_por_mes, entradas_por_mes, cotacoes_orc_por_mes, entradas_orc_por_mes)
         linhas_numericas.insert(
             3,
             {
@@ -6724,7 +6750,9 @@ def montar_tabela_funil_cotacoes(
                 "YoY": metricas_conv_1["YOY"],
                 "YTD25": metricas_conv_1["YTD25"],
                 "YTD26": metricas_conv_1["YTD26"],
-                "% YTD": metricas_conv_1["% YTD"],
+                "YTD_ORÇ": metricas_conv_1["YTD_ORÇ"],
+                "YTD26 vs YTD25": metricas_conv_1["YTD26 vs YTD25"],
+                "YTD26 vs YTD_ORÇ": metricas_conv_1["YTD26 vs YTD_ORÇ"],
             }
         )
 
@@ -6739,12 +6767,12 @@ def montar_tabela_funil_cotacoes(
                 continue
             valor = df_num.loc[idx, coluna]
             if etapa in linhas_percentuais:
-                if coluna in {"MoM", "YoY", "% YTD"}:
+                if coluna in {"MoM", "YoY", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"}:
                     df_fmt.loc[idx, coluna] = _fmt_pp(valor)
                 else:
                     df_fmt.loc[idx, coluna] = _fmt_pct(valor, mostrar_sinal=False)
             else:
-                if coluna in {"MoM", "YoY", "% YTD"}:
+                if coluna in {"MoM", "YoY", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"}:
                     df_fmt.loc[idx, coluna] = _fmt_pct(valor)
                 else:
                     df_fmt.loc[idx, coluna] = _fmt_num(valor)
@@ -7044,9 +7072,9 @@ def criar_tabela_html_funil_cotacoes(
 
     colunas = list(df_formatado.columns)
     col_etapa = colunas[0] if colunas else "ETAPA"
-    colunas_resumo = [col for col in ["MoM", "YoY", "YTD25", "YTD26", "% YTD"] if col in colunas]
-    colunas_variacao = {"MoM", "YoY", "% YTD"}
-    colunas_ytd = {"YTD25", "YTD26"}
+    colunas_resumo = [col for col in ["MoM", "YoY", "YTD25", "YTD26", "YTD_ORÇ", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"] if col in colunas]
+    colunas_variacao = {"MoM", "YoY", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"}
+    colunas_ytd = {"YTD25", "YTD26", "YTD_ORÇ"}
     colunas_meses = [col for col in colunas if col not in {col_etapa, *colunas_resumo}]
     col_mes_foco = colunas_meses[-1] if colunas_meses else ""
 
@@ -7431,8 +7459,8 @@ def criar_tabela_html_backlog_canais(
         return ""
 
     colunas = list(df_formatado.columns)
-    colunas_resumo_var = {"MoM", "YoY", "% YTD"}
-    colunas_resumo_valor = {"YTD25", "YTD26"}
+    colunas_resumo_var = {"MoM", "YoY", "YTD26 vs YTD25", "YTD26 vs YTD_ORÇ"}
+    colunas_resumo_valor = {"YTD25", "YTD26", "YTD_ORÇ"}
     qtd_meses = max(len(colunas) - 1, 1)
     largura_canal_pct = 16.2 if qtd_meses >= 10 else 20.0
     largura_mes_pct = (100.0 - largura_canal_pct) / qtd_meses
@@ -8856,7 +8884,8 @@ def calcular_yoy_ytd_mensal_lookup(
     lookup_real: dict[str, float] | None,
     lookup_tend: dict[str, float] | None,
     mes_ref: str,
-    mes_corrente: str | None = None
+    mes_corrente: str | None = None,
+    lookup_orc: dict[str, float] | None = None
 ) -> dict[str, float]:
     """
     Calcula YoY/YTD no padrão executivo:
@@ -8868,6 +8897,7 @@ def calcular_yoy_ytd_mensal_lookup(
     mes_corrente_norm = str(mes_corrente or get_mes_atual_formatado()).strip().lower()
     lookup_real_norm = _normalizar_lookup_mensal(lookup_real)
     lookup_tend_norm = _normalizar_lookup_mensal(lookup_tend)
+    lookup_orc_norm = _normalizar_lookup_mensal(lookup_orc)
 
     valor_atual = obter_valor_serie_mensal_mes(
         mes_ref_norm,
@@ -8892,12 +8922,18 @@ def calcular_yoy_ytd_mensal_lookup(
         for mes_item in meses_ytd_26
     ))
     ytd25 = float(sum(float(lookup_real_norm.get(mes_item, 0.0)) for mes_item in meses_ytd_25))
+    ytd_orc = float(sum(float(lookup_orc_norm.get(mes_item, 0.0)) for mes_item in meses_ytd_26))
+    ytd26_vs_ytd25 = calcular_variacao_percentual(ytd26, ytd25)
+    ytd26_vs_orc = calcular_variacao_percentual(ytd26, ytd_orc)
 
     return {
         "YOY": calcular_variacao_percentual(valor_atual, valor_yoy_base),
         "YTD25": ytd25,
         "YTD26": ytd26,
-        "% YTD": calcular_variacao_percentual(ytd26, ytd25),
+        "YTD_ORÇ": ytd_orc,
+        "% YTD": ytd26_vs_ytd25,
+        "YTD26 vs YTD25": ytd26_vs_ytd25,
+        "YTD26 vs YTD_ORÇ": ytd26_vs_orc,
     }
 
 def criar_grafico_serie_mensal_comparativos(
@@ -13532,7 +13568,7 @@ def construir_tabela_resultado_canais(
     """Monta tabela de resultado por canal (3 meses, MoM, YoY, YTD, Orç e Var Orç)."""
     colunas_saida = [
         'CANAL_PLAN', 'MES_M2', 'MES_M1', 'MES_ATUAL_TEND',
-        'MOM', 'YOY', 'YTD25', 'YTD26', 'VAR_YTD', 'META', 'VAR_META'
+        'MOM', 'YOY', 'YTD25', 'YTD26', 'YTD_ORC', 'VAR_YTD', 'VAR_YTD_ORC', 'META', 'VAR_META'
     ]
     colunas_retorno = [*colunas_saida, 'MES_YOY_BASE']
     canais_ordem = [
@@ -13573,7 +13609,9 @@ def construir_tabela_resultado_canais(
                     'YOY': 0.0,
                     'YTD25': 0.0,
                     'YTD26': 0.0,
+                    'YTD_ORC': 0.0,
                     'VAR_YTD': 0.0,
+                    'VAR_YTD_ORC': 0.0,
                     'MES_YOY_BASE': 0.0,
                     'META': 0.0,
                     'VAR_META': 0.0
@@ -13656,6 +13694,7 @@ def construir_tabela_resultado_canais(
 
     lookup_real_canal_mes = _lookup_mensal_por_canal('QTDE', indicador_real_norm)
     lookup_tend_canal_mes = _lookup_mensal_por_canal('TEND_QTD', indicador_real_norm)
+    lookup_meta_canal_mes = _lookup_mensal_por_canal('DESAFIO_QTD', indicador_meta_norm)
 
     def _lookup_canal(mapa_ref: dict[tuple[str, str], float], canal_ref: str) -> dict[str, float]:
         return {
@@ -13676,10 +13715,12 @@ def construir_tabela_resultado_canais(
         var_meta = (((val_m0 / val_meta) - 1.0) * 100.0) if val_meta > 0 else 0.0
         lookup_real_canal = _lookup_canal(lookup_real_canal_mes, canal)
         lookup_tend_canal = _lookup_canal(lookup_tend_canal_mes, canal)
+        lookup_meta_canal = _lookup_canal(lookup_meta_canal_mes, canal)
         yoy_ytd = calcular_yoy_ytd_mensal_lookup(
             lookup_real_canal,
             lookup_tend_canal,
-            mes_ref_norm
+            mes_ref_norm,
+            lookup_orc=lookup_meta_canal
         )
         val_yoy_base = float(lookup_real_canal.get(get_mes_ano_anterior(mes_ref_norm), 0.0))
 
@@ -13692,7 +13733,9 @@ def construir_tabela_resultado_canais(
             'YOY': yoy_ytd['YOY'],
             'YTD25': yoy_ytd['YTD25'],
             'YTD26': yoy_ytd['YTD26'],
-            'VAR_YTD': yoy_ytd['% YTD'],
+            'YTD_ORC': yoy_ytd['YTD_ORÇ'],
+            'VAR_YTD': yoy_ytd['YTD26 vs YTD25'],
+            'VAR_YTD_ORC': yoy_ytd['YTD26 vs YTD_ORÇ'],
             'MES_YOY_BASE': val_yoy_base,
             'META': val_meta,
             'VAR_META': var_meta
@@ -13711,6 +13754,7 @@ def _colunas_tabela_resultado_canais(
         produto_label = "CANAL_PLAN"
     return [
         produto_label,
+        'M-12',
         str(mes_m2).strip().upper(),
         str(mes_m1).strip().upper(),
         str(mes_ref).strip().upper(),
@@ -13718,7 +13762,9 @@ def _colunas_tabela_resultado_canais(
         'YoY',
         'YTD25',
         'YTD26',
-        '% YTD',
+        'YTD_ORÇ',
+        'YTD26 vs YTD25',
+        'YTD26 vs YTD_ORÇ',
         'Orç',
         'Var Orç'
     ]
@@ -13737,43 +13783,52 @@ def montar_tabela_resultado_canais_exibicao_numerica(
 
     df_num = pd.DataFrame({
         colunas_saida[0]: df_tabela['CANAL_PLAN'].astype(str),
-        colunas_saida[1]: normalizar_numerico_serie(df_tabela['MES_M2']).fillna(0.0),
-        colunas_saida[2]: normalizar_numerico_serie(df_tabela['MES_M1']).fillna(0.0),
-        colunas_saida[3]: normalizar_numerico_serie(df_tabela['MES_ATUAL_TEND']).fillna(0.0),
-        colunas_saida[4]: normalizar_numerico_serie(df_tabela['MOM']).fillna(0.0),
-        colunas_saida[5]: normalizar_numerico_serie(df_tabela['YOY']).fillna(0.0),
-        colunas_saida[6]: normalizar_numerico_serie(df_tabela['YTD25']).fillna(0.0),
-        colunas_saida[7]: normalizar_numerico_serie(df_tabela['YTD26']).fillna(0.0),
-        colunas_saida[8]: normalizar_numerico_serie(df_tabela['VAR_YTD']).fillna(0.0),
-        colunas_saida[9]: normalizar_numerico_serie(df_tabela['META']).fillna(0.0),
-        colunas_saida[10]: normalizar_numerico_serie(df_tabela['VAR_META']).fillna(0.0)
+        colunas_saida[1]: normalizar_numerico_serie(df_tabela.get('MES_YOY_BASE', 0)).fillna(0.0),
+        colunas_saida[2]: normalizar_numerico_serie(df_tabela['MES_M2']).fillna(0.0),
+        colunas_saida[3]: normalizar_numerico_serie(df_tabela['MES_M1']).fillna(0.0),
+        colunas_saida[4]: normalizar_numerico_serie(df_tabela['MES_ATUAL_TEND']).fillna(0.0),
+        colunas_saida[5]: normalizar_numerico_serie(df_tabela['MOM']).fillna(0.0),
+        colunas_saida[6]: normalizar_numerico_serie(df_tabela['YOY']).fillna(0.0),
+        colunas_saida[7]: normalizar_numerico_serie(df_tabela['YTD25']).fillna(0.0),
+        colunas_saida[8]: normalizar_numerico_serie(df_tabela['YTD26']).fillna(0.0),
+        colunas_saida[9]: normalizar_numerico_serie(df_tabela['YTD_ORC']).fillna(0.0),
+        colunas_saida[10]: normalizar_numerico_serie(df_tabela['VAR_YTD']).fillna(0.0),
+        colunas_saida[11]: normalizar_numerico_serie(df_tabela['VAR_YTD_ORC']).fillna(0.0),
+        colunas_saida[12]: normalizar_numerico_serie(df_tabela['META']).fillna(0.0),
+        colunas_saida[13]: normalizar_numerico_serie(df_tabela['VAR_META']).fillna(0.0)
     })
 
     if incluir_total and not df_num.empty:
-        total_m2 = float(pd.to_numeric(df_num[colunas_saida[1]], errors='coerce').fillna(0.0).sum())
-        total_m1 = float(pd.to_numeric(df_num[colunas_saida[2]], errors='coerce').fillna(0.0).sum())
-        total_m0 = float(pd.to_numeric(df_num[colunas_saida[3]], errors='coerce').fillna(0.0).sum())
-        total_ytd25 = float(pd.to_numeric(df_num[colunas_saida[6]], errors='coerce').fillna(0.0).sum())
-        total_ytd26 = float(pd.to_numeric(df_num[colunas_saida[7]], errors='coerce').fillna(0.0).sum())
-        total_meta = float(pd.to_numeric(df_num[colunas_saida[9]], errors='coerce').fillna(0.0).sum())
+        total_m12 = float(pd.to_numeric(df_num[colunas_saida[1]], errors='coerce').fillna(0.0).sum())
+        total_m2 = float(pd.to_numeric(df_num[colunas_saida[2]], errors='coerce').fillna(0.0).sum())
+        total_m1 = float(pd.to_numeric(df_num[colunas_saida[3]], errors='coerce').fillna(0.0).sum())
+        total_m0 = float(pd.to_numeric(df_num[colunas_saida[4]], errors='coerce').fillna(0.0).sum())
+        total_ytd25 = float(pd.to_numeric(df_num[colunas_saida[7]], errors='coerce').fillna(0.0).sum())
+        total_ytd26 = float(pd.to_numeric(df_num[colunas_saida[8]], errors='coerce').fillna(0.0).sum())
+        total_ytd_orc = float(pd.to_numeric(df_num[colunas_saida[9]], errors='coerce').fillna(0.0).sum())
+        total_meta = float(pd.to_numeric(df_num[colunas_saida[12]], errors='coerce').fillna(0.0).sum())
         mom_total = (((total_m0 / total_m1) - 1.0) * 100.0) if total_m1 > 0 else 0.0
         total_yoy_base = float(pd.to_numeric(df_tabela.get('MES_YOY_BASE', 0), errors='coerce').fillna(0.0).sum())
         yoy_total = calcular_variacao_percentual(total_m0, total_yoy_base)
         var_ytd_total = calcular_variacao_percentual(total_ytd26, total_ytd25)
+        var_ytd_orc_total = calcular_variacao_percentual(total_ytd26, total_ytd_orc)
         var_meta_total = (((total_m0 / total_meta) - 1.0) * 100.0) if total_meta > 0 else 0.0
 
         linha_total = {
             colunas_saida[0]: 'NACIONAIS',
-            colunas_saida[1]: total_m2,
-            colunas_saida[2]: total_m1,
-            colunas_saida[3]: total_m0,
-            colunas_saida[4]: mom_total,
-            colunas_saida[5]: yoy_total,
-            colunas_saida[6]: total_ytd25,
-            colunas_saida[7]: total_ytd26,
-            colunas_saida[8]: var_ytd_total,
-            colunas_saida[9]: total_meta,
-            colunas_saida[10]: var_meta_total
+            colunas_saida[1]: total_m12,
+            colunas_saida[2]: total_m2,
+            colunas_saida[3]: total_m1,
+            colunas_saida[4]: total_m0,
+            colunas_saida[5]: mom_total,
+            colunas_saida[6]: yoy_total,
+            colunas_saida[7]: total_ytd25,
+            colunas_saida[8]: total_ytd26,
+            colunas_saida[9]: total_ytd_orc,
+            colunas_saida[10]: var_ytd_total,
+            colunas_saida[11]: var_ytd_orc_total,
+            colunas_saida[12]: total_meta,
+            colunas_saida[13]: var_meta_total
         }
         df_num = pd.concat([pd.DataFrame([linha_total]), df_num], ignore_index=True)
 
@@ -13799,7 +13854,7 @@ def formatar_tabela_resultado_canais(
         return df_num
 
     colunas = list(df_num.columns)
-    colunas_percentuais = {'MoM', 'YoY', '% YTD', 'Var Orç'}
+    colunas_percentuais = {'MoM', 'YoY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'Var Orç'}
     df_fmt = df_num.copy().astype(object)
 
     def _fmt_pct(valor: float) -> str:
@@ -13830,7 +13885,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     if total_colunas == 1:
         larguras_colunas = [100.0]
     else:
-        largura_canal_pct = 22.0
+        largura_canal_pct = 13.0
         largura_num_pct = (100.0 - largura_canal_pct) / float(total_colunas - 1)
         larguras_colunas = [largura_canal_pct] + [largura_num_pct] * (total_colunas - 1)
     colgroup_html = "<colgroup>" + "".join(
@@ -13838,7 +13893,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     ) + "</colgroup>"
     col_canal = colunas[0] if colunas else 'CANAL_PLAN'
     col_meta = 'Orç'
-    colunas_var = {'MoM', 'YoY', '% YTD', 'Var Orç'}
+    colunas_var = {'MoM', 'YoY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'Var Orç'}
 
     html = f"""
     <style>
@@ -13873,7 +13928,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
             color: #FFFFFF !important;
             font-weight: 700;
-            padding: 5px 5px;
+            padding: 4px 3px;
             text-align: center;
             vertical-align: middle !important;
             border-bottom: 3px solid #5A0A06;
@@ -13886,7 +13941,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             text-transform: uppercase;
             letter-spacing: 0.3px;
             line-height: 1.2;
-            font-size: 9px;
+            font-size: 8px;
         }}
         #{table_id} .tabela-resultado-canais th.col-var {{
             background: linear-gradient(135deg, #5A6268 0%, #3E444A 100%) !important;
@@ -13895,7 +13950,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             background: linear-gradient(135deg, #A23B36 0%, #790E09 100%) !important;
         }}
         #{table_id} .tabela-resultado-canais td {{
-            padding: 6px 5px 4px 5px;
+            padding: 5px 3px 3px 3px;
             text-align: right;
             vertical-align: bottom !important;
             border-bottom: 1px solid #FFFFFF;
@@ -13903,7 +13958,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             font-weight: 400;
             font-variant-numeric: tabular-nums;
             color: #1F2937;
-            font-size: 10px;
+            font-size: 8.7px;
             line-height: 1.16;
             white-space: nowrap;
             overflow: hidden;
@@ -13920,7 +13975,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             text-align: left;
             color: #2F3747;
             background: transparent !important;
-            padding-left: 6px;
+            padding-left: 5px;
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: break-word;
@@ -14005,8 +14060,8 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
             color: #FFFFFF !important;
             font-weight: 700;
             border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
-            padding: 6px 5px 4px 5px !important;
-            font-size: 10px;
+            padding: 5px 3px 3px 3px !important;
+            font-size: 8.7px;
             vertical-align: bottom !important;
         }}
         #{table_id} .linha-total-resultado td.col-canal {{
@@ -16874,6 +16929,144 @@ with tab1:
                             f'</div>',
                             unsafe_allow_html=True
                         )
+
+        def montar_resumo_mensal_ativados_por_produto(
+            df_ref: pd.DataFrame,
+            produto_ref: str,
+            mes_foco_ref: str
+        ) -> tuple[pd.DataFrame, pd.DataFrame]:
+            if df_ref is None or df_ref.empty:
+                return pd.DataFrame(), pd.DataFrame()
+            produto_norm_ref = normalizar_rotulo_produto(produto_ref)
+            df_mes = df_ref[df_ref['COD_PLATAFORMA'].astype(str).str.strip().str.upper().eq(produto_norm_ref)].copy()
+            if df_mes.empty:
+                return pd.DataFrame(), pd.DataFrame()
+            df_mes['mes_ano'] = df_mes['dat_tratada'].astype(str).str.strip().str.lower()
+            for coluna_num_ref in ['QTDE', 'TEND_QTD', 'DESAFIO_QTD']:
+                if coluna_num_ref not in df_mes.columns:
+                    df_mes[coluna_num_ref] = 0.0
+                df_mes[coluna_num_ref] = pd.to_numeric(df_mes[coluna_num_ref], errors='coerce').fillna(0.0)
+
+            meses_janela = gerar_intervalo_meses_retroativos(mes_foco_ref, qtd_meses=13)
+            mes_corrente_local = get_mes_atual_formatado().strip().lower()
+            mes_m1_local = get_mes_anterior(mes_foco_ref)
+            mapa_real = (
+                df_mes.groupby(['CANAL_PLAN', 'mes_ano'], observed=True)['QTDE']
+                .sum()
+                .astype(float)
+                .to_dict()
+            )
+            mapa_tend = (
+                df_mes.groupby(['CANAL_PLAN', 'mes_ano'], observed=True)['TEND_QTD']
+                .sum()
+                .astype(float)
+                .to_dict()
+            )
+            mapa_meta = (
+                df_mes.groupby(['CANAL_PLAN', 'mes_ano'], observed=True)['DESAFIO_QTD']
+                .sum()
+                .astype(float)
+                .to_dict()
+            )
+            canais_ordenados = (
+                df_mes.groupby('CANAL_PLAN', observed=True)['QTDE']
+                .sum()
+                .sort_values(ascending=False)
+                .index.astype(str)
+                .tolist()
+            )
+
+            def _lookup_canal_mensal(mapa_ref: dict, canal_ref: str | None = None) -> dict[str, float]:
+                if canal_ref is None:
+                    saida: dict[str, float] = {}
+                    for (_canal_key, mes_key), valor in mapa_ref.items():
+                        mes_key_norm = str(mes_key).strip().lower()
+                        saida[mes_key_norm] = saida.get(mes_key_norm, 0.0) + float(valor or 0.0)
+                    return saida
+                return {
+                    str(mes_key).strip().lower(): float(valor or 0.0)
+                    for (canal_key, mes_key), valor in mapa_ref.items()
+                    if str(canal_key).strip() == str(canal_ref).strip()
+                }
+
+            linhas_num = []
+            for canal_ref in ['TOTAL', *canais_ordenados]:
+                lookup_real = _lookup_canal_mensal(mapa_real, None if canal_ref == 'TOTAL' else canal_ref)
+                lookup_tend = _lookup_canal_mensal(mapa_tend, None if canal_ref == 'TOTAL' else canal_ref)
+                lookup_meta = _lookup_canal_mensal(mapa_meta, None if canal_ref == 'TOTAL' else canal_ref)
+                valor_foco = obter_valor_serie_mensal_mes(mes_foco_ref, mes_foco_ref, mes_corrente_local, lookup_real, lookup_tend)
+                valor_m1 = float(lookup_real.get(mes_m1_local, 0.0))
+                metricas = calcular_yoy_ytd_mensal_lookup(
+                    lookup_real,
+                    lookup_tend,
+                    mes_foco_ref,
+                    mes_corrente_local,
+                    lookup_orc=lookup_meta
+                )
+                linha = {'CANAL': canal_ref}
+                for mes_col in meses_janela:
+                    linha[mes_col] = obter_valor_serie_mensal_mes(mes_col, mes_foco_ref, mes_corrente_local, lookup_real, lookup_tend)
+                linha.update({
+                    'MoM': calcular_variacao_percentual(valor_foco, valor_m1),
+                    'YoY': metricas['YOY'],
+                    'YTD25': metricas['YTD25'],
+                    'YTD26': metricas['YTD26'],
+                    'YTD_ORÇ': metricas['YTD_ORÇ'],
+                    'YTD26 vs YTD25': metricas['YTD26 vs YTD25'],
+                    'YTD26 vs YTD_ORÇ': metricas['YTD26 vs YTD_ORÇ'],
+                })
+                linhas_num.append(linha)
+
+            df_num_local = pd.DataFrame(linhas_num)
+            df_fmt_local = df_num_local.copy().astype(object)
+
+            def _fmt_pct_resumo_mensal(valor_pct) -> str:
+                try:
+                    return f"{float(valor_pct):+.1f}%".replace(".", ",")
+                except Exception:
+                    return "0,0%"
+
+            for coluna_ref in df_fmt_local.columns:
+                if coluna_ref == 'CANAL':
+                    continue
+                if coluna_ref in {'MoM', 'YoY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ'}:
+                    df_fmt_local[coluna_ref] = pd.to_numeric(df_fmt_local[coluna_ref], errors='coerce').fillna(0.0).apply(_fmt_pct_resumo_mensal)
+                else:
+                    df_fmt_local[coluna_ref] = pd.to_numeric(df_fmt_local[coluna_ref], errors='coerce').fillna(0.0).apply(
+                        lambda valor: formatar_numero_brasileiro(valor, 0)
+                    )
+            return df_fmt_local, df_num_local
+
+        st.markdown(
+            build_visual_title_html("RESUMO MENSAL POR CANAL", "grid", extra_style="margin-top:18px;"),
+            unsafe_allow_html=True
+        )
+        for produto_resumo_mensal in ['CONTA', 'FIXA']:
+            st.markdown(
+                build_visual_title_html(
+                    produto_resumo_mensal,
+                    produto_resumo_mensal,
+                    "subsection-title",
+                    extra_style="margin-top:8px;"
+                ),
+                unsafe_allow_html=True
+            )
+            df_mensal_ativ_fmt, df_mensal_ativ_num = montar_resumo_mensal_ativados_por_produto(
+                df_filtered_sem_periodo,
+                produto_resumo_mensal,
+                mes_selecionado_cards
+            )
+            if df_mensal_ativ_fmt.empty:
+                st.info(f"Sem dados para {produto_resumo_mensal} no resumo mensal por canal.")
+            else:
+                st.markdown(
+                    criar_tabela_html_backlog_canais(
+                        df_mensal_ativ_fmt,
+                        df_mensal_ativ_num,
+                        f"tabela-resumo-mensal-canal-{produto_resumo_mensal.lower()}"
+                    ),
+                    unsafe_allow_html=True
+                )
     
         with st.container():
             st.markdown(build_visual_title_html("EVOLUÇÃO MENSAL - COMPARATIVO ANUAL", "trend"), unsafe_allow_html=True)
@@ -17406,11 +17599,16 @@ with tab1:
                     df_regional.groupby('mes_ano', observed=True)['TEND_QTD'].sum().astype(float).to_dict()
                     if 'TEND_QTD' in df_regional.columns and not df_regional.empty else {}
                 )
+                lookup_meta_regional = (
+                    df_regional.groupby('mes_ano', observed=True)['DESAFIO_QTD'].sum().astype(float).to_dict()
+                    if 'DESAFIO_QTD' in df_regional.columns and not df_regional.empty else {}
+                )
                 yoy_ytd = calcular_yoy_ytd_mensal_lookup(
                     lookup_real_regional,
                     lookup_tend_regional,
                     mes_atual,
-                    mes_corrente_local
+                    mes_corrente_local,
+                    lookup_orc=lookup_meta_regional
                 )
 
                 row_data = {
@@ -17426,7 +17624,9 @@ with tab1:
                     'YOY': yoy_ytd['YOY'],
                     'YTD25': yoy_ytd['YTD25'],
                     'YTD26': yoy_ytd['YTD26'],
-                    '% YTD': yoy_ytd['% YTD']
+                    'YTD_ORÇ': yoy_ytd['YTD_ORÇ'],
+                    'YTD26 vs YTD25': yoy_ytd['YTD26 vs YTD25'],
+                    'YTD26 vs YTD_ORÇ': yoy_ytd['YTD26 vs YTD_ORÇ']
                 }
 
                 pivot_data.append(row_data)
@@ -17489,11 +17689,16 @@ with tab1:
             df_total.groupby('mes_ano', observed=True)['TEND_QTD'].sum().astype(float).to_dict()
             if 'TEND_QTD' in df_total.columns and not df_total.empty else {}
         )
+        lookup_meta_geral = (
+            df_total.groupby('mes_ano', observed=True)['DESAFIO_QTD'].sum().astype(float).to_dict()
+            if 'DESAFIO_QTD' in df_total.columns and not df_total.empty else {}
+        )
         yoy_ytd_geral = calcular_yoy_ytd_mensal_lookup(
             lookup_real_geral,
             lookup_tend_geral,
             mes_atual_tabela,
-            mes_corrente_ref
+            mes_corrente_ref,
+            lookup_orc=lookup_meta_geral
         )
     
         linha_total = {
@@ -17509,7 +17714,9 @@ with tab1:
             'YOY': yoy_ytd_geral['YOY'],
             'YTD25': yoy_ytd_geral['YTD25'],
             'YTD26': yoy_ytd_geral['YTD26'],
-            '% YTD': yoy_ytd_geral['% YTD']
+            'YTD_ORÇ': yoy_ytd_geral['YTD_ORÇ'],
+            'YTD26 vs YTD25': yoy_ytd_geral['YTD26 vs YTD25'],
+            'YTD26 vs YTD_ORÇ': yoy_ytd_geral['YTD26 vs YTD_ORÇ']
         }
     
         if pivot_data_ordenada:
@@ -17535,7 +17742,8 @@ with tab1:
         if col_atual_exib in df_final.columns:
             colunas_meses_janela.append(col_atual_exib)
         colunas_ordenadas = ['Regional'] + colunas_meses_janela + [
-            f'Orç {mes_atual_tabela}', 'MOM', 'YOY', 'YTD25', 'YTD26', '% YTD', 'TEND vs ORÇ'
+            f'Orç {mes_atual_tabela}', 'MOM', 'YOY', 'YTD25', 'YTD26', 'YTD_ORÇ',
+            'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ'
         ]
         colunas_ordenadas = [col for col in colunas_ordenadas if col in df_final.columns]
         df_final = df_final[colunas_ordenadas]
@@ -17570,7 +17778,7 @@ with tab1:
             # entrar na mesma regra. Excluímos qualquer coluna que contenha 'vs'.
             if col in colunas_tend_arredondar or (col_txt_lower.startswith('tend ') and 'vs' not in col_txt_lower):
                 df_exibicao[col] = df_exibicao[col].apply(formatar_numero_inteiro)
-            elif col not in ['Regional', 'MOM', 'YOY', '% YTD', 'TEND vs ORÇ']:
+            elif col not in ['Regional', 'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ']:
                 df_exibicao[col] = df_exibicao[col].apply(formatar_numero)
             else:
                 df_exibicao[col] = df_exibicao[col].apply(formatar_percentual)
@@ -17591,7 +17799,7 @@ with tab1:
                     return '56px'
                 if 'Orç' in col_txt and col_txt != 'TEND vs ORÇ':
                     return '56px'
-                if col_txt in {'MOM', 'YOY', '% YTD', 'TEND vs ORÇ'} or 'Alcance' in col_txt or 'Var' in col_txt:
+                if col_txt in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ'} or 'Alcance' in col_txt or 'Var' in col_txt:
                     return '59px'
                 return '54px'
 
@@ -17999,7 +18207,7 @@ with tab1:
                     classe = "col-meta"
                 elif 'Alcance' in col:
                     classe = "col-alcance"
-                elif 'Var' in col or col in {'MOM', 'YOY', '% YTD', 'TEND vs ORÇ'}:
+                elif 'Var' in col or col in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ'}:
                     classe = "col-variacao"
         
                 html += f'<th class="{classe}">{col}</th>'
@@ -18032,7 +18240,7 @@ with tab1:
                             classe_celula = "col-meta"
                         elif 'Alcance' in col:
                             classe_celula = "col-alcance"
-                        elif 'Var' in col or col in {'MOM', 'YOY', '% YTD', 'TEND vs ORÇ'}:
+                        elif 'Var' in col or col in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ'}:
                             classe_celula = "col-variacao"
                     else:
                         if col == 'Regional':
@@ -18049,7 +18257,7 @@ with tab1:
                             classe_celula = "col-tend"
                         elif 'Orç' in col and col != 'TEND vs ORÇ':
                             classe_celula = "col-meta"
-                        elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'YOY', '% YTD', 'TEND vs ORÇ']:
+                        elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ']:
                             try:
                                 valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                                 num_valor = float(valor_limpo)
@@ -18277,95 +18485,6 @@ with tab1:
                             df_base_completa[col] = serie_num.apply(lambda x: formatar_numero(x) if pd.notna(x) else '-')
                     st.dataframe(df_base_completa, width='stretch', hide_index=True, height=360)
 
-            def montar_resumo_mensal_ativados(df_ref: pd.DataFrame, mes_foco_ref: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-                if df_ref is None or df_ref.empty:
-                    return pd.DataFrame(), pd.DataFrame()
-                df_mes = df_ref.copy()
-                df_mes['mes_ano'] = df_mes['mes_ano'].astype(str).str.strip().str.lower()
-                df_mes['QTDE'] = pd.to_numeric(df_mes.get('QTDE', 0), errors='coerce').fillna(0.0)
-                if 'TEND_QTD' not in df_mes.columns:
-                    df_mes['TEND_QTD'] = 0.0
-                df_mes['TEND_QTD'] = pd.to_numeric(df_mes.get('TEND_QTD', 0), errors='coerce').fillna(0.0)
-                meses_janela = gerar_intervalo_meses_retroativos(mes_foco_ref, qtd_meses=13)
-                mes_corrente_local = get_mes_atual_formatado().strip().lower()
-                mes_m1_local = get_mes_anterior(mes_foco_ref)
-
-                mapa_real = (
-                    df_mes.groupby(['CANAL_PLAN', 'mes_ano'], observed=True)['QTDE']
-                    .sum()
-                    .astype(float)
-                    .to_dict()
-                )
-                mapa_tend = (
-                    df_mes.groupby(['CANAL_PLAN', 'mes_ano'], observed=True)['TEND_QTD']
-                    .sum()
-                    .astype(float)
-                    .to_dict()
-                )
-                canais_ordenados = (
-                    df_mes.groupby('CANAL_PLAN', observed=True)['QTDE']
-                    .sum()
-                    .sort_values(ascending=False)
-                    .index.astype(str)
-                    .tolist()
-                )
-
-                def _lookup_canal_mensal(mapa_ref: dict, canal_ref: str | None = None) -> dict[str, float]:
-                    if canal_ref is None:
-                        saida: dict[str, float] = {}
-                        for (_canal_key, mes_key), valor in mapa_ref.items():
-                            mes_key_norm = str(mes_key).strip().lower()
-                            saida[mes_key_norm] = saida.get(mes_key_norm, 0.0) + float(valor or 0.0)
-                        return saida
-                    return {
-                        str(mes_key).strip().lower(): float(valor or 0.0)
-                        for (canal_key, mes_key), valor in mapa_ref.items()
-                        if str(canal_key).strip() == str(canal_ref).strip()
-                    }
-
-                linhas_num = []
-                for canal_ref in ['TOTAL', *canais_ordenados]:
-                    lookup_real = _lookup_canal_mensal(mapa_real, None if canal_ref == 'TOTAL' else canal_ref)
-                    lookup_tend = _lookup_canal_mensal(mapa_tend, None if canal_ref == 'TOTAL' else canal_ref)
-                    valor_foco = obter_valor_serie_mensal_mes(mes_foco_ref, mes_foco_ref, mes_corrente_local, lookup_real, lookup_tend)
-                    valor_m1 = float(lookup_real.get(mes_m1_local, 0.0))
-                    metricas = calcular_yoy_ytd_mensal_lookup(lookup_real, lookup_tend, mes_foco_ref, mes_corrente_local)
-                    linha = {'Regional': canal_ref}
-                    for mes_col in meses_janela:
-                        linha[mes_col] = obter_valor_serie_mensal_mes(mes_col, mes_foco_ref, mes_corrente_local, lookup_real, lookup_tend)
-                    linha.update({
-                        'MOM': calcular_variacao_percentual(valor_foco, valor_m1),
-                        'YOY': metricas['YOY'],
-                        'YTD25': metricas['YTD25'],
-                        'YTD26': metricas['YTD26'],
-                        '% YTD': metricas['% YTD'],
-                    })
-                    linhas_num.append(linha)
-
-                df_num_local = pd.DataFrame(linhas_num)
-                df_fmt_local = df_num_local.copy().astype(object)
-                for coluna_ref in df_fmt_local.columns:
-                    if coluna_ref == 'Regional':
-                        continue
-                    if coluna_ref in {'MOM', 'YOY', '% YTD'}:
-                        df_fmt_local[coluna_ref] = pd.to_numeric(df_fmt_local[coluna_ref], errors='coerce').fillna(0.0).apply(formatar_percentual)
-                    else:
-                        df_fmt_local[coluna_ref] = pd.to_numeric(df_fmt_local[coluna_ref], errors='coerce').fillna(0.0).apply(formatar_numero)
-                return df_fmt_local, df_num_local
-
-            df_mensal_ativ_fmt, df_mensal_ativ_num = montar_resumo_mensal_ativados(df_tabela, mes_atual_tabela)
-            if not df_mensal_ativ_fmt.empty:
-                st.markdown(
-                    build_visual_title_html("RESUMO MENSAL - ÚLTIMOS 13 MESES", "grid", extra_style="margin-top:18px;"),
-                    unsafe_allow_html=True
-                )
-                html_resumo_mensal_ativ = obter_cache_session_dashboard(
-                    "html_tabela_ativados_resumo_mensal",
-                    serializar_dataframe_cache(df_mensal_ativ_fmt),
-                    lambda: criar_tabela_html(df_mensal_ativ_fmt).replace(">Regional<", ">CANAL<", 1),
-                    max_variacoes=1
-                )
-                st.markdown(html_resumo_mensal_ativ, unsafe_allow_html=True)
         else:
             st.warning("Não há dados disponíveis para exibir a tabela dinâmica com os filtros atuais.")
 
@@ -20381,11 +20500,16 @@ with tab3:
                         dfr.groupby('mes_ano', observed=True)['TEND_QTD'].sum().astype(float).to_dict()
                         if 'TEND_QTD' in dfr.columns and not dfr.empty else {}
                     )
+                    lookup_meta_regional = (
+                        dfr.groupby('mes_ano', observed=True)['DESAFIO_QTD'].sum().astype(float).to_dict()
+                        if 'DESAFIO_QTD' in dfr.columns and not dfr.empty else {}
+                    )
                     yoy_ytd = calcular_yoy_ytd_mensal_lookup(
                         lookup_real_regional,
                         lookup_tend_regional,
                         mes_foco,
-                        mes_corrente_local
+                        mes_corrente_local,
+                        lookup_orc=lookup_meta_regional
                     )
 
                     linha = {
@@ -20403,7 +20527,9 @@ with tab3:
                         'YOY': yoy_ytd['YOY'],
                         'YTD25': yoy_ytd['YTD25'],
                         'YTD26': yoy_ytd['YTD26'],
-                        '% YTD': yoy_ytd['% YTD']
+                        'YTD_ORÇ': yoy_ytd['YTD_ORÇ'],
+                        'YTD26 vs YTD25': yoy_ytd['YTD26 vs YTD25'],
+                        'YTD26 vs YTD_ORÇ': yoy_ytd['YTD26 vs YTD_ORÇ']
                     })
                     pivot.append(linha)
                 return pivot
@@ -20508,11 +20634,16 @@ with tab3:
                     df_total_pedidos.groupby('mes_ano', observed=True)['TEND_QTD'].sum().astype(float).to_dict()
                     if 'TEND_QTD' in df_total_pedidos.columns and not df_total_pedidos.empty else {}
                 )
+                lookup_meta_geral_pedidos = (
+                    df_total_pedidos.groupby('mes_ano', observed=True)['DESAFIO_QTD'].sum().astype(float).to_dict()
+                    if 'DESAFIO_QTD' in df_total_pedidos.columns and not df_total_pedidos.empty else {}
+                )
                 yoy_ytd_geral_pedidos = calcular_yoy_ytd_mensal_lookup(
                     lookup_real_geral_pedidos,
                     lookup_tend_geral_pedidos,
                     mes_foco_tabela_pedidos,
-                    mes_corrente_ref_pedidos
+                    mes_corrente_ref_pedidos,
+                    lookup_orc=lookup_meta_geral_pedidos
                 )
             
                 linha_total_pedidos = {
@@ -20527,7 +20658,9 @@ with tab3:
                     'YOY': yoy_ytd_geral_pedidos['YOY'],
                     'YTD25': yoy_ytd_geral_pedidos['YTD25'],
                     'YTD26': yoy_ytd_geral_pedidos['YTD26'],
-                    '% YTD': yoy_ytd_geral_pedidos['% YTD']
+                    'YTD_ORÇ': yoy_ytd_geral_pedidos['YTD_ORÇ'],
+                    'YTD26 vs YTD25': yoy_ytd_geral_pedidos['YTD26 vs YTD25'],
+                    'YTD26 vs YTD_ORÇ': yoy_ytd_geral_pedidos['YTD26 vs YTD_ORÇ']
                 }
             
                 df_final_pedidos = pd.DataFrame([linha_total_pedidos] + pivot_data_ordenada_pedidos)
@@ -20598,7 +20731,8 @@ with tab3:
                     colunas_meses_janela_ped.append(col_mes_ped_exib)
 
                 colunas_ordenadas_pedidos = ['Regional'] + colunas_meses_janela_ped + [
-                    f'Orç {mes_foco_tabela_pedidos}', 'MOM', 'YOY', 'YTD25', 'YTD26', '% YTD', 'TEND vs ORÇ'
+                    f'Orç {mes_foco_tabela_pedidos}', 'MOM', 'YOY', 'YTD25', 'YTD26', 'YTD_ORÇ',
+                    'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ'
                 ]
                 colunas_ordenadas_pedidos = list(dict.fromkeys(colunas_ordenadas_pedidos))
                 colunas_ordenadas_pedidos = [c for c in colunas_ordenadas_pedidos if c in df_final_pedidos.columns]
@@ -20634,7 +20768,7 @@ with tab3:
             
                 df_exibicao_pedidos = df_final_pedidos.copy().fillna(0)
                 for col in df_exibicao_pedidos.columns:
-                    if col in ['MOM', 'YOY', '% YTD', 'TEND vs ORÇ']:
+                    if col in ['MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ']:
                         df_exibicao_pedidos[col] = df_exibicao_pedidos[col].apply(formatar_percentual_pedidos)
                     elif col == 'Regional':
                         df_exibicao_pedidos[col] = df_exibicao_pedidos[col].astype(str)
@@ -20659,7 +20793,7 @@ with tab3:
                             return '56px'
                         if 'Orç' in col_txt and col_txt != 'TEND vs ORÇ':
                             return '56px'
-                        if col_txt in {'MOM', 'YOY', '% YTD', 'TEND vs ORÇ'} or 'Alcance' in col_txt or 'Var' in col_txt:
+                        if col_txt in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ'} or 'Alcance' in col_txt or 'Var' in col_txt:
                             return '59px'
                         return '54px'
                     colgroup_html = "<colgroup>" + "".join(
@@ -21081,7 +21215,7 @@ with tab3:
                             classe = "col-mes-2026-pedidos"
                         elif 'Alcance' in col or col == 'TEND vs ORÇ':
                             classe = "col-alcance-pedidos"
-                        elif 'Var' in col or col in {'MOM', 'YOY', '% YTD'}:
+                        elif 'Var' in col or col in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ'}:
                             classe = "col-variacao-pedidos"
                     
                         html += f'<th class="{classe}">{col}</th>'
@@ -21114,7 +21248,7 @@ with tab3:
                                     classe_celula = "col-mes-2026-pedidos"
                                 elif 'Alcance' in col or col == 'TEND vs ORÇ':
                                     classe_celula = "col-alcance-pedidos"
-                                elif 'Var' in col or col in {'MOM', 'YOY', '% YTD'}:
+                                elif 'Var' in col or col in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ'}:
                                     classe_celula = "col-variacao-pedidos"
                             else:
                                 if col == 'Regional':
@@ -21131,7 +21265,7 @@ with tab3:
                                     classe_celula = "col-real-jan26-pedidos"
                                 elif str(col).endswith('/26'):
                                     classe_celula = "col-mes-2026-pedidos"
-                                elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'YOY', '% YTD', 'TEND vs ORÇ']:
+                                elif 'Alcance' in col or 'Var' in col or col in ['MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ']:
                                     try:
                                         valor_limpo = str(valor).replace('%', '').replace('+', '').replace(',', '.')
                                         num_valor = float(valor_limpo)
@@ -22679,6 +22813,22 @@ with tab4:
                             df_filtrado.groupby(['REGIONAL', 'mes_ano'], observed=True)['QTDE'].sum().to_dict()
                             if not df_filtrado.empty else {}
                         )
+
+                        def _calcular_meta_ligacoes_mes(mes_ref_meta: str, regional_meta: str) -> float:
+                            if df_metas_lig.empty:
+                                return 0.0
+                            meta_fixa_ref = calcular_meta_correta(df_metas_lig, mes_ref_meta, regional_meta, 'FIXA')
+                            meta_conta_ref = calcular_meta_correta(df_metas_lig, mes_ref_meta, regional_meta, 'CONTA')
+                            if "Todas" not in plataforma_filtro and "CONTA" in plataforma_filtro and "FIXA" not in plataforma_filtro:
+                                return float(meta_conta_ref or 0.0)
+                            if "Todas" not in plataforma_filtro and "FIXA" in plataforma_filtro and "CONTA" not in plataforma_filtro:
+                                return float(meta_fixa_ref or 0.0)
+                            return float(calcular_meta_total_projetada_ligacoes(
+                                df_lig_reais,
+                                df_metas_lig,
+                                mes_ref_meta,
+                                regional_meta
+                            ) or 0.0)
                     
                         for regional in regionais_unicas:
                             valores_mensais = {}
@@ -22736,10 +22886,15 @@ with tab4:
                                 if str(mes_foco).strip().lower() == get_mes_atual_formatado().strip().lower()
                                 else {}
                             )
+                            lookup_meta_regional = {
+                                mes_ref_lig: _calcular_meta_ligacoes_mes(mes_ref_lig, regional)
+                                for mes_ref_lig in obter_meses_ytd_ano(mes_foco, "26")
+                            }
                             yoy_ytd = calcular_yoy_ytd_mensal_lookup(
                                 lookup_real_regional,
                                 lookup_tend_regional,
-                                mes_foco
+                                mes_foco,
+                                lookup_orc=lookup_meta_regional
                             )
                         
                             linha = {
@@ -22753,7 +22908,9 @@ with tab4:
                                 'YOY': yoy_ytd['YOY'],
                                 'YTD25': yoy_ytd['YTD25'],
                                 'YTD26': yoy_ytd['YTD26'],
-                                '% YTD': yoy_ytd['% YTD']
+                                'YTD_ORÇ': yoy_ytd['YTD_ORÇ'],
+                                'YTD26 vs YTD25': yoy_ytd['YTD26 vs YTD25'],
+                                'YTD26 vs YTD_ORÇ': yoy_ytd['YTD26 vs YTD_ORÇ']
                             }
                         
                             pivot_data.append(linha)
@@ -22779,12 +22936,16 @@ with tab4:
                                     total_real = float(linha_total.get(f'Real {mes_foco}', 0) or 0.0)
                                     total_yoy_base = float(linha_total.get(get_mes_ano_anterior(mes_foco), 0) or 0.0)
                                     linha_total[col] = calcular_variacao_percentual(total_real, total_yoy_base)
-                                elif col in ['YTD25', 'YTD26']:
+                                elif col in ['YTD25', 'YTD26', 'YTD_ORÇ']:
                                     linha_total[col] = df_totais[col].sum()
-                                elif col == '% YTD':
+                                elif col == 'YTD26 vs YTD25':
                                     total_ytd26 = float(linha_total.get('YTD26', 0) or 0.0)
                                     total_ytd25 = float(linha_total.get('YTD25', 0) or 0.0)
                                     linha_total[col] = calcular_variacao_percentual(total_ytd26, total_ytd25)
+                                elif col == 'YTD26 vs YTD_ORÇ':
+                                    total_ytd26 = float(linha_total.get('YTD26', 0) or 0.0)
+                                    total_ytd_orc = float(linha_total.get('YTD_ORÇ', 0) or 0.0)
+                                    linha_total[col] = calcular_variacao_percentual(total_ytd26, total_ytd_orc)
                                 else:
                                     linha_total[col] = df_totais[col].sum()
                         
@@ -22840,7 +23001,9 @@ with tab4:
                         'YOY',
                         'YTD25',
                         'YTD26',
-                        '% YTD',
+                        'YTD_ORÇ',
+                        'YTD26 vs YTD25',
+                        'YTD26 vs YTD_ORÇ',
                         'TEND vs ORÇ',
                     ]
                     colunas_ordenadas = [col for col in colunas_ordenadas if col in df_tabela_final.columns]
@@ -22857,7 +23020,7 @@ with tab4:
                             return "0"
                     
                         try:
-                            if coluna in ['MOM', 'YOY', '% YTD', 'TEND vs ORÇ']:
+                            if coluna in ['MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ']:
                                 return f"{float(valor):+.1f}%"
                             elif coluna in ['Regional']:
                                 return str(valor)
@@ -23227,7 +23390,7 @@ with tab4:
                                 classe = "col-meta-mes"
                             elif 'Alcance' in col or col == 'TEND vs ORÇ':
                                 classe = "col-alcance"
-                            elif 'Var' in col or col in {'MOM', 'YOY', '% YTD'}:
+                            elif 'Var' in col or col in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ'}:
                                 classe = "col-variacao"
                             elif col == 'Total 2025':
                                 classe = "col-total-anual"
@@ -23264,7 +23427,7 @@ with tab4:
                                         classes_celula.append("col-meta-mes")
                                     elif 'Alcance' in col or col == 'TEND vs ORÇ':
                                         classes_celula.append("col-alcance")
-                                    elif 'Var' in col or col in {'MOM', 'YOY', '% YTD'}:
+                                    elif 'Var' in col or col in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ'}:
                                         classes_celula.append("col-variacao")
                                 else:
                                     if col == 'Regional':
@@ -23282,10 +23445,10 @@ with tab4:
                                         classes_celula.append("col-meta-mes")
                                     elif 'Alcance' in col or col == 'TEND vs ORÇ':
                                         classes_celula.append("col-alcance")
-                                    elif 'Var' in col or col in {'MOM', 'YOY', '% YTD'}:
+                                    elif 'Var' in col or col in {'MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ'}:
                                         classes_celula.append("col-variacao")
                                 
-                                    if col in ['MOM', 'YOY', '% YTD', 'TEND vs ORÇ']:
+                                    if col in ['MOM', 'YOY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'TEND vs ORÇ']:
                                         try:
                                             valor_num = float(str(valor_numerico).replace('%', '').replace('+', ''))
                                             if valor_num > 0:
@@ -26794,6 +26957,117 @@ with tab5:
                         return float(meta_ativ_reg) / float(ratio_reg)
                     return 0.0
 
+                def calcular_metricas_regionais_mes(reg_ref: str, mes_ref_calc: str) -> dict[str, float]:
+                    mes_ref_norm_calc = str(mes_ref_calc).strip().lower()
+                    mes_m1_calc = get_mes_anterior(mes_ref_norm_calc)
+                    df_mes_calc = df_reg_base[df_reg_base['dat_tratada'].astype(str).str.strip().str.lower().eq(mes_ref_norm_calc)].copy()
+                    if canal_reg_sel != "Todos":
+                        df_mes_calc = df_mes_calc[df_mes_calc['CANAL_PLAN'] == canal_reg_sel]
+                    df_mes_calc = df_mes_calc[
+                        (df_mes_calc['COD_PLATAFORMA'] == produto_norm) &
+                        (df_mes_calc['REGIONAL'] == reg_ref)
+                    ].copy()
+                    df_mes_m1_calc = df_reg_base[df_reg_base['dat_tratada'].astype(str).str.strip().str.lower().eq(mes_m1_calc)].copy()
+                    if canal_reg_sel != "Todos":
+                        df_mes_m1_calc = df_mes_m1_calc[df_mes_m1_calc['CANAL_PLAN'] == canal_reg_sel]
+                    df_mes_m1_calc = df_mes_m1_calc[
+                        (df_mes_m1_calc['COD_PLATAFORMA'] == produto_norm) &
+                        (df_mes_m1_calc['REGIONAL'] == reg_ref)
+                    ].copy()
+
+                    ped_val = soma_indicador(df_mes_calc, aliases_ped, meta=False, coluna_valor='QTDE')
+                    if mes_ref_norm_calc == mes_corrente_norm:
+                        ped_tend_val = soma_indicador(df_mes_calc, aliases_ped, meta=False, coluna_valor='TEND_QTD')
+                        if ped_tend_val > 0:
+                            ped_val = ped_tend_val
+
+                    lig_val = soma_indicador(df_mes_calc, aliases_lig, meta=False)
+                    if not df_lig_resumo.empty:
+                        df_lig_calc = df_lig_resumo[df_lig_resumo['dat_tratada'].astype(str).str.strip().str.lower().eq(mes_ref_norm_calc)].copy()
+                        if canal_reg_sel != "Todos":
+                            df_lig_calc = df_lig_calc[df_lig_calc['CANAL_PLAN'] == canal_reg_sel]
+                        df_lig_calc = df_lig_calc[
+                            (df_lig_calc['COD_PLATAFORMA'] == produto_norm) &
+                            (df_lig_calc['REGIONAL'] == reg_ref)
+                        ].copy()
+                        if not df_lig_calc.empty:
+                            if produto_reg_sel == 'FIXA':
+                                lig_val = float(df_lig_calc[df_lig_calc['CABEADO'].astype(str).str.upper().isin(['SIM', 'S', 'TRUE', '1', 'FIXA'])]['QTDE'].sum())
+                            else:
+                                lig_val = float(df_lig_calc[df_lig_calc['TIPO_CHAMADA'] == 'DEMAIS']['QTDE'].sum())
+                    if mes_ref_norm_calc == mes_corrente_norm:
+                        lig_tend_val = obter_tend_ligacoes_produto(mes_ref_norm_calc, reg_ref, produto_reg_sel)
+                        if lig_tend_val > 0:
+                            lig_val = lig_tend_val
+
+                    vb_val = soma_indicador(df_mes_calc, aliases_vb, meta=False, coluna_valor='QTDE')
+                    if mes_ref_norm_calc == mes_corrente_norm:
+                        vb_tend_val = soma_indicador(df_mes_calc, aliases_vb, meta=False, coluna_valor='TEND_QTD')
+                        if vb_tend_val > 0:
+                            vb_val = vb_tend_val
+
+                    ativ_val = soma_indicador(df_mes_calc, aliases_ativ, meta=False)
+                    if mes_ref_norm_calc == mes_corrente_norm:
+                        aliases_ativ_norm_calc = {normalizar_texto_chave(a) for a in aliases_ativ}
+                        df_tend_ativ_calc = df_tend_base[
+                            (df_tend_base['dat_tratada'].astype(str).str.strip().str.lower() == mes_ref_norm_calc) &
+                            (df_tend_base['DSC_IND_NORM'].isin(aliases_ativ_norm_calc)) &
+                            (df_tend_base['COD_PLATAFORMA'] == produto_norm) &
+                            (df_tend_base['REGIONAL'] == reg_ref)
+                        ]
+                        if canal_reg_sel != "Todos":
+                            df_tend_ativ_calc = df_tend_ativ_calc[df_tend_ativ_calc['CANAL_PLAN'] == canal_reg_sel]
+                        tend_ativ_calc = float(pd.to_numeric(df_tend_ativ_calc.get('TEND_QTD', 0), errors='coerce').fillna(0).sum())
+                        if tend_ativ_calc > 0:
+                            ativ_val = tend_ativ_calc
+
+                    meta_ped_calc = soma_indicador(df_mes_calc, aliases_ped, meta=True)
+                    meta_lig_base_calc = soma_indicador(df_mes_calc, aliases_lig, meta=True)
+                    meta_lig_override_calc = obter_meta_ligacoes_produto(mes_ref_norm_calc, reg_ref, produto_reg_sel)
+                    meta_lig_calc = meta_lig_override_calc if meta_lig_override_calc > 0 else meta_lig_base_calc
+                    meta_ativ_calc = soma_indicador(df_mes_calc, alias_meta_ativ, meta=True)
+                    meta_vb_calc = calcular_orc_vb_projetado(df_mes_calc, df_mes_m1_calc)
+
+                    canal_norm_calc = str(canal_reg_sel).strip().upper()
+                    if canal_norm_calc in {'E-COMMERCE', 'E COMMERCE'}:
+                        demanda_calc = ped_val
+                        meta_demanda_calc = meta_ped_calc
+                    elif canal_norm_calc == 'TELEVENDAS RECEPTIVO':
+                        demanda_calc = lig_val
+                        meta_demanda_calc = meta_lig_calc
+                    else:
+                        demanda_calc = ped_val + lig_val
+                        meta_demanda_calc = meta_ped_calc + meta_lig_calc
+
+                    return {
+                        'DEMANDA': float(demanda_calc or 0.0),
+                        'DEMANDA_ORC': float(meta_demanda_calc or 0.0),
+                        'VB': float(vb_val or 0.0),
+                        'VB_ORC': float(meta_vb_calc or 0.0),
+                        'ATIV': float(ativ_val or 0.0),
+                        'ATIV_ORC': float(meta_ativ_calc or 0.0),
+                    }
+
+                def calcular_ytd_resumo_regional(reg_ref: str, chave_valor: str, chave_orc: str) -> tuple[float, float, float, float, float]:
+                    meses_ytd25 = obter_meses_ytd_ano(mes_reg_sel, "25")
+                    meses_ytd26 = obter_meses_ytd_ano(mes_reg_sel, "26")
+                    ytd25 = 0.0
+                    ytd26 = 0.0
+                    ytd_orc = 0.0
+                    for mes_calc in meses_ytd25:
+                        ytd25 += calcular_metricas_regionais_mes(reg_ref, mes_calc).get(chave_valor, 0.0)
+                    for mes_calc in meses_ytd26:
+                        metricas_mes = calcular_metricas_regionais_mes(reg_ref, mes_calc)
+                        ytd26 += metricas_mes.get(chave_valor, 0.0)
+                        ytd_orc += metricas_mes.get(chave_orc, 0.0)
+                    return (
+                        ytd25,
+                        ytd26,
+                        ytd_orc,
+                        calcular_variacao_percentual(ytd26, ytd25),
+                        calcular_variacao_percentual(ytd26, ytd_orc),
+                    )
+
                 for reg in regionais_reg:
                     df_r = df_reg[df_reg['REGIONAL'] == reg]
                     df_r_m1 = df_reg_m1[df_reg_m1['REGIONAL'] == reg]
@@ -26890,6 +27164,9 @@ with tab5:
                     mom_demanda = calcular_variacao_percentual(demanda, demanda_m1)
                     mom_vb = calcular_variacao_percentual(vb, vb_m1)
                     mom_ativ = calcular_variacao_percentual(ativ, ativ_m1)
+                    dem_ytd25, dem_ytd26, dem_ytd_orc, dem_ytd_vs_25, dem_ytd_vs_orc = calcular_ytd_resumo_regional(reg, 'DEMANDA', 'DEMANDA_ORC')
+                    vb_ytd25, vb_ytd26, vb_ytd_orc, vb_ytd_vs_25, vb_ytd_vs_orc = calcular_ytd_resumo_regional(reg, 'VB', 'VB_ORC')
+                    ativ_ytd25, ativ_ytd26, ativ_ytd_orc, ativ_ytd_vs_25, ativ_ytd_vs_orc = calcular_ytd_resumo_regional(reg, 'ATIV', 'ATIV_ORC')
                     conv_vb = (vb / demanda) * 100 if demanda > 0 else np.nan
                     conv_ativ = (ativ / vb) * 100 if vb > 0 else np.nan
                     pct_demanda = (((demanda / meta_demanda) - 1) * 100) if meta_demanda > 0 else np.nan
@@ -26903,16 +27180,31 @@ with tab5:
                         'DEMANDA_MOM': mom_demanda,
                         'DEMANDA_ORC': meta_demanda,
                         'DEMANDA_PCT': pct_demanda,
+                        'DEMANDA_YTD25': dem_ytd25,
+                        'DEMANDA_YTD26': dem_ytd26,
+                        'DEMANDA_YTD_ORC': dem_ytd_orc,
+                        'DEMANDA_YTD_VS_25': dem_ytd_vs_25,
+                        'DEMANDA_YTD_VS_ORC': dem_ytd_vs_orc,
                         'VB_REAL': vb,
                         'VB_M1': vb_m1,
                         'VB_MOM': mom_vb,
                         'VB_ORC': meta_vb,
                         'VB_PCT': pct_vb,
+                        'VB_YTD25': vb_ytd25,
+                        'VB_YTD26': vb_ytd26,
+                        'VB_YTD_ORC': vb_ytd_orc,
+                        'VB_YTD_VS_25': vb_ytd_vs_25,
+                        'VB_YTD_VS_ORC': vb_ytd_vs_orc,
                         'ATIV_REAL': ativ,
                         'ATIV_M1': ativ_m1,
                         'ATIV_MOM': mom_ativ,
                         'ATIV_ORC': meta_ativ,
                         'ATIV_PCT': pct_ativ,
+                        'ATIV_YTD25': ativ_ytd25,
+                        'ATIV_YTD26': ativ_ytd26,
+                        'ATIV_YTD_ORC': ativ_ytd_orc,
+                        'ATIV_YTD_VS_25': ativ_ytd_vs_25,
+                        'ATIV_YTD_VS_ORC': ativ_ytd_vs_orc,
                         'CONV_VB': conv_vb,
                         'CONV_ATIV': conv_ativ
                     })
@@ -26924,12 +27216,21 @@ with tab5:
                 total_dem_real = float(df_saida['DEMANDA_REAL'].sum())
                 total_dem_m1 = float(df_saida['DEMANDA_M1'].sum())
                 total_dem_orc = float(df_saida['DEMANDA_ORC'].sum())
+                total_dem_ytd25 = float(df_saida['DEMANDA_YTD25'].sum())
+                total_dem_ytd26 = float(df_saida['DEMANDA_YTD26'].sum())
+                total_dem_ytd_orc = float(df_saida['DEMANDA_YTD_ORC'].sum())
                 total_vb_real = float(df_saida['VB_REAL'].sum())
                 total_vb_m1 = float(df_saida['VB_M1'].sum())
                 total_vb_orc = float(df_saida['VB_ORC'].sum())
+                total_vb_ytd25 = float(df_saida['VB_YTD25'].sum())
+                total_vb_ytd26 = float(df_saida['VB_YTD26'].sum())
+                total_vb_ytd_orc = float(df_saida['VB_YTD_ORC'].sum())
                 total_ativ_real = float(df_saida['ATIV_REAL'].sum())
                 total_ativ_m1 = float(df_saida['ATIV_M1'].sum())
                 total_ativ_orc = float(df_saida['ATIV_ORC'].sum())
+                total_ativ_ytd25 = float(df_saida['ATIV_YTD25'].sum())
+                total_ativ_ytd26 = float(df_saida['ATIV_YTD26'].sum())
+                total_ativ_ytd_orc = float(df_saida['ATIV_YTD_ORC'].sum())
                 total_row = {
                     'REGIONAL': 'TOTAL',
                     'DEMANDA_REAL': total_dem_real,
@@ -26937,16 +27238,31 @@ with tab5:
                     'DEMANDA_MOM': calcular_variacao_percentual(total_dem_real, total_dem_m1),
                     'DEMANDA_ORC': total_dem_orc,
                     'DEMANDA_PCT': (((total_dem_real / total_dem_orc) - 1) * 100) if total_dem_orc > 0 else np.nan,
+                    'DEMANDA_YTD25': total_dem_ytd25,
+                    'DEMANDA_YTD26': total_dem_ytd26,
+                    'DEMANDA_YTD_ORC': total_dem_ytd_orc,
+                    'DEMANDA_YTD_VS_25': calcular_variacao_percentual(total_dem_ytd26, total_dem_ytd25),
+                    'DEMANDA_YTD_VS_ORC': calcular_variacao_percentual(total_dem_ytd26, total_dem_ytd_orc),
                     'VB_REAL': total_vb_real,
                     'VB_M1': total_vb_m1,
                     'VB_MOM': calcular_variacao_percentual(total_vb_real, total_vb_m1),
                     'VB_ORC': total_vb_orc,
                     'VB_PCT': (((total_vb_real / total_vb_orc) - 1) * 100) if total_vb_orc > 0 else np.nan,
+                    'VB_YTD25': total_vb_ytd25,
+                    'VB_YTD26': total_vb_ytd26,
+                    'VB_YTD_ORC': total_vb_ytd_orc,
+                    'VB_YTD_VS_25': calcular_variacao_percentual(total_vb_ytd26, total_vb_ytd25),
+                    'VB_YTD_VS_ORC': calcular_variacao_percentual(total_vb_ytd26, total_vb_ytd_orc),
                     'ATIV_REAL': total_ativ_real,
                     'ATIV_M1': total_ativ_m1,
                     'ATIV_MOM': calcular_variacao_percentual(total_ativ_real, total_ativ_m1),
                     'ATIV_ORC': total_ativ_orc,
                     'ATIV_PCT': (((total_ativ_real / total_ativ_orc) - 1) * 100) if total_ativ_orc > 0 else np.nan,
+                    'ATIV_YTD25': total_ativ_ytd25,
+                    'ATIV_YTD26': total_ativ_ytd26,
+                    'ATIV_YTD_ORC': total_ativ_ytd_orc,
+                    'ATIV_YTD_VS_25': calcular_variacao_percentual(total_ativ_ytd26, total_ativ_ytd25),
+                    'ATIV_YTD_VS_ORC': calcular_variacao_percentual(total_ativ_ytd26, total_ativ_ytd_orc),
                     'CONV_VB': (total_vb_real / total_dem_real) * 100 if total_dem_real > 0 else np.nan,
                     'CONV_ATIV': (total_ativ_real / total_vb_real) * 100 if total_vb_real > 0 else np.nan
                 }
@@ -26995,8 +27311,8 @@ with tab5:
                 }}
                 table.{tabela_id} {{
                     border-collapse: collapse;
-                    width: 100%;
-                    min-width: 100%;
+                    width: max-content;
+                    min-width: 1780px;
                     table-layout: fixed;
                     font-size: 9.5px;
                     line-height: 1.05;
@@ -27063,8 +27379,8 @@ with tab5:
                     text-overflow: clip;
                 }}
                 .{tabela_id} tbody td:nth-child(5),
-                .{tabela_id} tbody td:nth-child(10),
-                .{tabela_id} tbody td:nth-child(15) {{
+                .{tabela_id} tbody td:nth-child(15),
+                .{tabela_id} tbody td:nth-child(25) {{
                     background: #FFF3F0 !important;
                     color: #6B1F1A;
                     font-weight: 400;
@@ -27082,16 +27398,16 @@ with tab5:
                     font-weight: 600;
                 }}
                 .{tabela_id} tbody tr.linha-total td:nth-child(5),
-                .{tabela_id} tbody tr.linha-total td:nth-child(10),
-                .{tabela_id} tbody tr.linha-total td:nth-child(15) {{
+                .{tabela_id} tbody tr.linha-total td:nth-child(15),
+                .{tabela_id} tbody tr.linha-total td:nth-child(25) {{
                     background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
                     color: #FFFFFF !important;
                 }}
                 </style>
                 """
                 largura_regional_pct = 12.0
-                largura_demais_pct = (100.0 - largura_regional_pct) / 17.0
-                larguras_cols_pct = [largura_regional_pct] + [largura_demais_pct] * 17
+                largura_demais_pct = (100.0 - largura_regional_pct) / 32.0
+                larguras_cols_pct = [largura_regional_pct] + [largura_demais_pct] * 32
                 colgroup_html = "<colgroup>" + "".join(
                     [f'<col style="width:{w:.4f}%;">' for w in larguras_cols_pct]
                 ) + "</colgroup>"
@@ -27108,6 +27424,13 @@ with tab5:
                     html_rows += f'<td>{fmt_num(row["DEMANDA_ORC"])}</td>'
                     classe_dem_pct = "" if is_total else f" {classe_pct(row['DEMANDA_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_dem_pct}">{fmt_pct_com_icone(row["DEMANDA_PCT"], is_total=is_total)}</td>'
+                    html_rows += f'<td>{fmt_num(row["DEMANDA_YTD25"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["DEMANDA_YTD26"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["DEMANDA_YTD_ORC"])}</td>'
+                    classe_dem_ytd25 = "" if is_total else f" {classe_pct(row['DEMANDA_YTD_VS_25'])}"
+                    html_rows += f'<td class="col-pct{classe_dem_ytd25}">{fmt_pct_com_icone(row["DEMANDA_YTD_VS_25"], is_total=is_total)}</td>'
+                    classe_dem_ytdorc = "" if is_total else f" {classe_pct(row['DEMANDA_YTD_VS_ORC'])}"
+                    html_rows += f'<td class="col-pct{classe_dem_ytdorc}">{fmt_pct_com_icone(row["DEMANDA_YTD_VS_ORC"], is_total=is_total)}</td>'
 
                     html_rows += f'<td>{fmt_num(row["VB_REAL"])}</td>'
                     html_rows += f'<td>{fmt_num(row["VB_M1"])}</td>'
@@ -27116,6 +27439,13 @@ with tab5:
                     html_rows += f'<td>{fmt_num(row["VB_ORC"])}</td>'
                     classe_vb_pct = "" if is_total else f" {classe_pct(row['VB_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_vb_pct}">{fmt_pct_com_icone(row["VB_PCT"], is_total=is_total)}</td>'
+                    html_rows += f'<td>{fmt_num(row["VB_YTD25"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["VB_YTD26"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["VB_YTD_ORC"])}</td>'
+                    classe_vb_ytd25 = "" if is_total else f" {classe_pct(row['VB_YTD_VS_25'])}"
+                    html_rows += f'<td class="col-pct{classe_vb_ytd25}">{fmt_pct_com_icone(row["VB_YTD_VS_25"], is_total=is_total)}</td>'
+                    classe_vb_ytdorc = "" if is_total else f" {classe_pct(row['VB_YTD_VS_ORC'])}"
+                    html_rows += f'<td class="col-pct{classe_vb_ytdorc}">{fmt_pct_com_icone(row["VB_YTD_VS_ORC"], is_total=is_total)}</td>'
 
                     html_rows += f'<td>{fmt_num(row["ATIV_REAL"])}</td>'
                     html_rows += f'<td>{fmt_num(row["ATIV_M1"])}</td>'
@@ -27124,6 +27454,13 @@ with tab5:
                     html_rows += f'<td>{fmt_num(row["ATIV_ORC"])}</td>'
                     classe_ativ_pct = "" if is_total else f" {classe_pct(row['ATIV_PCT'])}"
                     html_rows += f'<td class="col-pct{classe_ativ_pct}">{fmt_pct_com_icone(row["ATIV_PCT"], is_total=is_total)}</td>'
+                    html_rows += f'<td>{fmt_num(row["ATIV_YTD25"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["ATIV_YTD26"])}</td>'
+                    html_rows += f'<td>{fmt_num(row["ATIV_YTD_ORC"])}</td>'
+                    classe_ativ_ytd25 = "" if is_total else f" {classe_pct(row['ATIV_YTD_VS_25'])}"
+                    html_rows += f'<td class="col-pct{classe_ativ_ytd25}">{fmt_pct_com_icone(row["ATIV_YTD_VS_25"], is_total=is_total)}</td>'
+                    classe_ativ_ytdorc = "" if is_total else f" {classe_pct(row['ATIV_YTD_VS_ORC'])}"
+                    html_rows += f'<td class="col-pct{classe_ativ_ytdorc}">{fmt_pct_com_icone(row["ATIV_YTD_VS_ORC"], is_total=is_total)}</td>'
 
                     html_rows += f'<td class="col-pct">{fmt_pct(row["CONV_VB"])}</td>'
                     html_rows += f'<td class="col-pct">{fmt_pct(row["CONV_ATIV"])}</td>'
@@ -27137,9 +27474,9 @@ with tab5:
                     <thead>
                       <tr>
                         <th rowspan="2">REGIONAL</th>
-                        <th colspan="5">DEMANDA</th>
-                        <th colspan="5">VENDA BRUTA</th>
-                        <th colspan="5">ATIVADOS</th>
+                        <th colspan="10">DEMANDA</th>
+                        <th colspan="10">VENDA BRUTA</th>
+                        <th colspan="10">ATIVADOS</th>
                         <th colspan="2">CONVERSÃO</th>
                       </tr>
                       <tr>
@@ -27148,16 +27485,31 @@ with tab5:
                         <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub">ORÇ</th>
                         <th class="th-sub th-pct">% ORÇ</th>
+                        <th class="th-sub">YTD25</th>
+                        <th class="th-sub">YTD26</th>
+                        <th class="th-sub">YTD_ORÇ</th>
+                        <th class="th-sub th-pct">YTD26<br>vs<br>YTD25</th>
+                        <th class="th-sub th-pct">YTD26<br>vs<br>ORÇ</th>
                         <th class="th-sub">REAL</th>
                         <th class="th-sub">M-1</th>
                         <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub">ORÇ</th>
                         <th class="th-sub th-pct">% ORÇ</th>
+                        <th class="th-sub">YTD25</th>
+                        <th class="th-sub">YTD26</th>
+                        <th class="th-sub">YTD_ORÇ</th>
+                        <th class="th-sub th-pct">YTD26<br>vs<br>YTD25</th>
+                        <th class="th-sub th-pct">YTD26<br>vs<br>ORÇ</th>
                         <th class="th-sub">REAL</th>
                         <th class="th-sub">M-1</th>
                         <th class="th-sub th-pct">MoM</th>
                         <th class="th-sub">ORÇ</th>
                         <th class="th-sub th-pct">% ORÇ</th>
+                        <th class="th-sub">YTD25</th>
+                        <th class="th-sub">YTD26</th>
+                        <th class="th-sub">YTD_ORÇ</th>
+                        <th class="th-sub th-pct">YTD26<br>vs<br>YTD25</th>
+                        <th class="th-sub th-pct">YTD26<br>vs<br>ORÇ</th>
                         <th class="th-conv">V. BRUTA</th>
                         <th class="th-conv">ATIVADOS</th>
                       </tr>
@@ -27195,26 +27547,21 @@ with tab5:
             home_inicio_ctx["regional_fixa"] = html_regional_produtos.get("FIXA", "")
 
             if render_blocos_home_only_no_funil_movel:
-                col_reg_conta, col_reg_fixa = st.columns(2, gap="medium")
-                for col_ref, produto_ref in [
-                    (col_reg_conta, 'CONTA'),
-                    (col_reg_fixa, 'FIXA')
-                ]:
-                    with col_ref:
-                        st.markdown(
-                            build_visual_title_html(
-                                produto_ref,
-                                produto_ref,
-                                "subsection-title",
-                                extra_style="margin-top:8px;"
-                            ),
-                            unsafe_allow_html=True
-                        )
-                        html_tabela_reg = html_regional_produtos.get(produto_ref, "")
-                        if html_tabela_reg:
-                            st.markdown(html_tabela_reg, unsafe_allow_html=True)
-                        else:
-                            st.info(f"Sem dados para {produto_ref} com os filtros selecionados.")
+                for produto_ref in ['CONTA', 'FIXA']:
+                    st.markdown(
+                        build_visual_title_html(
+                            produto_ref,
+                            produto_ref,
+                            "subsection-title",
+                            extra_style="margin-top:8px;"
+                        ),
+                        unsafe_allow_html=True
+                    )
+                    html_tabela_reg = html_regional_produtos.get(produto_ref, "")
+                    if html_tabela_reg:
+                        st.markdown(html_tabela_reg, unsafe_allow_html=True)
+                    else:
+                        st.info(f"Sem dados para {produto_ref} com os filtros selecionados.")
 
             if qtd_renderizadas == 0:
                 if render_blocos_home_only_no_funil_movel:
@@ -27713,21 +28060,18 @@ with tab0:
         html_regional_conta_home = home_inicio_ctx.get("regional_conta", "")
         html_regional_fixa_home = home_inicio_ctx.get("regional_fixa", "")
         if html_regional_conta_home or html_regional_fixa_home:
-            col_home_reg_1, col_home_reg_2 = st.columns(2, gap="medium")
-            with col_home_reg_1:
-                if html_regional_conta_home:
-                    st.markdown(
-                        build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
-                        unsafe_allow_html=True
-                    )
-                    renderizar_html_otimizado(html_regional_conta_home)
-            with col_home_reg_2:
-                if html_regional_fixa_home:
-                    st.markdown(
-                        build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:8px;"),
-                        unsafe_allow_html=True
-                    )
-                    renderizar_html_otimizado(html_regional_fixa_home)
+            if html_regional_conta_home:
+                st.markdown(
+                    build_visual_title_html("CONTA", "conta", "subsection-title", extra_style="margin-top:8px;"),
+                    unsafe_allow_html=True
+                )
+                renderizar_html_otimizado(html_regional_conta_home)
+            if html_regional_fixa_home:
+                st.markdown(
+                    build_visual_title_html("FIXA", "fixa", "subsection-title", extra_style="margin-top:8px;"),
+                    unsafe_allow_html=True
+                )
+                renderizar_html_otimizado(html_regional_fixa_home)
         else:
             st.info("Os dados de PERFORMANCE POR REGIONAL não estão disponíveis para a capa.")
 
