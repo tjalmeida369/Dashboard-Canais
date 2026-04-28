@@ -176,7 +176,7 @@ def desserializar_dataframe_cache(df_json: str) -> pd.DataFrame:
     """Desserializa DataFrame previamente convertido para JSON orient=split."""
     if not df_json:
         return pd.DataFrame()
-    return pd.read_json(StringIO(df_json), orient="split")
+    return pd.read_json(StringIO(df_json), orient="split", dtype=False)
 
 
 def _desempacotar_item_cache_session(item):
@@ -7408,7 +7408,7 @@ def criar_tabela_html_funil_cotacoes(
         html += f'<th class="{" ".join(classes)}">{escape(str(col))}</th>'
     html += "</tr></thead><tbody>"
 
-    for idx, row in df_formatado.iterrows():
+    for idx, row in df_display.iterrows():
         etapa_ref = str(row.get(col_etapa, "")).strip().upper()
         if " VS " in etapa_ref:
             classe_linha = "linha-conversao-funil etapa-conversao"
@@ -14130,6 +14130,37 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     col_meta = 'Orç'
     colunas_var = {'MoM', 'YoY', 'YTD26 vs YTD25', 'YTD26 vs YTD_ORÇ', 'Var Orç'}
 
+    def _serie_fonte_coluna(coluna_nome: str) -> pd.Series:
+        if df_numerico is not None and not df_numerico.empty and coluna_nome in df_numerico.columns:
+            return df_numerico[coluna_nome]
+        if coluna_nome in df_formatado.columns:
+            return df_formatado[coluna_nome]
+        return pd.Series([None] * len(df_formatado), index=df_formatado.index)
+
+    def _fmt_int_dashboard(valor) -> str:
+        try:
+            valor_num = float(pd.to_numeric(pd.Series([valor]), errors='coerce').fillna(0.0).iloc[0])
+        except Exception:
+            valor_num = 0.0
+        return formatar_numero_brasileiro(valor_num, 0)
+
+    def _fmt_pct_dashboard(valor) -> str:
+        try:
+            valor_num = float(pd.to_numeric(pd.Series([valor]), errors='coerce').fillna(0.0).iloc[0])
+        except Exception:
+            valor_num = 0.0
+        return f"{valor_num:+.1f}%".replace('.', ',')
+
+    df_display = pd.DataFrame(index=df_formatado.index)
+    for coluna_nome in colunas:
+        serie_fonte = _serie_fonte_coluna(coluna_nome)
+        if coluna_nome == col_canal:
+            df_display[coluna_nome] = serie_fonte.astype(str)
+        elif coluna_nome in colunas_var:
+            df_display[coluna_nome] = serie_fonte.apply(_fmt_pct_dashboard)
+        else:
+            df_display[coluna_nome] = serie_fonte.apply(_fmt_int_dashboard)
+
     html = f"""
     <style>
         #{table_id}.tabela-container-resultado-canais {{
@@ -14399,9 +14430,11 @@ def cached_tabela_html_analitica(df_fmt_json: str, df_num_json: str, table_id: s
 
 @st.cache_data(show_spinner=False, max_entries=3, persist="disk")
 def cached_tabela_html_resultado_canais(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
+    df_num = desserializar_dataframe_cache(df_num_json)
+    df_fmt = desserializar_dataframe_cache(df_fmt_json)
     return criar_tabela_html_resultado_canais(
-        desserializar_dataframe_cache(df_fmt_json),
-        desserializar_dataframe_cache(df_num_json),
+        df_fmt if df_fmt is not None else pd.DataFrame(),
+        df_num if df_num is not None else pd.DataFrame(),
         table_id
     )
 
@@ -25086,8 +25119,8 @@ with tab5:
                 def _montar_ctx_resultado_canais_home():
                     resultados_html_local: dict[str, str] = {}
                     for produto_resultado, table_id_resultado in [
-                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v2'),
-                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v2')
+                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v3'),
+                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v3')
                     ]:
                         tabela_resultado_canais = construir_tabela_resultado_canais(
                             df_base=base_resultado,
@@ -25110,15 +25143,15 @@ with tab5:
                             produto_ref=produto_resultado,
                             incluir_total=True
                         )
-                        resultados_html_local[produto_resultado] = cached_tabela_html_resultado_canais(
-                            serializar_dataframe_cache(tabela_resultado_canais_fmt),
-                            serializar_dataframe_cache(tabela_resultado_canais_num),
+                        resultados_html_local[produto_resultado] = criar_tabela_html_resultado_canais(
+                            tabela_resultado_canais_fmt,
+                            tabela_resultado_canais_num,
                             table_id_resultado
                         )
                     return resultados_html_local
 
                 resultados_html = obter_cache_session_dashboard(
-                    "home_resultado_canais_html_v4",
+                    "home_resultado_canais_html_v6",
                     (
                         "resultado_canais",
                         file_mtime,
