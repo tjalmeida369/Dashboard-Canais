@@ -7408,7 +7408,7 @@ def criar_tabela_html_funil_cotacoes(
         html += f'<th class="{" ".join(classes)}">{escape(str(col))}</th>'
     html += "</tr></thead><tbody>"
 
-    for idx, row in df_display.iterrows():
+    for idx, row in df_formatado.iterrows():
         etapa_ref = str(row.get(col_etapa, "")).strip().upper()
         if " VS " in etapa_ref:
             classe_linha = "linha-conversao-funil etapa-conversao"
@@ -14368,7 +14368,7 @@ def criar_tabela_html_resultado_canais(df_formatado: pd.DataFrame, df_numerico: 
     html += "</tr></thead><tbody>"
 
     idx_linha_canal = 0
-    for idx, row in df_formatado.iterrows():
+    for idx, row in df_display.iterrows():
         canal_ref = str(df_numerico.iloc[idx, 0]) if idx < len(df_numerico) else str(row.iloc[0])
         canal_ref_norm = canal_ref.strip().upper()
         is_total = canal_ref_norm.startswith("TOTAL") or canal_ref_norm.startswith("NACIONAIS")
@@ -14430,11 +14430,9 @@ def cached_tabela_html_analitica(df_fmt_json: str, df_num_json: str, table_id: s
 
 @st.cache_data(show_spinner=False, max_entries=3, persist="disk")
 def cached_tabela_html_resultado_canais(df_fmt_json: str, df_num_json: str, table_id: str) -> str:
-    df_num = desserializar_dataframe_cache(df_num_json)
-    df_fmt = desserializar_dataframe_cache(df_fmt_json)
     return criar_tabela_html_resultado_canais(
-        df_fmt if df_fmt is not None else pd.DataFrame(),
-        df_num if df_num is not None else pd.DataFrame(),
+        desserializar_dataframe_cache(df_fmt_json),
+        desserializar_dataframe_cache(df_num_json),
         table_id
     )
 
@@ -25119,8 +25117,8 @@ with tab5:
                 def _montar_ctx_resultado_canais_home():
                     resultados_html_local: dict[str, str] = {}
                     for produto_resultado, table_id_resultado in [
-                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v3'),
-                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v3')
+                        ('CONTA', 'tabela-analitico-resultado-canais-conta-v4'),
+                        ('FIXA', 'tabela-analitico-resultado-canais-fixa-v4')
                     ]:
                         tabela_resultado_canais = construir_tabela_resultado_canais(
                             df_base=base_resultado,
@@ -25151,7 +25149,7 @@ with tab5:
                     return resultados_html_local
 
                 resultados_html = obter_cache_session_dashboard(
-                    "home_resultado_canais_html_v6",
+                    "home_resultado_canais_html_v7",
                     (
                         "resultado_canais",
                         file_mtime,
