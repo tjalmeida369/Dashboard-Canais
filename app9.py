@@ -2666,6 +2666,7 @@ st.markdown("""
 
 st.markdown("""
     <style>
+        @media not all {
         /* Executive visual layer for the regional tables in ATIVADOS, PEDIDOS, LIGACOES and DESATIVACOES. */
         body .tabela-container-melhorada,
         body .tabela-container-pedidos,
@@ -2967,6 +2968,184 @@ st.markdown("""
         body table.tabela-pedidos td.performance-excelente-pedidos,
         body table.tabela-pedidos td.performance-critica-pedidos {
             animation: none !important;
+        }
+        }
+
+        /* Clean regional table layer: alinhado ao visual de PEDIDOS POR REGIONAL. */
+        body .tabela-container-melhorada,
+        body .tabela-container-ligacoes,
+        body .tabela-container-desativados {
+            width: 100% !important;
+            max-height: 650px !important;
+            overflow-y: auto !important;
+            overflow-x: auto !important;
+            border: 2px solid #790E09 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15) !important;
+            background: #FFFFFF !important;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+        }
+
+        body .tabela-container-melhorada::after,
+        body .tabela-container-ligacoes::after,
+        body .tabela-container-desativados::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        body table.tabela-melhorada,
+        body table.tabela-ligacoes,
+        body table.tabela-desativados {
+            width: max-content !important;
+            min-width: 100% !important;
+            border-collapse: collapse !important;
+            border-spacing: 0 !important;
+            table-layout: auto !important;
+            font-size: 9px !important;
+            line-height: 1.04 !important;
+            font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+            font-variant-numeric: tabular-nums !important;
+        }
+
+        body table.tabela-melhorada th,
+        body table.tabela-ligacoes th,
+        body table.tabela-desativados th {
+            background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+            padding: 5px 4px !important;
+            text-align: center !important;
+            border-bottom: 3px solid #5A0A06 !important;
+            border-right: 1px solid #FFFFFF !important;
+            white-space: normal !important;
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+            font-size: 9px !important;
+            letter-spacing: 0.5px !important;
+            text-transform: uppercase !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+        }
+
+        body table.tabela-melhorada td,
+        body table.tabela-ligacoes td,
+        body table.tabela-desativados td {
+            padding: 3.6px 4px !important;
+            font-size: 9.3px !important;
+            line-height: 1.12 !important;
+            font-weight: 400 !important;
+            color: #2F3747 !important;
+            text-align: right !important;
+            border-bottom: 1px solid #FFFFFF !important;
+            border-right: 1px solid #FFFFFF !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            box-shadow: none !important;
+        }
+
+        body table.tabela-melhorada tr:not(.linha-total-melhorada) td:first-child,
+        body table.tabela-ligacoes tr:not(.linha-total-ligacoes) td:first-child,
+        body table.tabela-desativados tr:not(.linha-total-desativados) td:first-child {
+            text-align: left !important;
+            font-weight: 400 !important;
+            color: #333333 !important;
+            background: transparent !important;
+            padding-left: 7px !important;
+            box-shadow: none !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada:nth-child(even) td,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes:nth-child(even) td,
+        body table.tabela-desativados tr.linha-regional-desativados:nth-child(even) td {
+            background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada:nth-child(odd) td,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes:nth-child(odd) td,
+        body table.tabela-desativados tr.linha-regional-desativados:nth-child(odd) td {
+            background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada:hover td,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes:hover td,
+        body table.tabela-desativados tr.linha-regional-desativados:hover td {
+            background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+            box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
+            transform: none !important;
+        }
+
+        body table.tabela-melhorada tr.linha-total-melhorada td,
+        body table.tabela-ligacoes tr.linha-total-ligacoes td,
+        body table.tabela-desativados tr.linha-total-desativados td {
+            background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 400 !important;
+            font-size: 9.5px !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-shadow: none !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-total-anual,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-total-anual,
+        body table.tabela-desativados tr.linha-regional-desativados td.col-total-anual-desativados {
+            background: linear-gradient(180deg, rgba(47, 55, 71, 0.045) 0%, rgba(47, 55, 71, 0.018) 100%) !important;
+            color: #1F2937 !important;
+            font-weight: 600 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-mes,
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-real-mes,
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-tend,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-mes-2026,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-real-mes,
+        body table.tabela-desativados tr.linha-regional-desativados td.col-real-mes-desativados {
+            background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%) !important;
+            color: #1F2937 !important;
+            font-weight: 600 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-meta,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-meta-mes {
+            background: linear-gradient(180deg, rgba(121, 14, 9, 0.06) 0%, rgba(121, 14, 9, 0.022) 100%) !important;
+            color: #6B1F1A !important;
+            font-weight: 600 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-alcance,
+        body table.tabela-melhorada tr.linha-regional-melhorada td.col-variacao,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-alcance,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.col-variacao,
+        body table.tabela-desativados tr.linha-regional-desativados td.col-variacao-desativados {
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            font-weight: 600 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.percentual-positivo,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.valor-positivo,
+        body table.tabela-desativados tr.linha-regional-desativados td.percentual-positivo-desativados {
+            color: #1B5E20 !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            font-weight: 700 !important;
+        }
+
+        body table.tabela-melhorada tr.linha-regional-melhorada td.percentual-negativo,
+        body table.tabela-ligacoes tr.linha-regional-ligacoes td.valor-negativo,
+        body table.tabela-desativados tr.linha-regional-desativados td.percentual-negativo-desativados {
+            color: #C62828 !important;
+            background: linear-gradient(180deg, rgba(90, 98, 104, 0.08) 0%, rgba(90, 98, 104, 0.03) 100%) !important;
+            font-weight: 700 !important;
+        }
+
+        body table.tabela-melhorada td.performance-excelente,
+        body table.tabela-melhorada td.performance-critica,
+        body table.tabela-ligacoes td.performance-excelente,
+        body table.tabela-ligacoes td.performance-boa,
+        body table.tabela-ligacoes td.performance-media,
+        body table.tabela-ligacoes td.performance-ruim,
+        body table.tabela-ligacoes td.performance-critica {
+            animation: none !important;
+            box-shadow: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -4993,6 +5172,11 @@ RAW_TEND_FUNIL_FIXA_FILE_PATH = resolver_arquivo_dashboard(
     "tend_funil_ecom.xlsx",
     DASHBOARD_LEGACY_MOBILITY_DIR / "tend_funil_ecom.xlsx"
 )
+RAW_CONVERGENCIA_FILE_PATH = resolver_arquivo_dashboard(
+    "base_convergencia.xlsx",
+    Path(r"base_convergencia.xlsx"),
+    Path(r"base_convergencia.xlsx"),
+)
 
 
 def _resolver_primeiro_arquivo_existente(*candidatos: str | Path) -> Path:
@@ -5051,6 +5235,7 @@ BACKLOG_CONSOLIDADO_FILE_PATH = resolver_arquivo_preprocessado(
 )
 ANALITICO_MIGRACOES_FILE_PATH = resolver_arquivo_preprocessado("migracoes_pme.parquet", RAW_MIGRACOES_FILE_PATH)
 DESATIVADOS_FILE_PATH = resolver_arquivo_preprocessado("desativados_base.parquet", CHURN_FILE_PATH)
+CONVERGENCIA_FILE_PATH = RAW_CONVERGENCIA_FILE_PATH
 
 
 def _carregar_dataframe_preprocessado(
@@ -5103,6 +5288,425 @@ def _carregar_dataframe_preprocessado(
 
     compactar_colunas_categoricas(df, list(category_cols or text_cols or []))
     return df
+
+
+CONVERGENCIA_COL_ALIASES = {
+    'DAT_MOVIMENTO': ('DAT_MOVIMENTO', 'DATA_MOVIMENTO', 'DATA', 'PERIODO'),
+    'DSC_REGIONAL': ('DSC_REGIONAL', 'REGIONAL', 'DSC_REGIONAL_CMV'),
+    'DSC_CANAL_VENDA': ('DSC_CANAL_VENDA', 'CANAL_PLAN', 'DSC_CANAL', 'CANAL'),
+    'DSC_TIPO_ORIGEM': ('DSC_TIPO_ORIGEM', 'COD_PLATAFORMA', 'PRODUTO', 'PLATAFORMA'),
+    'QTDE': ('QTDE', 'QTD'),
+    'QTDE_CNPJ8': ('QTDE_CNPJ8', 'QTD_CNPJ8', 'QTDE_CLIENTES', 'CLIENTES'),
+    'FLG_INCREMENTO': ('FLG_INCREMENTO', 'FLAG_INCREMENTO'),
+    'FLG_PORTABILIDADE': ('FLG_PORTABILIDADE', 'FLAG_PORTABILIDADE'),
+    'FLG_MIGRACAO': ('FLG_MIGRACAO', 'FLAG_MIGRACAO'),
+    'FLG_RENOVACAO': ('FLG_RENOVACAO', 'FLAG_RENOVACAO'),
+    'FLG_TROCA_TITULARIDADE': ('FLG_TROCA_TITULARIDADE', 'FLAG_TROCA_TITULARIDADE'),
+    'FLG_VENDA_CONVERGENTE': ('FLG_VENDA_CONVERGENTE', 'FLAG_VENDA_CONVERGENTE', 'VENDA_CONVERGENTE'),
+    'FLG_NOVO': ('FLG_NOVO', 'FLAG_NOVO'),
+    'FLG_NOVO_NOVO': ('FLG_NOVO_NOVO', 'FLAG_NOVO_NOVO', 'FLG_NOVO-NOVO'),
+}
+
+
+def _normalizar_produto_convergencia(valor) -> str:
+    texto = normalizar_texto_chave(valor)
+    if not texto:
+        return ""
+    if "FIXA BRUTA" in texto:
+        return "IGNORAR"
+    if "FIXA" in texto:
+        return "FIXA"
+    if "MOVEL" in texto or "MOBILE" in texto or "CONTA" in texto:
+        return "CONTA"
+    return texto
+
+
+@st.cache_data(show_spinner=False, max_entries=2, persist="disk")
+def load_convergencia_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
+    """Carrega a base de convergência, mantendo apenas campos usados nos KPIs/tabela."""
+    _ = file_mtime
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return pd.DataFrame()
+
+    try:
+        header_df = load_excel_cached(str(path_obj), file_mtime, nrows=0)
+        colunas_origem = list(getattr(header_df, "columns", []))
+    except Exception:
+        return pd.DataFrame()
+
+    rename_map = {}
+    usecols = []
+    for destino, aliases in CONVERGENCIA_COL_ALIASES.items():
+        coluna_real = encontrar_coluna_por_alias(colunas_origem, *aliases)
+        if coluna_real:
+            rename_map[coluna_real] = destino
+            usecols.append(coluna_real)
+
+    obrigatorias = {'DAT_MOVIMENTO', 'DSC_REGIONAL', 'DSC_CANAL_VENDA', 'DSC_TIPO_ORIGEM', 'QTDE', 'QTDE_CNPJ8'}
+    if not obrigatorias.issubset(set(rename_map.values())):
+        return pd.DataFrame()
+
+    try:
+        df = load_excel_cached(str(path_obj), file_mtime, usecols=usecols)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.rename(columns=rename_map)
+    for coluna in CONVERGENCIA_COL_ALIASES:
+        if coluna not in df.columns:
+            df[coluna] = ""
+
+    df['DATA_DIA'] = pd.to_datetime(df['DAT_MOVIMENTO'], errors='coerce', dayfirst=True).dt.normalize()
+    df = df[df['DATA_DIA'].notna()].copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    df['mes_ano'] = df['DATA_DIA'].apply(_formatar_mes_ano_backlog)
+    df['REGIONAL'] = df['DSC_REGIONAL'].astype(str).str.strip().str[:3].str.upper()
+    df['CANAL_PLAN'] = df['DSC_CANAL_VENDA'].map(normalizar_canal_plan).astype('string').str.strip()
+    df['COD_PLATAFORMA'] = df['DSC_TIPO_ORIGEM'].apply(_normalizar_produto_convergencia)
+    df = df[df['COD_PLATAFORMA'].isin(['FIXA', 'CONTA'])].copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0.0)
+    df['QTDE_CNPJ8'] = normalizar_numerico_serie(df['QTDE_CNPJ8']).fillna(0.0)
+
+    df['FLAG_CONV'] = df['FLG_VENDA_CONVERGENTE'].apply(normalizar_texto_chave).eq('CONV')
+    df['FLAG_NOVO'] = df['FLG_NOVO'].apply(normalizar_texto_chave).eq('NOVO')
+    df['FLAG_NOVO_NOVO'] = df['FLG_NOVO_NOVO'].apply(normalizar_texto_chave).eq('NOVO NOVO')
+
+    colunas_saida = [
+        'DATA_DIA', 'mes_ano', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA',
+        'QTDE', 'QTDE_CNPJ8', 'FLAG_CONV', 'FLAG_NOVO', 'FLAG_NOVO_NOVO'
+    ]
+    df_saida = df[colunas_saida].copy()
+    compactar_colunas_categoricas(df_saida, ['mes_ano', 'REGIONAL', 'CANAL_PLAN', 'COD_PLATAFORMA'])
+    return df_saida
+
+
+def ordenar_meses_convergencia(meses_ref) -> list[str]:
+    return sorted(
+        [str(m).strip().lower() for m in list(meses_ref or []) if str(m).strip()],
+        key=mes_ano_para_data
+    )
+
+
+def pct_convergencia(parte: float, total: float) -> float:
+    return (float(parte) / float(total) * 100.0) if float(total or 0) > 0 else 0.0
+
+
+def fmt_pct_convergencia(valor: float) -> str:
+    return f"{float(valor or 0):.0f}%".replace(".", ",")
+
+
+def agregar_convergencia_metricas(df_ref: pd.DataFrame, chaves: list[str]) -> pd.DataFrame:
+    colunas_saida = chaves + ['TOTAL', 'LINHAS', 'NOVO', 'NOVO_NOVO', 'CONV']
+    if df_ref is None or df_ref.empty:
+        return pd.DataFrame(columns=colunas_saida)
+
+    df_tmp = df_ref.copy()
+    df_tmp['QTDE_CNPJ8'] = pd.to_numeric(df_tmp.get('QTDE_CNPJ8', 0), errors='coerce').fillna(0.0)
+    df_tmp['QTDE'] = pd.to_numeric(df_tmp.get('QTDE', 0), errors='coerce').fillna(0.0)
+    base = (
+        df_tmp.groupby(chaves, as_index=False, observed=True)[['QTDE_CNPJ8', 'QTDE']]
+        .sum()
+        .rename(columns={'QTDE_CNPJ8': 'TOTAL', 'QTDE': 'LINHAS'})
+    )
+    for flag_col, destino in [
+        ('FLAG_NOVO', 'NOVO'),
+        ('FLAG_NOVO_NOVO', 'NOVO_NOVO'),
+        ('FLAG_CONV', 'CONV'),
+    ]:
+        df_flag = df_tmp[df_tmp[flag_col].astype(bool)].copy()
+        if df_flag.empty:
+            base[destino] = 0.0
+            continue
+        agg_flag = (
+            df_flag.groupby(chaves, as_index=False, observed=True)['QTDE_CNPJ8']
+            .sum()
+            .rename(columns={'QTDE_CNPJ8': destino})
+        )
+        base = base.merge(agg_flag, on=chaves, how='left')
+        base[destino] = pd.to_numeric(base[destino], errors='coerce').fillna(0.0)
+
+    return base[colunas_saida].copy()
+
+
+def linha_chip_convergencia(rotulo: str, valor: float, total: float) -> str:
+    return (
+        '<span class="conv-kpi-chip">'
+        f'<span class="conv-kpi-chip-label">{escape(str(rotulo))}:</span>'
+        f'<span class="conv-kpi-chip-value">{formatar_numero_brasileiro(valor, 0)}</span>'
+        '<span class="conv-kpi-chip-sep">-</span>'
+        f'<span class="conv-kpi-chip-pct">{fmt_pct_convergencia(pct_convergencia(valor, total))}</span>'
+        '</span>'
+    )
+
+
+def montar_card_convergencia_html(canal_ref: str, produto_ref: str, metricas_ref: dict) -> str:
+    total = float(metricas_ref.get('TOTAL', 0) or 0)
+    novo = float(metricas_ref.get('NOVO', 0) or 0)
+    novo_novo = float(metricas_ref.get('NOVO_NOVO', 0) or 0)
+    conv = float(metricas_ref.get('CONV', 0) or 0)
+    return (
+        f'<div class="kpi-block-dinamico conv-kpi-block" title="Convergência {escape(str(produto_ref))} no canal {escape(str(canal_ref))}">'
+        f'{build_kpi_block_label_html(str(produto_ref), str(produto_ref))}'
+        f'<div class="kpi-value-wrap"><div class="kpi-value-dinamico">{formatar_numero_brasileiro(total, 0)}</div></div>'
+        '<div class="conv-kpi-main-label">Clientes</div>'
+        '<div class="conv-kpi-line conv-kpi-line-compact">'
+        f'{linha_chip_convergencia("Novo", novo, total)}'
+        f'{linha_chip_convergencia("NV-NV", novo_novo, total)}'
+        f'{linha_chip_convergencia("Conv", conv, total)}'
+        '</div>'
+        '</div>'
+    )
+
+
+def montar_tabela_convergencia_dimensao_html(
+    df_ref: pd.DataFrame,
+    meses_ref: list[str],
+    coluna_dimensao: str = 'REGIONAL',
+    titulo_coluna: str = 'REGIONAL',
+    ordem_linhas: list[str] | None = None
+) -> str:
+    if df_ref is None or df_ref.empty or not meses_ref or coluna_dimensao not in df_ref.columns:
+        return ""
+    df_tab = df_ref[df_ref['mes_ano'].astype(str).str.strip().str.lower().isin(meses_ref)].copy()
+    if df_tab.empty:
+        return ""
+
+    df_agg = agregar_convergencia_metricas(df_tab, [coluna_dimensao, 'mes_ano'])
+    if df_agg.empty:
+        return ""
+
+    mapa_metricas = {
+        (str(row[coluna_dimensao]).strip(), str(row['mes_ano']).strip().lower()): row
+        for _, row in df_agg.iterrows()
+    }
+    linhas_dimensao_base = (
+        df_agg[df_agg['mes_ano'].astype(str).str.lower().eq(str(meses_ref[-1]).lower())]
+        .sort_values('TOTAL', ascending=False)[coluna_dimensao]
+        .astype(str)
+        .tolist()
+    )
+    todas_linhas = df_agg[coluna_dimensao].dropna().astype(str).unique().tolist()
+    if ordem_linhas:
+        linhas_dimensao = [item for item in ordem_linhas if item in set(todas_linhas)]
+        linhas_dimensao += [item for item in linhas_dimensao_base if item not in linhas_dimensao]
+    else:
+        linhas_dimensao = list(linhas_dimensao_base)
+    linhas_dimensao += [
+        item for item in sorted(todas_linhas)
+        if item not in linhas_dimensao
+    ]
+
+    def _metricas_linha(reg_ref: str, mes_ref: str) -> dict[str, float]:
+        row_ref = mapa_metricas.get((reg_ref, str(mes_ref).strip().lower()))
+        if row_ref is None:
+            return {'TOTAL': 0.0, 'NOVO': 0.0, 'NOVO_NOVO': 0.0, 'CONV': 0.0}
+        return {
+            'TOTAL': float(row_ref.get('TOTAL', 0) or 0),
+            'NOVO': float(row_ref.get('NOVO', 0) or 0),
+            'NOVO_NOVO': float(row_ref.get('NOVO_NOVO', 0) or 0),
+            'CONV': float(row_ref.get('CONV', 0) or 0),
+        }
+
+    def _cells_metricas(reg_ref: str, mes_ref: str) -> str:
+        m = _metricas_linha(reg_ref, mes_ref)
+        total = m['TOTAL']
+        return (
+            f'<td class="col-total">{formatar_numero_brasileiro(total, 0)}</td>'
+            f'<td>{formatar_numero_brasileiro(m["NOVO"], 0)}</td>'
+            f'<td>{formatar_numero_brasileiro(m["NOVO_NOVO"], 0)}</td>'
+            f'<td>{formatar_numero_brasileiro(m["CONV"], 0)}</td>'
+            f'<td class="col-pct">{fmt_pct_convergencia(pct_convergencia(m["NOVO"], total))}</td>'
+            f'<td class="col-pct">{fmt_pct_convergencia(pct_convergencia(m["NOVO_NOVO"], total))}</td>'
+            f'<td class="col-pct">{fmt_pct_convergencia(pct_convergencia(m["CONV"], total))}</td>'
+        )
+
+    total_por_mes = {}
+    for mes_ref in meses_ref:
+        df_mes = df_agg[df_agg['mes_ano'].astype(str).str.strip().str.lower().eq(str(mes_ref).lower())]
+        total_por_mes[mes_ref] = {
+            'TOTAL': float(df_mes['TOTAL'].sum()),
+            'NOVO': float(df_mes['NOVO'].sum()),
+            'NOVO_NOVO': float(df_mes['NOVO_NOVO'].sum()),
+            'CONV': float(df_mes['CONV'].sum()),
+        }
+
+    def _cells_total(mes_ref: str) -> str:
+        m = total_por_mes.get(mes_ref, {'TOTAL': 0.0, 'NOVO': 0.0, 'NOVO_NOVO': 0.0, 'CONV': 0.0})
+        total = float(m['TOTAL'] or 0)
+        return (
+            f'<td class="col-total">{formatar_numero_brasileiro(total, 0)}</td>'
+            f'<td>{formatar_numero_brasileiro(m["NOVO"], 0)}</td>'
+            f'<td>{formatar_numero_brasileiro(m["NOVO_NOVO"], 0)}</td>'
+            f'<td>{formatar_numero_brasileiro(m["CONV"], 0)}</td>'
+            f'<td class="col-pct">{fmt_pct_convergencia(pct_convergencia(m["NOVO"], total))}</td>'
+            f'<td class="col-pct">{fmt_pct_convergencia(pct_convergencia(m["NOVO_NOVO"], total))}</td>'
+            f'<td class="col-pct">{fmt_pct_convergencia(pct_convergencia(m["CONV"], total))}</td>'
+        )
+
+    th_mes = ''.join(
+        f'<th colspan="7" class="th-mes">{escape(str(mes).replace("/", "-").upper())}</th>'
+        for mes in meses_ref
+    )
+    th_sub = ''.join(
+        '<th class="th-total">TOTAL</th><th class="th-novo">NOVO</th><th class="th-nvnv">NV-NV</th><th class="th-conv">CONV</th>'
+        '<th class="th-pct th-pct-first">%NOVO</th><th class="th-pct">%NV-NV</th><th class="th-pct">%CONV</th>'
+        for _ in meses_ref
+    )
+    colgroup = '<colgroup><col style="width:82px;">' + ''.join(
+        '<col style="width:48px;"><col style="width:44px;"><col style="width:44px;"><col style="width:44px;">'
+        '<col style="width:46px;"><col style="width:46px;"><col style="width:46px;">'
+        for _ in meses_ref
+    ) + '</colgroup>'
+
+    linhas = (
+        '<tr class="linha-total"><td class="col-regional">TOTAL</td>' +
+        ''.join(_cells_total(mes_ref) for mes_ref in meses_ref) +
+        '</tr>'
+    )
+    for reg_ref in linhas_dimensao:
+        linhas += (
+            '<tr class="linha-regional">'
+            f'<td class="col-regional">{escape(str(reg_ref))}</td>'
+            f'{"".join(_cells_metricas(str(reg_ref), mes_ref) for mes_ref in meses_ref)}'
+            '</tr>'
+        )
+
+    return f"""
+    <style>
+    .conv-table-container {{
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 560px;
+        border: 2px solid #790E09;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15);
+        background: #FFFFFF;
+        margin: 12px 0 18px 0;
+        font-family: 'Manrope', 'Segoe UI', sans-serif;
+    }}
+    table.conv-table {{
+        width: max-content;
+        min-width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-variant-numeric: tabular-nums;
+        font-size: 9px;
+        line-height: 1.04;
+    }}
+    .conv-table th {{
+        background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%);
+        color: #FFFFFF;
+        padding: 5px 4px;
+        text-align: center;
+        border-right: 1px solid #FFFFFF;
+        border-bottom: 3px solid #5A0A06;
+        font-weight: 700;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        text-transform: uppercase;
+    }}
+    .conv-table th.th-mes {{
+        background: linear-gradient(135deg, #6C0C08 0%, #4A0704 100%);
+        font-size: 9.4px;
+    }}
+    .conv-table th.th-total {{
+        background: linear-gradient(135deg, #5F0B07 0%, #4B0805 100%);
+    }}
+    .conv-table th.th-novo {{
+        background: linear-gradient(135deg, #72130E 0%, #5B0D08 100%);
+    }}
+    .conv-table th.th-nvnv {{
+        background: linear-gradient(135deg, #7A2D22 0%, #5E1710 100%);
+    }}
+    .conv-table th.th-conv {{
+        background: linear-gradient(135deg, #67413A 0%, #4E241D 100%);
+    }}
+    .conv-table th.th-pct {{
+        background: linear-gradient(135deg, #5F0B07 0%, #4B0805 100%) !important;
+        color: #FFFFFF !important;
+        border-bottom-color: #5A0A06;
+    }}
+    .conv-table th.th-pct-first {{
+        border-left: 2px solid rgba(255, 255, 255, 0.78);
+    }}
+    .conv-table td {{
+        padding: 3.8px 4px;
+        text-align: right;
+        border-bottom: 1px solid #FFFFFF;
+        border-right: 1px solid #FFFFFF;
+        color: #2F3747;
+        font-weight: 400;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+    .conv-table td.col-regional {{
+        text-align: left;
+        font-weight: 600;
+        color: #333333;
+    }}
+    .conv-table tr.linha-regional:nth-child(even) td {{
+        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%);
+    }}
+    .conv-table tr.linha-regional:nth-child(odd) td {{
+        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%);
+    }}
+    .conv-table tr.linha-regional:hover td {{
+        background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%);
+        box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12);
+    }}
+    .conv-table td.col-total {{
+        background: linear-gradient(180deg, rgba(47, 55, 71, 0.06) 0%, rgba(47, 55, 71, 0.025) 100%);
+        color: #1F2937;
+        font-weight: 600;
+    }}
+    .conv-table td.col-pct {{
+        font-weight: 600;
+    }}
+    .conv-table tr.linha-total td {{
+        background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+        color: #FFFFFF !important;
+        font-weight: 700;
+    }}
+    </style>
+    <div class="conv-table-container">
+      <table class="conv-table">
+        {colgroup}
+        <thead>
+          <tr><th rowspan="2">{escape(str(titulo_coluna).upper())}</th>{th_mes}</tr>
+          <tr>{th_sub}</tr>
+        </thead>
+        <tbody>{linhas}</tbody>
+      </table>
+    </div>
+    """
+
+
+def montar_tabela_convergencia_regional_html(df_ref: pd.DataFrame, meses_ref: list[str]) -> str:
+    return montar_tabela_convergencia_dimensao_html(df_ref, meses_ref, 'REGIONAL', 'REGIONAL')
+
+
+def montar_tabela_convergencia_canal_html(
+    df_ref: pd.DataFrame,
+    meses_ref: list[str],
+    ordem_canais_ref: list[str] | None = None
+) -> str:
+    return montar_tabela_convergencia_dimensao_html(
+        df_ref,
+        meses_ref,
+        'CANAL_PLAN',
+        'CANAL',
+        ordem_canais_ref
+    )
 
 
 @st.cache_data(show_spinner=False, max_entries=2, persist="disk")
@@ -14476,9 +15080,10 @@ FUNIL_FIXA_INDICADORES_CONFIG = [
     ("ENDERECO", "ENDEREÇO", 5),
     ("PAGAMENTO", "PAGAMENTO", 6),
     ("PEDIDOS_TOTAL", "PEDIDOS_TOTAL", 7),
-    ("VENDA_BRUTA", "VENDA BRUTA", 8),
-    ("DESISTENCIA", "DESISTÊNCIA", 9),
-    ("INSTALACAO", "INSTALAÇÃO", 10),
+    ("REJEITADO", "REJEITADO", 8),
+    ("VENDA_BRUTA", "VENDA BRUTA", 9),
+    ("DESISTENCIA", "DESISTÊNCIA", 10),
+    ("INSTALACAO", "INSTALAÇÃO", 11),
 ]
 FUNIL_FIXA_INDICADOR_LABELS = {
     chave: label for chave, label, _ in FUNIL_FIXA_INDICADORES_CONFIG
@@ -14553,6 +15158,36 @@ def _normalizar_segmento_funil_fixa(valor) -> str:
     return str(valor).strip()
 
 
+def _normalizar_indicadores_funil_fixa_df(df_funil: pd.DataFrame) -> pd.DataFrame:
+    if df_funil is None or df_funil.empty or 'INDICADOR' not in df_funil.columns:
+        return df_funil
+
+    df = df_funil.copy()
+    if 'INDICADOR_CHAVE' in df.columns:
+        chave_base = df['INDICADOR_CHAVE'].astype('object')
+        mask_chave_vazia = chave_base.isna() | chave_base.astype(str).str.strip().eq('')
+        chave_base.loc[mask_chave_vazia] = df.loc[mask_chave_vazia, 'INDICADOR']
+    else:
+        chave_base = df['INDICADOR']
+
+    df['INDICADOR_CHAVE'] = chave_base.map(_normalizar_chave_funil_fixa)
+    df = df[df['INDICADOR_CHAVE'].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
+    if df.empty:
+        return df
+
+    df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
+    if 'INDICADOR_ORDEM' not in df.columns:
+        df['INDICADOR_ORDEM'] = 999.0
+    df['INDICADOR_ORDEM'] = normalizar_numerico_serie(df['INDICADOR_ORDEM']).fillna(999.0)
+    df['INDICADOR_ORDEM'] = (
+        df['INDICADOR_CHAVE']
+        .map(FUNIL_FIXA_INDICADOR_ORDENS)
+        .fillna(df['INDICADOR_ORDEM'])
+        .astype(float)
+    )
+    return df
+
+
 @st.cache_data(ttl=3600, show_spinner=False, max_entries=1)
 def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.DataFrame:
     _ = file_mtime
@@ -14571,6 +15206,7 @@ def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.
             category_cols=['SEGMENTO', 'INDICADOR', 'INDICADOR_CHAVE', 'MES_ANO']
         )
         if not df_opt.empty:
+            df_opt = _normalizar_indicadores_funil_fixa_df(df_opt)
             df_opt['MES_ANO_ORDEM'] = normalizar_numerico_serie(df_opt['MES_ANO_ORDEM']).fillna(0).astype(int)
             return df_opt
 
@@ -14596,12 +15232,10 @@ def load_tend_funil_fixa_data(path: str, file_mtime: float | None = None) -> pd.
     df['SEGMENTO'] = df['SEGMENTO'].map(_normalizar_segmento_funil_fixa)
     df['INDICADOR_CHAVE'] = df['INDICADOR'].map(_normalizar_chave_funil_fixa)
     df = df[df['SEGMENTO'].isin(['PF', 'PME'])].copy()
-    df = df[df['INDICADOR_CHAVE'].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
+    df = _normalizar_indicadores_funil_fixa_df(df)
     if df.empty:
         return pd.DataFrame()
 
-    df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
-    df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(999.0)
     df['PERIODO_MES'] = pd.to_datetime(
         df['PERIODO_MES'],
         format='mixed',
@@ -14712,6 +15346,11 @@ def _aplicar_tend_funil_fixa(df_funil: pd.DataFrame, df_tend: pd.DataFrame) -> p
 
     base = df_funil.copy()
     base['EH_TEND'] = pd.to_numeric(base.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
+    base = _normalizar_indicadores_funil_fixa_df(base)
+    if df_tend is None or df_tend.empty:
+        return base
+
+    df_tend = _normalizar_indicadores_funil_fixa_df(df_tend)
     if df_tend is None or df_tend.empty:
         return base
 
@@ -14801,6 +15440,7 @@ def _aplicar_tend_funil_fixa(df_funil: pd.DataFrame, df_tend: pd.DataFrame) -> p
     df_out['MES_ANO_ORDEM'] = normalizar_numerico_serie(df_out['MES_ANO_ORDEM']).fillna(0).astype(int)
     df_out['INDICADOR_ORDEM'] = normalizar_numerico_serie(df_out['INDICADOR_ORDEM']).fillna(999.0)
     df_out['EH_TEND'] = pd.to_numeric(df_out.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
+    df_out = _normalizar_indicadores_funil_fixa_df(df_out)
     return df_out
 
 
@@ -14829,6 +15469,7 @@ def load_funil_fixa_ecommerce_data(
             default_values={'EH_TEND': 0, 'CANAL_ENTRADA': 'Não Informado'}
         )
         if not df_opt.empty:
+            df_opt = _normalizar_indicadores_funil_fixa_df(df_opt)
             df_opt['MES_ANO_ORDEM'] = normalizar_numerico_serie(df_opt['MES_ANO_ORDEM']).fillna(0).astype(int)
             df_opt['EH_TEND'] = pd.to_numeric(df_opt.get('EH_TEND', 0), errors='coerce').fillna(0).astype(int)
 
@@ -14893,14 +15534,9 @@ def load_funil_fixa_ecommerce_data(
     df['SEGMENTO'] = df['SEGMENTO'].map(_normalizar_segmento_funil_fixa)
     df['INDICADOR_CHAVE'] = df['INDICADOR'].map(_normalizar_chave_funil_fixa)
     df = df[df['SEGMENTO'].isin(['PF', 'PME'])].copy()
-    df = df[df['INDICADOR_CHAVE'].isin(FUNIL_FIXA_INDICADOR_LABELS.keys())].copy()
-    df['INDICADOR'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_LABELS)
+    df = _normalizar_indicadores_funil_fixa_df(df)
 
     df['QTDE'] = normalizar_numerico_serie(df['QTDE']).fillna(0.0)
-    if 'INDICADOR_ORDEM' not in df.columns:
-        df['INDICADOR_ORDEM'] = 999.0
-    df['INDICADOR_ORDEM'] = normalizar_numerico_serie(df['INDICADOR_ORDEM']).fillna(999.0)
-    df['INDICADOR_ORDEM'] = df['INDICADOR_CHAVE'].map(FUNIL_FIXA_INDICADOR_ORDENS).fillna(df['INDICADOR_ORDEM'])
 
     df['PERIODO_MES'] = pd.to_datetime(
         df['PERIODO_MES'],
@@ -15017,7 +15653,9 @@ def montar_estrutura_funil_fixa_ecommerce(
     if df_funil is None or df_funil.empty:
         return estrutura_vazia
 
-    base = df_funil.copy()
+    base = _normalizar_indicadores_funil_fixa_df(df_funil)
+    if base is None or base.empty:
+        return estrutura_vazia
     if segmentos_sel:
         base = base[base['SEGMENTO'].isin(segmentos_sel)].copy()
     if origens_sel:
@@ -15064,6 +15702,8 @@ def montar_estrutura_funil_fixa_ecommerce(
     tabela_child = tabela_child.reindex(columns=meses_ordem, fill_value=0.0)
 
     mes_atual_ordem = meses_ordem[-1]
+    mes_yoy_ordem = int(mes_atual_ordem) - 100
+    tem_mes_yoy = mes_yoy_ordem in tabela_child.columns
     mes_mais_recente_disponivel = max(mapa_ordem_rotulo.keys()) if mapa_ordem_rotulo else None
     meses_mm3 = meses_ordem[-4:-1] if len(meses_ordem) >= 4 else meses_ordem[:-1]
     aplicar_mm3_mes_atual = bool(
@@ -15088,6 +15728,7 @@ def montar_estrutura_funil_fixa_ecommerce(
         serie_pai = tabela_parent.loc[(indicador, indicador_ordem)]
         atual_pai = float(serie_pai.get(mes_atual_ordem, 0.0))
         anterior_pai = float(serie_pai.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
+        yoy_pai = float(serie_pai.get(mes_yoy_ordem, 0.0)) if tem_mes_yoy else 0.0
         row_id = f"funil-pai-{idx_pai}"
         filhos = []
 
@@ -15107,6 +15748,7 @@ def montar_estrutura_funil_fixa_ecommerce(
             origem = str(linha_filho.get('ORIGEM_AGG', '')).strip()
             atual_filho = float(linha_filho.get(mes_atual_ordem, 0.0))
             anterior_filho = float(linha_filho.get(meses_ordem[-2], 0.0)) if len(meses_ordem) >= 2 else 0.0
+            yoy_filho = float(linha_filho.get(mes_yoy_ordem, 0.0)) if tem_mes_yoy else 0.0
             raw_values_filho = [float(linha_filho.get(mes, 0.0)) for mes in meses_ordem]
             filhos.append({
                 'id': f'{row_id}-filho-{idx_filho}',
@@ -15119,6 +15761,7 @@ def montar_estrutura_funil_fixa_ecommerce(
                 'sort_total': float(sum(raw_values_filho)) if raw_values_filho else 0.0,
                 'sort_vector': [float(v) for v in raw_values_filho[::-1]],
                 'mom_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_filho, anterior_filho)),
+                'yoy_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_filho, yoy_filho)),
             })
 
         filhos = sorted(
@@ -15138,6 +15781,7 @@ def montar_estrutura_funil_fixa_ecommerce(
             'values': [_formatar_valor_funil_fixa(valor) for valor in raw_values_pai],
             'raw_values': raw_values_pai,
             'mom_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_pai, anterior_pai)),
+            'yoy_html': _render_mom_badge_funil_fixa(_calcular_mom_funil_fixa(atual_pai, yoy_pai)),
             'children': filhos,
         })
 
@@ -15177,16 +15821,18 @@ def criar_tabela_html_funil_fixa_ecommerce(
 
     qtd_meses = max(len(estrutura.get('meses_rotulos', [])), 1)
     largura_primeira_coluna = 148
-    largura_coluna_mom = 72
+    largura_coluna_variacao = 72
+    largura_colunas_variacao = largura_coluna_variacao * 2
     mes_tend_ordem = estrutura.get('mes_tend_ordem')
     colgroup_html = (
         '<colgroup>'
         f'<col style="width:{largura_primeira_coluna}px;">'
         + ''.join(
-            f'<col style="width:calc((100% - {largura_primeira_coluna + largura_coluna_mom}px) / {qtd_meses});">'
+            f'<col style="width:calc((100% - {largura_primeira_coluna + largura_colunas_variacao}px) / {qtd_meses});">'
             for _ in range(qtd_meses)
         )
-        + f'<col style="width:{largura_coluna_mom}px;">'
+        + f'<col style="width:{largura_coluna_variacao}px;">'
+        + f'<col style="width:{largura_coluna_variacao}px;">'
         + '</colgroup>'
     )
 
@@ -15228,6 +15874,7 @@ def criar_tabela_html_funil_fixa_ecommerce(
             f'<td class="ff-sticky ff-row-label">{btn_toggle}<span class="ff-label-text">{escape(str(row.get("label")))}</span></td>'
             f'{valores_html}'
             f'<td class="ff-mom-cell">{row.get("mom_html", "")}</td>'
+            f'<td class="ff-mom-cell">{row.get("yoy_html", "")}</td>'
             f'</tr>'
         )
         maximos_filhos = []
@@ -15256,6 +15903,7 @@ def criar_tabela_html_funil_fixa_ecommerce(
                 f'<td class="ff-sticky ff-row-label ff-row-label-child"><span class="ff-child-indent"></span><span class="ff-label-text">{escape(str(child.get("label")))}</span></td>'
                 f'{child_values_html}'
                 f'<td class="ff-mom-cell">{child.get("mom_html", "")}</td>'
+                f'<td class="ff-mom-cell">{child.get("yoy_html", "")}</td>'
                 f'</tr>'
             )
 
@@ -15303,7 +15951,9 @@ def criar_tabela_html_funil_fixa_ecommerce(
             font-weight:800;
         }}
         #{table_id} thead th:first-child {{left:0; z-index:4; border-top-left-radius:5px; text-align:left; padding-left:12px; background:linear-gradient(180deg, #6C0C08 0%, #3D0704 100%);}}
-        #{table_id} thead th:last-child {{border-top-right-radius:5px; background:linear-gradient(180deg, #4F5861 0%, #343B43 100%);}}
+        #{table_id} thead th:nth-last-child(2),
+        #{table_id} thead th:last-child {{background:linear-gradient(180deg, #4F5861 0%, #343B43 100%);}}
+        #{table_id} thead th:last-child {{border-top-right-radius:5px;}}
         #{table_id} thead th.ff-col-tend {{background:linear-gradient(135deg, #B7443B 0%, #8F241D 100%); color:#FFFFFF;}}
         #{table_id} tbody td {{
             padding:7px 5px;
@@ -15355,7 +16005,7 @@ def criar_tabela_html_funil_fixa_ecommerce(
         #{table_id} .ff-toggle:hover {{background:linear-gradient(180deg,#FFFFFF 0%,#FFDCD5 100%); transform:translateY(-1px);}}
         #{table_id} .ff-toggle-placeholder {{border-color:transparent; background:transparent; cursor:default; box-shadow:none;}}
         #{table_id} .ff-col-mes {{min-width:0;}}
-        #{table_id} .ff-mom-cell {{text-align:center !important; width:{largura_coluna_mom}px; min-width:{largura_coluna_mom}px;}}
+        #{table_id} .ff-mom-cell {{text-align:center !important; width:{largura_coluna_variacao}px; min-width:{largura_coluna_variacao}px;}}
         #{table_id} .ff-data-cell {{padding:4px 3px;}}
         #{table_id} .ff-data-bar-wrap {{position:relative; width:100%; min-width:0; height:20px; border-radius:3px; background:linear-gradient(180deg, rgba(121,14,9,0.035) 0%, rgba(121,14,9,0.075) 100%); overflow:hidden; border:1px solid rgba(121,14,9,0.055); box-shadow:inset 0 1px 0 rgba(255,255,255,0.82);}}
         #{table_id} .ff-data-cell.ff-col-tend .ff-data-bar-wrap {{background:linear-gradient(180deg, rgba(183,68,59,0.045) 0%, rgba(183,68,59,0.085) 100%); border-color:rgba(183,68,59,0.10);}}
@@ -15379,6 +16029,7 @@ def criar_tabela_html_funil_fixa_ecommerce(
               <th class="ff-sticky">Indicador / Origem</th>
               {cabecalhos_meses}
               <th>MoM</th>
+              <th>YoY</th>
             </tr>
           </thead>
           <tbody>
@@ -15417,7 +16068,9 @@ def _preparar_base_mes_funil_segmentado_fixa(
     if df_funil is None or df_funil.empty:
         return base_vazia
 
-    base = df_funil.copy()
+    base = _normalizar_indicadores_funil_fixa_df(df_funil)
+    if base is None or base.empty:
+        return base_vazia
     if origens_sel:
         base = base[base['ORIGEM_AGG'].isin(origens_sel)].copy()
     if canais_entrada_sel and 'CANAL_ENTRADA' in base.columns:
@@ -15479,6 +16132,10 @@ def _preparar_base_mes_funil_segmentado_fixa(
     )
     base_mes['MES_ANO_ORDEM'] = normalizar_numerico_serie(base_mes['MES_ANO_ORDEM']).fillna(0).astype(int)
     base_mes['QTDE'] = normalizar_numerico_serie(base_mes['QTDE']).fillna(0.0)
+    base_mes = (
+        base_mes.groupby(['SEGMENTO', 'INDICADOR', 'INDICADOR_ORDEM', 'MES_ANO_ORDEM'], as_index=False, observed=True)['QTDE']
+        .sum()
+    )
     return base_mes, mapa_ordem_rotulo, mes_atual_ordem, (meses_mm3 if aplicar_mm3 else []), mes_tend_ordem
 
 
@@ -15585,6 +16242,10 @@ def criar_grafico_funil_segmentado_fixa(
 
     base_mes['SEGMENTO'] = base_mes['SEGMENTO'].astype(str).str.strip()
     base_mes['INDICADOR'] = base_mes['INDICADOR'].astype(str).str.strip()
+    base_mes_plot = (
+        base_mes.groupby(['SEGMENTO', 'INDICADOR'], as_index=False, observed=True)['QTDE']
+        .sum()
+    )
 
     base_skeleton = pd.MultiIndex.from_product(
         [['PME', 'PF'], indicadores_plot],
@@ -15595,7 +16256,7 @@ def criar_grafico_funil_segmentado_fixa(
     ).fillna(999.0)
 
     base_plot = base_skeleton.merge(
-        base_mes[['SEGMENTO', 'INDICADOR', 'QTDE']],
+        base_mes_plot,
         on=['SEGMENTO', 'INDICADOR'],
         how='left'
     )
@@ -15647,7 +16308,10 @@ def criar_grafico_funil_segmentado_fixa(
             eh_primeiro_step_investimento = valor_anterior_real is None and indicador_norm == 'investimento'
             valor_base_step = valor_anterior_real
             etapa_base_step = etapa_anterior
-            if indicador_norm in {'instalacao', 'instalado', 'instalados'} and 'venda bruta' in valores_por_indicador_norm:
+            if indicador_norm in {'rejeitado', 'venda bruta'} and 'pedidos total' in valores_por_indicador_norm:
+                valor_base_step = valores_por_indicador_norm.get('pedidos total')
+                etapa_base_step = 'PEDIDOS_TOTAL'
+            elif indicador_norm in {'instalacao', 'instalado', 'instalados'} and 'venda bruta' in valores_por_indicador_norm:
                 valor_base_step = valores_por_indicador_norm.get('venda bruta')
                 etapa_base_step = 'VENDA BRUTA'
             percentual_step = _formatar_percentual_step_funil_segmentado(
@@ -18448,6 +19112,81 @@ with tab1:
             .tabela-melhorada td[class*="percentual-"] {
                 font-weight: 400 !important;
             }
+
+            /* Pedidos parity override: visual mais clean e harmônico */
+            .tabela-container-melhorada {
+                overflow-x: auto !important;
+                background: #FFFFFF !important;
+                border: 2px solid #790E09 !important;
+                border-radius: 10px !important;
+                box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15) !important;
+            }
+
+            .tabela-melhorada {
+                width: max-content !important;
+                min-width: 100% !important;
+                table-layout: auto !important;
+                font-size: 9px !important;
+                line-height: 1.04 !important;
+            }
+
+            .tabela-melhorada th {
+                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+                color: #FFFFFF !important;
+                font-weight: 600 !important;
+                padding: 5px 4px !important;
+                border-bottom: 3px solid #5A0A06 !important;
+                border-right: 1px solid #FFFFFF !important;
+                letter-spacing: 0.5px !important;
+            }
+
+            .tabela-melhorada td {
+                padding: 3.6px 4px !important;
+                font-size: 9.3px !important;
+                line-height: 1.12 !important;
+                font-weight: 400 !important;
+                border-bottom: 1px solid #FFFFFF !important;
+                border-right: 1px solid #FFFFFF !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                box-shadow: none !important;
+            }
+
+            .tabela-melhorada tr:not(.linha-total-melhorada) td:first-child {
+                font-weight: 400 !important;
+                color: #333333 !important;
+                background: transparent !important;
+                text-align: left !important;
+            }
+
+            .linha-total-melhorada td,
+            .linha-total-melhorada td:first-child {
+                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+                color: #FFFFFF !important;
+                font-weight: 400 !important;
+                font-size: 9.5px !important;
+            }
+
+            .linha-regional-melhorada:nth-child(even) {
+                background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+            }
+
+            .linha-regional-melhorada:nth-child(odd) {
+                background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+            }
+
+            .linha-regional-melhorada:hover {
+                background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
+                transform: none !important;
+            }
+
+            .linha-regional-melhorada td.performance-excelente,
+            .linha-regional-melhorada td.performance-critica {
+                animation: none !important;
+                box-shadow: none !important;
+            }
         </style>
     
         <div class="tabela-container-melhorada">
@@ -18566,7 +19305,7 @@ with tab1:
 
         if not df_exibicao.empty:
             html_tabela_ativados = obter_cache_session_dashboard(
-                "html_tabela_ativados_regional",
+                "html_tabela_ativados_regional_v3",
                 serializar_dataframe_cache(df_exibicao),
                 lambda: criar_tabela_html(df_exibicao),
                 max_variacoes=1
@@ -19907,6 +20646,75 @@ with tab2:
                         border-left: 1px solid rgba(90, 98, 104, 0.08) !important;
                         border-right: 1px solid rgba(90, 98, 104, 0.08) !important;
                     }
+
+                    /* Pedidos parity override: visual mais clean e harmônico */
+                    .tabela-container-desativados {
+                        overflow-x: auto !important;
+                        background: #FFFFFF !important;
+                        border: 2px solid #790E09 !important;
+                        border-radius: 10px !important;
+                        box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15) !important;
+                    }
+
+                    .tabela-desativados {
+                        width: max-content !important;
+                        min-width: 100% !important;
+                        table-layout: auto !important;
+                        font-size: 9px !important;
+                        line-height: 1.04 !important;
+                    }
+
+                    .tabela-desativados th {
+                        background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+                        color: #FFFFFF !important;
+                        font-weight: 600 !important;
+                        padding: 5px 4px !important;
+                        border-bottom: 3px solid #5A0A06 !important;
+                        border-right: 1px solid #FFFFFF !important;
+                        letter-spacing: 0.5px !important;
+                    }
+
+                    .tabela-desativados td {
+                        padding: 3.6px 4px !important;
+                        font-size: 9.3px !important;
+                        line-height: 1.12 !important;
+                        font-weight: 400 !important;
+                        border-bottom: 1px solid #FFFFFF !important;
+                        border-right: 1px solid #FFFFFF !important;
+                        white-space: nowrap !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                        box-shadow: none !important;
+                    }
+
+                    .tabela-desativados tr:not(.linha-total-desativados) td:first-child {
+                        font-weight: 400 !important;
+                        color: #333333 !important;
+                        background: transparent !important;
+                        text-align: left !important;
+                    }
+
+                    .linha-total-desativados td,
+                    .linha-total-desativados td:first-child {
+                        background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+                        color: #FFFFFF !important;
+                        font-weight: 400 !important;
+                        font-size: 9.5px !important;
+                    }
+
+                    .linha-regional-desativados:nth-child(even) {
+                        background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+                    }
+
+                    .linha-regional-desativados:nth-child(odd) {
+                        background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+                    }
+
+                    .linha-regional-desativados:hover {
+                        background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                        box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
+                        transform: none !important;
+                    }
                 </style>
             
                 <div class="tabela-container-desativados">
@@ -19977,7 +20785,7 @@ with tab2:
                 return html
         
             html_tabela_desativados = obter_cache_session_dashboard(
-                "html_tabela_desativados_regional",
+                "html_tabela_desativados_regional_v3",
                 serializar_dataframe_cache(df_exibicao),
                 lambda: criar_tabela_html_desativados(df_exibicao),
                 max_variacoes=1
@@ -23595,7 +24403,7 @@ with tab4:
                             }
                         
                             .highlight-animation {
-                                animation: highlight 2s ease;
+                                animation: none !important;
                             }
 
                             /* Unified table visual override */
@@ -23631,6 +24439,75 @@ with tab4:
 
                             .linha-total-ligacoes td {
                                 font-weight: 800 !important;
+                            }
+
+                            /* Pedidos parity override: visual mais clean e harmônico */
+                            .tabela-container-ligacoes {
+                                overflow-x: auto !important;
+                                background: #FFFFFF !important;
+                                border: 2px solid #790E09 !important;
+                                border-radius: 10px !important;
+                                box-shadow: 0 4px 20px rgba(121, 14, 9, 0.15) !important;
+                            }
+
+                            .tabela-ligacoes {
+                                width: max-content !important;
+                                min-width: 100% !important;
+                                table-layout: auto !important;
+                                font-size: 9px !important;
+                                line-height: 1.04 !important;
+                            }
+
+                            .tabela-ligacoes th {
+                                background: linear-gradient(135deg, #790E09 0%, #5A0A06 100%) !important;
+                                color: #FFFFFF !important;
+                                font-weight: 600 !important;
+                                padding: 5px 4px !important;
+                                border-bottom: 3px solid #5A0A06 !important;
+                                border-right: 1px solid #FFFFFF !important;
+                                letter-spacing: 0.5px !important;
+                            }
+
+                            .tabela-ligacoes td {
+                                padding: 3.6px 4px !important;
+                                font-size: 9.3px !important;
+                                line-height: 1.12 !important;
+                                font-weight: 400 !important;
+                                border-bottom: 1px solid #FFFFFF !important;
+                                border-right: 1px solid #FFFFFF !important;
+                                white-space: nowrap !important;
+                                overflow: hidden !important;
+                                text-overflow: ellipsis !important;
+                                box-shadow: none !important;
+                            }
+
+                            .tabela-ligacoes tr:not(.linha-total-ligacoes) td:first-child {
+                                font-weight: 400 !important;
+                                color: #333333 !important;
+                                background: transparent !important;
+                                text-align: left !important;
+                            }
+
+                            .linha-total-ligacoes td,
+                            .linha-total-ligacoes td:first-child {
+                                background: linear-gradient(135deg, #5A0A06 0%, #3D0704 100%) !important;
+                                color: #FFFFFF !important;
+                                font-weight: 400 !important;
+                                font-size: 9.5px !important;
+                            }
+
+                            .linha-regional-ligacoes:nth-child(even) {
+                                background: linear-gradient(135deg, #FCFCFD 0%, #F7F8FA 100%) !important;
+                            }
+
+                            .linha-regional-ligacoes:nth-child(odd) {
+                                background: linear-gradient(135deg, #FFFFFF 0%, #FAFBFC 100%) !important;
+                            }
+
+                            .linha-regional-ligacoes:hover {
+                                background: linear-gradient(135deg, #FFF6F3 0%, #FAF0ED 100%) !important;
+                                box-shadow: inset 0 0 0 1px rgba(162, 59, 54, 0.12) !important;
+                                transform: none !important;
                             }
                         </style>
                     
@@ -23758,7 +24635,8 @@ with tab4:
                         df_fmt_json: str,
                         df_num_json: str,
                         meses_lista_json: str,
-                        mes_foco_cache: str
+                        mes_foco_cache: str,
+                        style_version_cache: str
                     ) -> str:
                         return criar_tabela_html_ligacoes(
                             desserializar_dataframe_cache(df_fmt_json),
@@ -23771,7 +24649,8 @@ with tab4:
                         serializar_dataframe_cache(df_exibicao_formatado),
                         serializar_dataframe_cache(df_tabela_final),
                         json.dumps(list(meses_tabela), ensure_ascii=False),
-                        str(mes_selecionado)
+                        str(mes_selecionado),
+                        "pedidos_parity_v3"
                     )
                 
                     st.markdown(tabela_html, unsafe_allow_html=True)
@@ -23931,6 +24810,289 @@ with tab5:
                             st.session_state["obs_resultado_canais"] = ""
                             save_obs_resultado("")
                             st.success("Observações removidas.")
+
+            st.markdown(
+                build_visual_title_html(
+                    "CONVERGÊNCIA",
+                    "target",
+                    subtitle="EFICIÊNCIA DE VENDA COMBINADA FIXA + CONTA",
+                    extra_style="margin-top:8px;"
+                ),
+                unsafe_allow_html=True
+            )
+
+            convergencia_path_obj = Path(CONVERGENCIA_FILE_PATH)
+            convergencia_mtime = convergencia_path_obj.stat().st_mtime if convergencia_path_obj.exists() else None
+            df_convergencia = load_convergencia_data(str(CONVERGENCIA_FILE_PATH), convergencia_mtime)
+
+            st.markdown(
+                """
+                <style>
+                .conv-kpi-block .kpi-value-dinamico {
+                    font-size: clamp(1.45rem, 2.2vw, 2.2rem) !important;
+                }
+                .conv-kpi-main-label {
+                    margin-top: -0.2rem;
+                    color: #6B5C59;
+                    font-size: 0.68rem;
+                    font-weight: 700;
+                    text-align: center;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                }
+                .conv-kpi-line {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 0.35rem;
+                    margin-top: 0.38rem;
+                    color: #3E454E;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    min-width: 0;
+                }
+                .conv-kpi-line-compact {
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: 0.24rem;
+                    margin-top: 0.45rem;
+                }
+                .conv-kpi-chip {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.16rem;
+                    min-width: 0;
+                    flex: 1 1 auto;
+                    padding: 0.16rem 0.3rem;
+                    border-radius: 999px;
+                    border: 1px solid rgba(121, 14, 9, 0.12);
+                    background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%);
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.92);
+                    white-space: nowrap;
+                }
+                .conv-kpi-chip-label {
+                    color: #790E09;
+                    font-weight: 800;
+                }
+                .conv-kpi-chip-value {
+                    color: #263241;
+                    font-weight: 800;
+                }
+                .conv-kpi-chip-sep {
+                    color: #8A8F98;
+                    font-weight: 800;
+                }
+                .conv-kpi-chip-pct {
+                    color: #5A6268;
+                    font-weight: 800;
+                }
+                .conv-kpi-grid-single {
+                    grid-template-columns: 1fr !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if df_convergencia.empty:
+                st.info("Base de convergência não encontrada ou sem dados válidos para montar os visuais.")
+            else:
+                df_convergencia_fixa = df_convergencia[
+                    df_convergencia['COD_PLATAFORMA'].astype(str).str.strip().str.upper().eq('FIXA')
+                ].copy()
+                if df_convergencia_fixa.empty:
+                    st.info("Base de convergência sem dados válidos de FIXA para montar os visuais.")
+                else:
+                    meses_convergencia = ordenar_meses_convergencia(df_convergencia_fixa['mes_ano'].dropna().unique().tolist())
+                    if not meses_convergencia:
+                        st.info("Base de convergência sem meses válidos para montar os visuais.")
+                    else:
+                        mes_atual_conv = get_mes_atual_formatado().strip().lower()
+                        mes_default_conv = mes_atual_conv if mes_atual_conv in meses_convergencia else meses_convergencia[-1]
+
+                        ordem_canais_conv = [
+                            'Televendas Ativo',
+                            'Televendas Receptivo',
+                            'S2S+DAC',
+                            'E-Commerce',
+                            'Hospitality',
+                            'Consultivo Remoto',
+                        ]
+                        canais_base_conv = (
+                            df_convergencia_fixa.groupby('CANAL_PLAN', observed=True)['QTDE_CNPJ8']
+                            .sum()
+                            .sort_values(ascending=False)
+                            .index.astype(str)
+                            .tolist()
+                        )
+                        canais_base_ordenados_conv = [
+                            canal for canal in ordem_canais_conv if canal in set(canais_base_conv)
+                        ] + [
+                            canal for canal in canais_base_conv if canal not in set(ordem_canais_conv)
+                        ]
+
+                        col_conv_mes, col_conv_info = st.columns([1.15, 2.85], gap="medium")
+                        with col_conv_mes:
+                            render_filter_label("MÊS DA CONVERGÊNCIA")
+                            mes_convergencia_sel = st.selectbox(
+                                "Mês da convergência",
+                                options=meses_convergencia,
+                                index=meses_convergencia.index(mes_default_conv),
+                                key="mes_convergencia_funil_movel",
+                                label_visibility="collapsed"
+                            )
+                        with col_conv_info:
+                            st.markdown(
+                                f"""
+                                <div class="info-box" style="margin: 21px 0 0 0; padding: 9px 14px; min-height: 38px; display: flex; align-items: center;">
+                                    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                                        <span style="font-size:13px; color:#333333; font-weight:600;">Visão por cliente:</span>
+                                        <span style="font-size:14px; color:#FF2800; font-weight:800; background:rgba(255,40,0,0.10); padding:6px 15px; border-radius:20px;">
+                                            {escape(str(mes_convergencia_sel))}
+                                        </span>
+                                        <span style="font-size:13px; color:#666666; font-weight:600;">
+                                            Base FIXA | Total = QTDE_CNPJ8 | Percentuais sobre clientes
+                                        </span>
+                                    </div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        df_conv_mes = df_convergencia_fixa[
+                            df_convergencia_fixa['mes_ano'].astype(str).str.strip().str.lower().eq(str(mes_convergencia_sel).strip().lower())
+                        ].copy()
+                        df_conv_cards = agregar_convergencia_metricas(df_conv_mes, ['CANAL_PLAN', 'COD_PLATAFORMA'])
+                        mapa_cards_conv = {
+                            (str(row['CANAL_PLAN']).strip(), str(row['COD_PLATAFORMA']).strip().upper()): row.to_dict()
+                            for _, row in df_conv_cards.iterrows()
+                        }
+                        canais_presentes_conv = (
+                            df_conv_mes.groupby('CANAL_PLAN', observed=True)['QTDE_CNPJ8']
+                            .sum()
+                            .sort_values(ascending=False)
+                            .index.astype(str)
+                            .tolist()
+                        )
+                        canais_ordenados_conv = [
+                            canal for canal in ordem_canais_conv if canal in set(canais_presentes_conv)
+                        ] + [
+                            canal for canal in canais_presentes_conv if canal not in set(ordem_canais_conv)
+                        ]
+
+                        st.markdown(
+                            build_visual_title_html("CONVERGÊNCIA - KPI POR CANAL", "target", "subsection-title", extra_style="margin-top:10px;"),
+                            unsafe_allow_html=True
+                        )
+                        if not canais_ordenados_conv:
+                            st.info("Sem dados de convergência FIXA para o mês selecionado.")
+                        else:
+                            for inicio in range(0, len(canais_ordenados_conv), 3):
+                                cols_conv = st.columns(3)
+                                for idx_col, canal_ref in enumerate(canais_ordenados_conv[inicio:inicio + 3]):
+                                    metricas_ref = mapa_cards_conv.get(
+                                        (str(canal_ref).strip(), 'FIXA'),
+                                        {'TOTAL': 0.0, 'LINHAS': 0.0, 'NOVO': 0.0, 'NOVO_NOVO': 0.0, 'CONV': 0.0}
+                                    )
+                                    bloco_html_conv = montar_card_convergencia_html(canal_ref, 'FIXA', metricas_ref)
+                                    with cols_conv[idx_col]:
+                                        st.markdown(
+                                            f'<div class="kpi-card-dinamico animate-fade-in-up" title="Convergência FIXA do canal {escape(str(canal_ref))}">'
+                                            f'{build_kpi_title_html(str(canal_ref), "target")}'
+                                            f'<div class="kpi-grid-dual conv-kpi-grid-single">{bloco_html_conv}</div>'
+                                            '</div>',
+                                            unsafe_allow_html=True
+                                        )
+
+                        st.markdown(
+                            build_visual_title_html("CONVERGÊNCIA POR REGIONAL", "grid", "subsection-title", extra_style="margin-top:16px;"),
+                            unsafe_allow_html=True
+                        )
+                        col_conv_tab_mes, col_conv_tab_canal, col_conv_tab_spacer = st.columns([1.05, 1.35, 2.6], gap="medium")
+                        with col_conv_tab_mes:
+                            render_filter_label("MÊS DA TABELA")
+                            mes_tabela_convergencia_sel = st.selectbox(
+                                "Mês da tabela de convergência",
+                                options=meses_convergencia,
+                                index=meses_convergencia.index(mes_default_conv),
+                                key="mes_convergencia_tabela_funil_movel",
+                                label_visibility="collapsed"
+                            )
+                        with col_conv_tab_canal:
+                            render_filter_label("CANAL DA TABELA")
+                            canal_tabela_convergencia_sel = st.selectbox(
+                                "Canal da tabela de convergência",
+                                options=["Todos"] + canais_base_ordenados_conv,
+                                index=0,
+                                key="canal_convergencia_tabela_funil_movel",
+                                label_visibility="collapsed"
+                            )
+
+                        idx_mes_conv_tabela = (
+                            meses_convergencia.index(mes_tabela_convergencia_sel)
+                            if mes_tabela_convergencia_sel in meses_convergencia
+                            else len(meses_convergencia) - 1
+                        )
+                        meses_tabela_conv = meses_convergencia[max(0, idx_mes_conv_tabela - 2):idx_mes_conv_tabela + 1]
+                        df_conv_tabela = df_convergencia_fixa
+                        if canal_tabela_convergencia_sel != "Todos":
+                            df_conv_tabela = df_conv_tabela[
+                                df_conv_tabela['CANAL_PLAN'].astype(str).str.strip().eq(str(canal_tabela_convergencia_sel).strip())
+                            ]
+                        html_conv_regional = montar_tabela_convergencia_regional_html(df_conv_tabela, meses_tabela_conv)
+                        if html_conv_regional:
+                            st.markdown(html_conv_regional, unsafe_allow_html=True)
+                        else:
+                            st.info("Sem dados para montar a tabela regional de convergência.")
+
+                        st.markdown(
+                            build_visual_title_html("CONVERGÊNCIA POR CANAL", "target", "subsection-title", extra_style="margin-top:16px;"),
+                            unsafe_allow_html=True
+                        )
+                        regionais_base_conv = sorted(
+                            df_convergencia_fixa['REGIONAL'].dropna().astype(str).str.strip().unique().tolist()
+                        )
+                        col_conv_canal_mes, col_conv_canal_reg, col_conv_canal_spacer = st.columns([1.05, 1.35, 2.6], gap="medium")
+                        with col_conv_canal_mes:
+                            render_filter_label("MÊS DA TABELA")
+                            mes_tabela_canal_convergencia_sel = st.selectbox(
+                                "Mês da tabela de convergência por canal",
+                                options=meses_convergencia,
+                                index=meses_convergencia.index(mes_default_conv),
+                                key="mes_convergencia_canal_funil_movel",
+                                label_visibility="collapsed"
+                            )
+                        with col_conv_canal_reg:
+                            render_filter_label("REGIONAL DA TABELA")
+                            regional_tabela_convergencia_sel = st.selectbox(
+                                "Regional da tabela de convergência por canal",
+                                options=["Todas"] + regionais_base_conv,
+                                index=0,
+                                key="regional_convergencia_canal_funil_movel",
+                                label_visibility="collapsed"
+                            )
+
+                        idx_mes_conv_canal = (
+                            meses_convergencia.index(mes_tabela_canal_convergencia_sel)
+                            if mes_tabela_canal_convergencia_sel in meses_convergencia
+                            else len(meses_convergencia) - 1
+                        )
+                        meses_tabela_conv_canal = meses_convergencia[max(0, idx_mes_conv_canal - 2):idx_mes_conv_canal + 1]
+                        df_conv_canal = df_convergencia_fixa
+                        if regional_tabela_convergencia_sel != "Todas":
+                            df_conv_canal = df_conv_canal[
+                                df_conv_canal['REGIONAL'].astype(str).str.strip().eq(str(regional_tabela_convergencia_sel).strip())
+                            ]
+                        html_conv_canal = montar_tabela_convergencia_canal_html(
+                            df_conv_canal,
+                            meses_tabela_conv_canal,
+                            ordem_canais_conv
+                        )
+                        if html_conv_canal:
+                            st.markdown(html_conv_canal, unsafe_allow_html=True)
+                        else:
+                            st.info("Sem dados para montar a tabela por canal de convergência.")
 
 
         def normalizar_texto_chave(valor):
@@ -27163,11 +28325,9 @@ with tab5:
                     df_lig_filt = df_lig_resumo[df_lig_resumo['dat_tratada'] == mes_reg_sel].copy()
                     if canal_reg_sel != "Todos":
                         df_lig_filt = df_lig_filt[df_lig_filt['CANAL_PLAN'] == canal_reg_sel]
-                    df_lig_filt = df_lig_filt[df_lig_filt['COD_PLATAFORMA'] == produto_norm]
                     df_lig_filt_m1 = df_lig_resumo[df_lig_resumo['dat_tratada'] == mes_reg_m1].copy()
                     if canal_reg_sel != "Todos":
                         df_lig_filt_m1 = df_lig_filt_m1[df_lig_filt_m1['CANAL_PLAN'] == canal_reg_sel]
-                    df_lig_filt_m1 = df_lig_filt_m1[df_lig_filt_m1['COD_PLATAFORMA'] == produto_norm]
 
                 regionais_reg = sorted(df_reg['REGIONAL'].dropna().unique().tolist())
                 linhas_saida = []
@@ -27250,7 +28410,6 @@ with tab5:
                         if canal_reg_sel != "Todos":
                             df_lig_calc = df_lig_calc[df_lig_calc['CANAL_PLAN'] == canal_reg_sel]
                         df_lig_calc = df_lig_calc[
-                            (df_lig_calc['COD_PLATAFORMA'] == produto_norm) &
                             (df_lig_calc['REGIONAL'] == reg_ref)
                         ].copy()
                         if not df_lig_calc.empty:
@@ -27717,7 +28876,7 @@ with tab5:
                 return html_regional_produtos_local
 
             html_regional_produtos = obter_cache_session_dashboard(
-                "home_regional_resumo_html_v4",
+                "home_regional_resumo_html_v5",
                 (
                     "regional_resumo",
                     file_mtime,
